@@ -2,8 +2,7 @@ import { TOPOLOGY_CONTRACT_FAMILIES, TOPOLOGY_EXAMPLE_RULES } from "./topology-c
 import { EXECUTION_READINESS_CONTRACT_FAMILIES, EXECUTION_READINESS_EXAMPLE_RULES } from "./execution-readiness-contract-families.mjs";
 import { INTEGRATION_CONTRACT_FAMILIES, INTEGRATION_EXAMPLE_RULES } from "./integration-contract-family.mjs";
 import { EXTERNAL_RUN_PROJECTION_CONTRACT_FAMILIES, EXTERNAL_RUN_PROJECTION_EXAMPLE_RULES } from "./external-run-projection-contract-family.mjs";
-import { INTENT_CONTRACT_FAMILIES, INTENT_EXAMPLE_RULES } from "./intent-contract-families.mjs"; import { RUNNER_OUTPUT_CONTRACT_FAMILIES, RUNNER_OUTPUT_EXAMPLE_RULES } from "./runner-output-contract-families.mjs"; import { TASK_CONTRACT_FAMILIES, TASK_EXAMPLE_RULES } from "./task-contract-families.mjs"; const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
-const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
+import { INTENT_CONTRACT_FAMILIES, INTENT_EXAMPLE_RULES } from "./intent-contract-families.mjs"; import { RUNNER_OUTPUT_CONTRACT_FAMILIES, RUNNER_OUTPUT_EXAMPLE_RULES } from "./runner-output-contract-families.mjs"; import { TASK_CONTRACT_FAMILIES, TASK_EXAMPLE_RULES } from "./task-contract-families.mjs"; const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"]; const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
@@ -26,6 +25,8 @@ const COMPILER_REVISION_LIFECYCLE_VALUES = ["draft", "candidate", "stable", "fro
 const COMPILER_REVISION_STATUS_VALUES = ["ready", "blocked"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
+const DELIVERY_MANIFEST_STATUS_VALUES = ["draft", "submitted", "complete", "partial", "blocked", "failed"];
+const RELEASE_PACKET_STATUS_VALUES = ["draft", "ready-for-close", "released", "blocked", "failed"];
 const ASSET_MODE_VALUES = ["bundled", "materialized"];
 const ONBOARDING_STATUS_VALUES = ["ready", "blocked"];
 const NEXT_ACTION_STATUS_VALUES = ["ready", "blocked"];
@@ -55,7 +56,7 @@ const OPERATOR_REQUEST_INTENT_VALUES = [
   "implement",
   "review",
 ];
-const OPERATOR_REQUEST_STATUS_VALUES = ["created", "running", "completed", "failed", "blocked"];
+const OPERATOR_REQUEST_STATUS_VALUES = ["created", "run-pending", "running", "completed", "failed", "blocked"];
 export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
   "run.started", "parent.started", "parent.updated", "parent.terminal",
@@ -491,7 +492,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       status: "string",
       created_at: "string",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "status", allowedValues: RELEASE_PACKET_STATUS_VALUES }],
   },
   {
     family: "delivery-plan",
@@ -583,7 +584,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       created_at: "string",
       coordination_transaction: "object",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "status", allowedValues: DELIVERY_MANIFEST_STATUS_VALUES }],
   },
   {
     family: "incident-report",
@@ -1126,7 +1127,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
     fieldTypes: {
       request_id: "string",
-      project_id: "string",
+      idempotency_key: "string", project_id: "string",
       version: "number",
       source_surface: "string",
       target_stage: "string",
@@ -1141,7 +1142,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       created_at: "string",
       updated_at: "string",
       result_refs: "array",
-      evidence_refs: "array",
+      evidence_refs: "array", attempt: "number", execution: "object",
     },
     enumChecks: [
       { field: "target_stage", allowedValues: OPERATOR_REQUEST_STAGE_VALUES },
@@ -1166,7 +1167,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       primary: "object",
       required_output_schema_ref: "string", required_output_mode: "string",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "step", allowedValues: ROUTE_STEP_VALUES }],
   },
   {
     family: "wrapper-profile",

@@ -54,6 +54,7 @@ Core lifecycle:
   - aor plan status
 
 Run control:
+  - aor workspace provision
   - aor run start
   - aor run pause
   - aor run resume

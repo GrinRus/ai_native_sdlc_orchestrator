@@ -180,7 +180,7 @@ hard dependencies nor makes any W60 slice done.
 - **State:** done
 - **Remediation priority:** P2
 - **Estimated effort:** L
-- **Primary modules:** `apps/web/src/spa.jsx`, `apps/web/src/spa.css`, extracted
+- **Primary modules:** [spa.jsx snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.jsx), [spa.css snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.css), extracted
   web modules/components, browser tests
 - **Hard dependencies:** W59-S01, W59-S02
 - **Primary user story surfaces:** PBO-09, OPS-01, OPS-10, OPS-11.

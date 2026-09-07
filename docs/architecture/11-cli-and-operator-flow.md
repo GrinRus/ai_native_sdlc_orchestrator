@@ -14,7 +14,7 @@ The guided layer targets the first-run vocabulary defined in `docs/product/02-in
 
 These are wrappers over runtime-owned command families. They must not remove or rename existing grouped commands, and they must keep ids, packet refs, report refs, blockers, and evidence locations visible.
 
-W21-S02 implements the first-run shell for `doctor`, `onboard`, `app`, and `next`. These shortcuts default to human-readable output for installed users and accept `--json` when scripts need machine-readable fields. `onboard` delegates to `project init`; W21-S03 makes that path clean-repo safe by defaulting to bundled registry roots, writing the generated profile under `.aor/`, and emitting an onboarding report. W31-S01 changes the public `aor app` behavior from guidance to a foreground local app launcher backed by the same control-plane routes; `ui attach` and `ui detach` remain lower-level lifecycle commands. `next` writes the deterministic next-action report used by CLI/API/web surfaces.
+W21-S02 implements the first-run shell for `doctor`, `onboard`, `app`, and `next`. These shortcuts default to human-readable output for installed users and accept `--json` when scripts need machine-readable fields. `onboard` delegates to `project init`; the current path uses bundled registry roots and writes the generated profile and onboarding report in central AOR Home. W31-S01 changes the public `aor app` behavior from guidance to a foreground local app launcher backed by the same control-plane routes; `ui attach` and `ui detach` remain lower-level lifecycle commands. `next` writes the deterministic next-action report used by CLI/API/web surfaces.
 
 `aor app` launcher semantics:
 - default host is `127.0.0.1`; default port `0` asks the OS for a free local port;

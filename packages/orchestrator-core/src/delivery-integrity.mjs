@@ -2,6 +2,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { resolveCanonicalContainedPath } from "./shared/canonical-paths.mjs";
+
 function git(cwd, args) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
   if (result.status !== 0) {
@@ -67,13 +69,18 @@ export function captureDeliveryDiff(executionRoot) {
   ]);
 
   for (const repoPath of allPaths) {
-    const absolute = path.resolve(root, repoPath);
-    const relative = path.relative(root, absolute);
-    if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-      throw new Error(`Delivery path '${repoPath}' escapes the execution root.`);
-    }
-    if (fs.existsSync(absolute) && fs.lstatSync(absolute).isSymbolicLink()) {
-      throw new Error(`Delivery path '${repoPath}' is a symbolic link and cannot be authorized.`);
+    const canonicalReference = repoPath.replace(/\/+$/u, "");
+    const resolution = resolveCanonicalContainedPath({
+      root,
+      relativePath: canonicalReference,
+      base: "repository-bound",
+      rejectFinalSymlink: true,
+    });
+    if (!resolution.ok) {
+      const detail = ["symlink-escape", "canonical-escape", "final-symlink"].includes(resolution.reason)
+        ? "symbolic link or canonical escape"
+        : "canonical ownership failure";
+      throw new Error(`Delivery path '${repoPath}' cannot be canonically owned (${detail}: ${resolution.reason}).`);
     }
   }
 

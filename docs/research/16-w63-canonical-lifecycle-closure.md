@@ -9,12 +9,12 @@ renderer until W65.
 
 ## Executable evidence
 
-- Journey contract: `apps/web/browser/fixtures/golden-lifecycle.json`
+- Journey contract: [golden-lifecycle.json snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/fixtures/golden-lifecycle.json)
 - Contract loader and safety allowlist:
-  `apps/web/browser/golden-lifecycle-loader.mjs`
+  [golden-lifecycle-loader.mjs snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/golden-lifecycle-loader.mjs)
 - Installed browser proof: the `canonical no-write lifecycle` case in
-  `apps/web/browser/operator-scenarios.spec.mjs`
-- Production action boundary: `apps/web/src/operator-control.js`
+  [operator-scenarios.spec.mjs snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/operator-scenarios.spec.mjs)
+- Production action boundary: [operator-control.js snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/operator-control.js)
 - Installed acceptance baseline:
   `docs/research/15-w63-installed-console-acceptance.md`
 

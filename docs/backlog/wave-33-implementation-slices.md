@@ -59,13 +59,13 @@ stabilization fixes traceable after the W31/W32 rebase:
 5. W33 is the highest backlog wave.
 
 ### Done evidence
-- `apps/web/test/operator-console.test.mjs`
+- [operator-console.test.mjs snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-console.test.mjs)
 - `scripts/live-e2e/lib/flows.mjs`
 - `scripts/live-e2e/lib/guided-proof.mjs`
 - `scripts/live-e2e/run-profile.mjs`
 - `scripts/live-e2e/profiles/installed-user-guided-journey.yaml`
-- `scripts/test/live-e2e-proof-runner.test.mjs`
-- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-app-smoke.sample.json`
+- `scripts/live-e2e/test/live-e2e-proof-runner.test.mjs`
+- `scripts/live-e2e/fixtures/evidence/w21-s07/installed-user-guided-app-smoke.sample.json`
 - updated README, architecture, ops, product, live E2E, and backlog docs
 
 ### Out of scope
@@ -326,7 +326,7 @@ stabilization fixes traceable after the W31/W32 rebase:
 
 ### Done evidence
 - `apps/web/package.json`
-- `apps/web/test/operator-console.test.mjs`
+- [operator-console.test.mjs snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-console.test.mjs)
 - removed static snapshot module tree
 
 ### Out of scope

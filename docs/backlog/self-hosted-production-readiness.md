@@ -3,11 +3,13 @@
 ## Status
 
 W57-W59 completed remediation and independent requalification of the July 2026
-audit findings, but the later W66 qualification intake invalidated that
-historical bounded self-hosted release clearance. Until W66-S09 closes the
-fresh same-commit Codex/Claude matrix, the machine-readable gate returns
-`status=blocked`, `gate_execution_status=pass`,
-`release_disposition=audit-hold`, and `release_clearance=false`.
+audit findings, but the later W66 qualification intake and post-W70 W71 audit
+disposition keep that historical bounded self-hosted release clearance closed.
+Until W71 findings close and W66-S09 closes the fresh same-commit Codex/Claude
+matrix, the machine-readable gate returns `status=blocked`,
+`gate_execution_status=pass`, `release_disposition=audit-hold`, and
+`release_clearance=false`. The active W71 registry is
+`docs/research/26-w71-audit-disposition.json`.
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -69,9 +71,10 @@ not override the active W66 qualification hold.
 - `partial`
 - `blocked`
 
-The W59-S07 matrix records `baseline-covered=108`, `proof-covered=4`,
-`partial=2`, and `blocked=2`. FIN-03 now cites the final audit closure and
-independent S1 review. PBO-10 and OPS-12 remain partial, and OpenCode
+The current W71 matrix records `baseline-covered=102`, `proof-covered=4`,
+`partial=8`, and `blocked=2`. FIN-03 cites the final audit closure and
+independent S1 review. PBO-10 and OPS-12 remain partial, W62 multirepo claims
+are explicitly partial until public provision/integration exists, and OpenCode
 certification stories remain blocked.
 
 The current sanitized production proof fixture is configured by `pnpm production:ready`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.

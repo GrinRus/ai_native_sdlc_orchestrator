@@ -2,11 +2,11 @@
 
 This document is the normative UI source of truth for W70. Product, API,
 browser-proof, and migration work must use Task-first vocabulary and the
-server-owned projection rules below; screenshots and legacy Quiet Cockpit
-renderers are compatibility evidence only.
+server-owned projection rules below. Historical renderer contracts are retained
+in Git history and do not define the packaged surface.
 
-Status: W70 target product and visual contract; successor to the shipped Quiet
-Cockpit presentation after W69 closes.
+Status: implemented W70 Task Workspace product and visual baseline. W71 owns
+post-W70 runtime remediation and current integrated installed-lifecycle proof.
 
 ## Product outcome
 
@@ -48,6 +48,24 @@ The default journey is:
 The migration removes duplicate navigation and presentation concepts. It does
 not merge runtime mutations, discard evidence types, or move lifecycle state
 into the browser.
+
+## Runtime-owned actions
+
+Action labels describe their actual effect. Controls consume the structured
+`operator_control` projection in the [next-action report](../contracts/next-action-report.md);
+CLI command text is diagnostic and must not be parsed to select browser behavior.
+Unknown, unavailable, or stale actions remain blocked. Successful mutation
+feedback requires durable control-plane readback for the same Task and revision.
+
+Ask AOR uses the [operator-request contract](../contracts/operator-request.md).
+It preserves the created request identity across run failure and recovery, so a
+retry resumes that request instead of creating another one. Operator requests
+remain distinct from runtime-initiated interaction answers.
+
+Completed Tasks and their internal Flow evidence are immutable. A follow-up
+creates fresh submission and Mission lineage and may cite the completed source
+without modifying it. These requirements remain runtime-owned across every
+presentation change.
 
 ## Screen inventory
 

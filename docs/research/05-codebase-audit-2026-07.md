@@ -496,7 +496,7 @@ effective rule text or an immutable readable attachment.
 
 ### AUD-019 — GET routes and initial SPA load mutate clean projects
 
-**Evidence:** `apps/web/src/spa.jsx:6469-6472,6493-6502`,
+**Evidence:** [spa.jsx:6469-6472,6493-6502 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx),
 `packages/orchestrator-core/src/control-plane/http/http-read-handlers.mjs:143-144`,
 `packages/orchestrator-core/src/control-plane/read-run-projections.mjs:495-500`,
 and
@@ -538,7 +538,7 @@ returns 400.
 **Evidence:** the explicit list in `scripts/test.mjs:1178-1184,1233-1257` does not
 include:
 
-- `apps/web/test/operator-request-spa.test.mjs`;
+- [operator-request-spa.test.mjs snapshot (db995171)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/test/operator-request-spa.test.mjs);
 - `packages/orchestrator-core/test/control-plane-interaction-answer.test.mjs`;
 - `packages/orchestrator-core/test/flow-projections.test.mjs`,
   `packages/orchestrator-core/test/intake-create-cli.test.mjs`,
@@ -753,7 +753,7 @@ compatible.
 
 ### AUD-039 — Console does not implement configured detached/live transport
 
-`apps/web/src/spa.jsx:6229-6233,6616-6625` uses relative HTTP and an eight-request
+[spa.jsx:6229-6233,6616-6625 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx) uses relative HTTP and an eight-request
 poll every five seconds only while one provider state is active. It contains no
 `EventSource` and does not consume `config.control_plane`, `api_base_url`, or the
 UI lifecycle endpoints required by `docs/contracts/control-plane-api.md:683-689`.
@@ -763,7 +763,7 @@ the UI, project switches close old streams, and explicit detach is invoked.
 
 ### AUD-040 — Stale project refresh can overwrite a new selection
 
-`apps/web/src/spa.jsx:6447-6568,6659-6668` applies most project state, packets,
+[spa.jsx:6447-6568,6659-6668 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx) applies most project state, packets,
 runs, and request setters without the selection-version guard used by only flow
 selection/workbench. A slow A refresh can therefore commit after fast B. This is
 `Probable`: the asynchronous state trace is unambiguous, but a deterministic
@@ -773,7 +773,7 @@ renders any A identifier after B becomes current.
 
 ### AUD-041 — Endpoint failures render as empty connected state
 
-`apps/web/src/spa.jsx:6432-6444,6531-6540` turns graph/trace and seven list/report
+[spa.jsx:6432-6444,6531-6540 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx) turns graph/trace and seven list/report
 failures into null/empty values; `:7217` labels connection as connected whenever
 config exists. A 500/offline response is indistinguishable from no evidence.
 Track per-resource loading/error/stale state, retain last-known snapshots, and
@@ -782,7 +782,7 @@ partial/offline errors and never appear as an authoritative empty result.
 
 ### AUD-042 — Multi-item interaction queues expose only the first item
 
-`apps/web/src/spa.jsx:4749-4771,5072-5077` fixes both interaction and decision
+[spa.jsx:4749-4771,5072-5077 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx) fixes both interaction and decision
 workspaces to `[0]`; displayed rows do not select another item. Later pending
 questions/decisions cannot be answered. Add an accessible selected ID and
 per-item draft state. Acceptance: with two entries an operator selects and submits
@@ -790,7 +790,7 @@ each with the correct run/request reference.
 
 ### AUD-043 — Add Project drawer is not an accessible modal
 
-`apps/web/src/spa.jsx:5922-5994` renders the drawer as a complementary region. In
+[spa.jsx:5922-5994 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx) renders the drawer as a complementary region. In
 Chrome's accessibility tree it was not a dialog; focus stayed on the background
 opener, Escape did not close it, and the next Tab reached a background Flow
 selector. Introduce a shared labelled dialog primitive with initial focus,
@@ -800,8 +800,8 @@ widgets also receive APG/native keyboard semantics.
 
 ### AUD-044 — Web gates scan strings instead of exercising behavior
 
-`apps/web/test/operator-console.test.mjs:24-80+`,
-`apps/web/test/operator-request-spa.test.mjs:10-80+`, and
+[operator-console.test.mjs:24-80+ at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/test/operator-console.test.mjs),
+[operator-request-spa.test.mjs:10-80+ at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/test/operator-request-spa.test.mjs), and
 `packages/orchestrator-core/src/operator-cli/app-launcher.mjs:255-294` inspect
 source/bundle markers. Targeted
 web/API tests passed despite automatic initialization, missing live transport,
@@ -871,7 +871,7 @@ same oversized units, and diagnostic analysis recorded:
 
 - `executeFullJourneyFlow`, `scripts/live-e2e/lib/flows.mjs:5108`: complexity 404,
   about 2,552 function lines; file 7,710 lines;
-- `FlowCockpit`, `apps/web/src/spa.jsx:3801`: 215; `App` at `:6190`: 144 and
+- `FlowCockpit`, [spa.jsx:3801 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx): 215; `App` at `:6190`: 144 and
   about 1,218 lines; file 7,409 lines;
 - `executeRoutedStep`, `packages/orchestrator-core/src/step-execution-engine.mjs:1019`:
   147 and about 748 lines;
@@ -949,7 +949,7 @@ modules and public removal is covered by an export-surface test.
 
 ### AUD-054 — UI displays a stale hard-coded version
 
-`apps/web/src/spa.jsx:7183-7189` displays `v0.4.2`; the package is
+[spa.jsx:7183-7189 at audit baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/db9951718083804bab1e1e4028a8a713bd2ec574/apps/web/src/spa.jsx) displays `v0.4.2`; the package is
 `0.1.0-alpha.15`, and app config already supplies the version. Render
 `config.version` with a fallback. Acceptance: the installed browser UI matches the
 package manifest in release smoke.

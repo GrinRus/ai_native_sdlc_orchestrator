@@ -23,7 +23,7 @@ import {
   isLiveE2eControllerStop,
   resolveLiveE2eCommandStep,
 } from "./step-controller.mjs";
-import { DEFAULT_BACKLOG_REFS, createProofRunnerEnvironment, createSessionRoots } from "./profile-catalog.mjs";
+import { createProofRunnerEnvironment, createSessionRoots } from "./profile-catalog.mjs";
 import {
   buildGuidedJourneyProof,
   isGuidedJourneyEnabled,
@@ -37,8 +37,8 @@ import {
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
 import { materializeAndAttachDependencySnapshot, resolveStabilizedSetupCommands } from "./dependency-snapshot.mjs";
-import { deriveBrowserCacheKey, prepareBrowserCachePreflight } from "./browser-cache.mjs";
-import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
+import { prepareBrowserCachePreflight } from "./browser-cache.mjs";
+import { runLiveAdapterPreflight } from "./preflight.mjs";
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 import { deriveGuidedFollowUpMissionId } from "./guided-flow-identity.mjs";
 import { runGuidedBrowserTaskCollector } from "./browser-proof-collector.mjs";
@@ -49,6 +49,7 @@ import {
   materializeBrowserEvidenceIndex,
   validateInstalledBrowserProof,
 } from "./installed-browser-proof.mjs";
+import { evaluateArtifactConsistency } from "./artifact-consistency.mjs";
 
 export { computeSourceTreeDigest, sourceInstallCacheMatches } from "./source-tree-identity.mjs";
 
@@ -1275,16 +1276,6 @@ function getStringField(payload, field) {
 function getStringArrayField(payload, field) {
   if (!payload) return [];
   return asStringArray(payload[field]);
-}
-
-/**
- * @param {Record<string, unknown>} profile
- * @returns {string[]}
- */
-function getBacklogRefs(profile) {
-  const learningLoop = asRecord(profile.learning_loop);
-  const refs = asStringArray(learningLoop.backlog_refs);
-  return refs.length > 0 ? refs : [...DEFAULT_BACKLOG_REFS];
 }
 
 /**
@@ -4076,29 +4067,6 @@ function evaluateScenarioCoverage(options) {
  * @param {unknown} value
  * @returns {unknown}
  */
-function sortJsonValue(value) {
-  if (Array.isArray(value)) {
-    return value.map((entry) => sortJsonValue(entry));
-  }
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
-      Object.entries(/** @type {Record<string, unknown>} */ (value))
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, sortJsonValue(entry)]),
-    );
-  }
-  return value;
-}
-
-/**
- * @param {unknown} left
- * @param {unknown} right
- * @returns {boolean}
- */
-function jsonEquivalent(left, right) {
-  return JSON.stringify(sortJsonValue(left)) === JSON.stringify(sortJsonValue(right));
-}
-
 /**
  * @param {string} cwd
  * @returns {string | null}
@@ -4193,126 +4161,6 @@ function resolveEffectiveTargetBaselineStatus(artifacts, observedStatus) {
     postRunOutputQualityFailures.length === 0
     ? "pass"
     : observedStatus;
-}
-
-/**
- * @param {{
- *   label: string,
- *   field: string,
- *   expected: Record<string, unknown>,
- *   actual: Record<string, unknown>,
- *   findings: string[],
- * }} options
- */
-function compareArtifactObject(options) {
-  if (!hasObjectFields(options.actual)) {
-    options.findings.push(`Artifact consistency mismatch: ${options.label}.${options.field} is missing.`);
-    return;
-  }
-  if (!jsonEquivalent(options.actual, options.expected)) {
-    options.findings.push(`Artifact consistency mismatch: ${options.label}.${options.field} differs from summary.`);
-  }
-}
-
-/**
- * @param {{
- *   artifacts: Record<string, unknown>,
- *   reviewReport: Record<string, unknown>,
- *   auditPayload: Record<string, unknown>,
- *   runId: string,
- * }} options
- */
-function evaluateArtifactConsistency(options) {
-  /** @type {string[]} */
-  const findings = [];
-  const expectedMatrixCell = asRecord(options.artifacts.matrix_cell);
-  const expectedCoverageFollowUp = asRecord(options.artifacts.coverage_follow_up);
-  const reviewFeatureTraceability = asRecord(options.reviewReport.feature_traceability);
-  const auditRecords = Array.isArray(options.auditPayload.run_audit_records)
-    ? options.auditPayload.run_audit_records.map((record) => asRecord(record))
-    : [];
-  const auditRecord =
-    auditRecords.find((record) => asNonEmptyString(record.run_id) === options.runId) || auditRecords[0] || {};
-  const learningHandoffFile = asNonEmptyString(options.artifacts.learning_loop_handoff_file);
-  const learningScorecardFile = asNonEmptyString(options.artifacts.learning_loop_scorecard_file);
-  const learningHandoff = learningHandoffFile && fileExists(learningHandoffFile) ? readJson(learningHandoffFile) : {};
-  const learningScorecard =
-    learningScorecardFile && fileExists(learningScorecardFile) ? readJson(learningScorecardFile) : {};
-
-  if (!hasObjectFields(expectedMatrixCell)) {
-    findings.push("Artifact consistency mismatch: summary.matrix_cell is missing.");
-  }
-  if (!hasObjectFields(expectedCoverageFollowUp)) {
-    findings.push("Artifact consistency mismatch: summary.coverage_follow_up is missing.");
-  }
-
-  if (hasObjectFields(expectedMatrixCell)) {
-    compareArtifactObject({
-      label: "review-report.feature_traceability",
-      field: "matrix_cell",
-      expected: expectedMatrixCell,
-      actual: asRecord(reviewFeatureTraceability.matrix_cell),
-      findings,
-    });
-    compareArtifactObject({
-      label: "audit-runs.run_audit_records[0]",
-      field: "matrix_cell",
-      expected: expectedMatrixCell,
-      actual: asRecord(auditRecord.matrix_cell),
-      findings,
-    });
-    compareArtifactObject({
-      label: "learning-loop-handoff",
-      field: "matrix_cell",
-      expected: expectedMatrixCell,
-      actual: asRecord(learningHandoff.matrix_cell),
-      findings,
-    });
-    compareArtifactObject({
-      label: "learning-loop-scorecard",
-      field: "matrix_cell",
-      expected: expectedMatrixCell,
-      actual: asRecord(learningScorecard.matrix_cell),
-      findings,
-    });
-  }
-
-  if (hasObjectFields(expectedCoverageFollowUp)) {
-    compareArtifactObject({
-      label: "review-report.feature_traceability",
-      field: "coverage_follow_up",
-      expected: expectedCoverageFollowUp,
-      actual: asRecord(reviewFeatureTraceability.coverage_follow_up),
-      findings,
-    });
-    compareArtifactObject({
-      label: "audit-runs.run_audit_records[0]",
-      field: "coverage_follow_up",
-      expected: expectedCoverageFollowUp,
-      actual: asRecord(auditRecord.coverage_follow_up),
-      findings,
-    });
-    compareArtifactObject({
-      label: "learning-loop-handoff",
-      field: "coverage_follow_up",
-      expected: expectedCoverageFollowUp,
-      actual: asRecord(learningHandoff.coverage_follow_up),
-      findings,
-    });
-    compareArtifactObject({
-      label: "learning-loop-scorecard",
-      field: "coverage_follow_up",
-      expected: expectedCoverageFollowUp,
-      actual: asRecord(learningScorecard.coverage_follow_up),
-      findings,
-    });
-  }
-
-  return {
-    status: findings.length > 0 ? "fail" : "pass",
-    findings,
-    summary: findings[0] ?? "Full-journey artifact lineage is internally consistent.",
-  };
 }
 
 /**

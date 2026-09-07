@@ -6,11 +6,13 @@ AOR retains the W57-W59 **bounded self-hosted release clearance** as historical
 prerequisite evidence for the declared Node 22 CLI/API, loopback local app, and
 no-upstream-write defaults. W66 has placed current release disposition on
 `audit-hold` until deterministic remediation and fresh same-commit Codex and
-Claude qualification close.
+Claude qualification close. Post-W70 remediation blockers are tracked
+separately in `docs/research/26-w71-audit-disposition.json` and keep
+`release_clearance=false` until W71-S14 freezes the integrated proof.
 
 - CLI and API/control-plane runtime are supported operator surfaces.
 - The npm alpha also includes an optional packaged local web console launched by `aor app`; CLI/API/runtime must remain usable without it.
-- Runtime outputs stay under `.aor/` in the operator workspace and must not be committed.
+- Runtime outputs stay under AOR Home (`~/.aor` or `AOR_HOME`) and must not be committed.
 - Production proof is limited to the committed W25 real-run fixture and the stricter production-readiness gate.
 - W30 alpha-hardening ADRs, OpenAPI route drift checks, and self-hosted operations runbooks are part of the reviewable bounded-mode evidence.
 - W31 installed-user app launch evidence covers the local SPA first-run path without changing the headless runtime boundary.
@@ -32,6 +34,13 @@ Run the baseline repository gate first:
 
 ```bash
 pnpm check
+```
+
+For W71 filesystem or Task-flow changes, run the slim fail-hard bootstrap gate
+before the full repository gate:
+
+```bash
+pnpm remediation:gate
 ```
 
 This writes the ignored test-execution manifest consumed by readiness. Do not
@@ -70,7 +79,7 @@ well-formed audited hold and cannot turn failed evidence into clearance.
 6. Scope bearer principals to the expected project id unless cross-project automation is intentional.
 7. Configure additional redaction values for local secrets before starting connected surfaces.
 8. For installed-user UI validation, launch `aor app --project-ref <repo> on loopback.
-9. For operator-initiated runtime work, use `aor request create/run/status` or the local UI Ask AOR drawer; keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
+9. For operator-initiated runtime work, use `aor request create/run/status`. The active Task's Ask AOR guidance composer creates a `no-write` request but does not run it; execute and inspect it through the request CLI/API. Keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
 10. Keep credentialed provider qualification and real network delivery inside
     the explicitly reviewed W66 profile only. The compatibility flag
     `--unsafe-development-override` is for maintainer development probes and
@@ -112,7 +121,7 @@ Operator requests follow the same delivery-policy vocabulary:
 Rollback is workspace-local for this supported mode:
 
 1. Stop the detached API/web surfaces, including any foreground `aor app` process.
-2. Preserve `.aor/` evidence for audit before cleanup.
+2. Preserve the selected project evidence in AOR Home for audit before cleanup.
 3. Revert or discard local target checkout changes according to the operator's repository policy.
 4. Drop local branches created by `local-branch` delivery only after delivery manifests and audit refs are preserved.
 5. Re-run `pnpm check` and `pnpm production:ready` after restoring the workspace.

@@ -3,6 +3,13 @@
 All families inherit the cross-cutting [canonical identifier, path-scope, and
 reference-base rules](canonical-identifiers-and-paths.md).
 
+Shared mutable local state also follows the [state transaction contract](state-transaction.md).
+
+Evidence bytes and lineage follow the [evidence reference contract](evidence-reference.md).
+
+Filesystem reads, materialization, copy, and cleanup additionally inherit the
+[canonical path ownership rules](canonical-path-ownership.md).
+
 ## Core packets and profiles
 - `workspace-registry.md`
 - `project-profile.md`
@@ -17,6 +24,8 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `intent-submission.md`
 - `intent-normalization-report.md`
 - `task-source-item.md`
+- `task-projection.md`
+- `task-action-catalog.md`
 - `task-runner-selection.md`
 - `task-review.md`
 - `wave-ticket.md`
@@ -79,6 +88,8 @@ Compiled-context and external-runner contracts include context-budget evidence f
 - `learning-loop-handoff.md`
 - `control-plane-api.md`
 - `control-plane-api.openapi.json`
+
+Foundational and qualification references: [canonical-identifiers-and-paths.md](canonical-identifiers-and-paths.md), [canonical-path-ownership.md](canonical-path-ownership.md), [evidence-reference.md](evidence-reference.md), [state-transaction.md](state-transaction.md), [contract-loader-coverage.md](contract-loader-coverage.md), and [w66-adversarial-proof.md](w66-adversarial-proof.md).
 
 ## Loader coverage
 See `contract-loader-coverage.md` for the contract-to-loader mapping table, current limitation status, and W0-S03 reference-integrity failure shapes.

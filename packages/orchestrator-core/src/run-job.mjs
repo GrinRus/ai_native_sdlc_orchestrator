@@ -29,6 +29,16 @@ function assertRunJob(job) {
   if (!validation.ok) throw new Error(`Run job contract validation failed: ${validation.issues.map((issue) => issue.message).join("; ")}`);
 }
 
+export function signalProcessGroup(pid, signal, kill = process.kill) {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    kill(process.platform === "win32" ? pid : -pid, signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function readRunJobFile(file) {
   return fs.existsSync(file) ? readJson(file) : null;
 }

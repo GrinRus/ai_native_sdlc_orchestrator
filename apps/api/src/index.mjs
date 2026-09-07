@@ -28,6 +28,12 @@ export { submitInteractionAnswer } from "./interaction-answer.mjs";
 export { createControlPlaneHttpServer } from "./http-transport.mjs";
 export { createOperatorError, RECOVERY_ACTION_CATALOG } from "../../../packages/orchestrator-core/src/control-plane/operator-error.mjs";
 export {
+  TASK_ACTION_CATALOG,
+  getTaskActionCatalog,
+  getTaskActionDefinition,
+  validateTaskActionPayload,
+} from "../../../packages/orchestrator-core/src/control-plane/task-action-catalog.mjs";
+export {
   applyTopologyAction,
   readProjectTopology,
 } from "../../../packages/orchestrator-core/src/control-plane/topology-management.mjs";
@@ -35,3 +41,7 @@ export {
   applyExecutionProfileAction,
   readExecutionProfile,
 } from "../../../packages/orchestrator-core/src/control-plane/execution-profile.mjs";
+export {
+  provisionProjectWorkspaceSet,
+  readProjectWorkspaceSet,
+} from "../../../packages/orchestrator-core/src/workspace-set-service.mjs";

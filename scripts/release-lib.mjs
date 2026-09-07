@@ -8,6 +8,7 @@ export const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+-alpha\.\d+$/u;
 export const RELEASE_BRANCH_PATTERN = /^release\/v(\d+\.\d+\.\d+-alpha\.\d+)$/u;
 export const RELEASE_VALIDATE_NODE_VERSION = "22.14.0";
 export const RELEASE_PUBLISH_NODE_VERSION = "24.20.0";
+export const SUPPORTED_NODE_ENGINE = ">=22 <23";
 
 const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "apps/cli/bin",
@@ -186,8 +187,8 @@ export function validateReleaseState(options = {}) {
   if (packageJson.bin?.aor !== "apps/cli/bin/aor.mjs") {
     findings.push("package.json bin.aor must point to apps/cli/bin/aor.mjs.");
   }
-  if (packageJson.engines?.node !== ">=22") {
-    findings.push("package.json engines.node must remain >=22.");
+  if (packageJson.engines?.node !== SUPPORTED_NODE_ENGINE) {
+    findings.push(`package.json engines.node must remain ${SUPPORTED_NODE_ENGINE} (the tested Node 22.x range).`);
   }
   if (packageJson.dependencies?.yaml !== "^2.8.1") {
     findings.push("package.json must declare runtime dependency yaml@^2.8.1.");

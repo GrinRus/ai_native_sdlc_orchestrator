@@ -8,6 +8,7 @@ import { scoreEvaluationSuite } from "../../harness/src/scorer-interface.mjs";
 import { createProjectContext, resolveProjectContextReference } from "./control-plane/project-context.mjs";
 import { loadEvaluationRegistry, resolveSuiteWithDataset } from "./evaluation-registry.mjs";
 import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
+import { resolveCanonicalContainedPath } from "./shared/canonical-paths.mjs";
 
 const SUPPORTED_SUBJECT_TYPES = new Set(["run", "wrapper", "route", "adapter"]);
 const SUBJECT_FAMILIES = { wrapper: "wrapper-profile", route: "provider-route-profile", adapter: "adapter-capability-profile" };
@@ -134,13 +135,15 @@ function resolveRegistryFixturePath(registryRoot, reference) {
   const segments = reference.split("/");
   if (segments.some((segment) => !segment || segment === "." || segment === "..")) return null;
   const relativeSegments = segments[0] === "examples" ? segments.slice(1) : segments;
-  const canonicalRoot = fs.realpathSync.native(registryRoot);
-  const candidate = path.join(canonicalRoot, ...relativeSegments);
-  if (!fs.existsSync(candidate)) return null;
-  const canonicalCandidate = fs.realpathSync.native(candidate);
-  const relative = path.relative(canonicalRoot, canonicalCandidate);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
-  return canonicalCandidate;
+  const resolution = resolveCanonicalContainedPath({
+    root: registryRoot,
+    relativePath: relativeSegments.join("/"),
+    base: "repository-bound",
+    rejectFinalSymlink: true,
+  });
+  return resolution.ok && resolution.finalExists && resolution.finalStat?.isFile()
+    ? resolution.canonicalPath
+    : null;
 }
 
 function resolveCaseArtifact({ context, reference, family, registryRoot }) {

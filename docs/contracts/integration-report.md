@@ -18,8 +18,17 @@ state, and delivery readiness.
 - `created_at`, `updated_at`
 
 Only patch or commit outputs owned by the same project and parent run are
-accepted. Apply order follows the approved execution DAG. Repository results
-must point at disposable integration roots and never at primary checkouts.
+accepted. A commit output must additionally carry `commit_sha` (an exact
+40-character Git object); the integration workspace verifies its ancestry from
+the authoritative repository base before applying it. Apply order follows the
+approved execution DAG. Repository results must point at disposable
+integration roots and never at primary checkouts.
+
+Integration measures the applied diff and changed paths in the target clone.
+Those values must exactly match the child output evidence and the unit's
+declared `allowed_paths` scope. A mismatch, invalid scope, cross-repository
+object, or digest mismatch blocks the parent rather than being repaired by
+copying client-authored state.
 
 Aggregate gates record verification, review, QA, and Runtime Harness results.
 A parent run cannot pass or become deliverable until every required gate

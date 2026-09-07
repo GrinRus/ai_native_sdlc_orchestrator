@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "purpose": "Temporary, reviewable exceptions for shared mutable state writers while they migrate to the transaction primitive.",
+  "entries": [
+    {
+      "file": "packages/orchestrator-core/src/control-plane/ui-lifecycle.mjs",
+      "match": "fs.writeFileSync(stateFile",
+      "owner": "control-plane/ui-lifecycle",
+      "expires": "2026-12-31",
+      "reason": "UI lifecycle state migration is scheduled after the run-control owner; this writer remains atomic at its current boundary."
+    },
+    {
+      "file": "packages/orchestrator-core/src/multirepo-coordination.mjs",
+      "match": "fs.writeFileSync(statePath",
+      "owner": "multirepo-coordination",
+      "expires": "2026-12-31",
+      "reason": "Multirepo state is owned by W71-S09 and is intentionally out of scope for W71-S05."
+    },
+    {
+      "file": "packages/orchestrator-core/src/operator-request.mjs",
+      "match": "fs.writeFileSync(options.requestFile",
+      "owner": "operator-request",
+      "expires": "2026-12-31",
+      "reason": "Operator-request transaction ownership is a follow-up slice; W71-S05 only consumes its run-control boundary."
+    }
+  ]
+}

@@ -135,14 +135,22 @@ export function validateWorkspaceSet(document, source) {
     if (!/^[0-9a-f]{40}$/u.test(String(repository.resolved_commit ?? ""))) pushTopologyIssue(issues, source, `repositories.${index}.resolved_commit`, "Workspace repository commit must be an exact 40-character Git SHA.", String(repository.resolved_commit));
     if (!string(repository.execution_root)) pushTopologyIssue(issues, source, `repositories.${index}.execution_root`, "Workspace repository execution root is required.");
     const provisioning = record(repository.provisioning);
-    if (!provisioning || !["detached-worktree", "independent-clone"].includes(String(provisioning.strategy)) || !["ready", "failed", "cleaned"].includes(String(provisioning.state))) {
-      pushTopologyIssue(issues, source, `repositories.${index}.provisioning`, "Workspace repository provisioning must declare a supported strategy and state.");
+    if (!provisioning || !["detached-worktree", "independent-clone"].includes(String(provisioning.strategy)) || !["planned", "ready", "failed", "cleaned"].includes(String(provisioning.state))) {
+      pushTopologyIssue(issues, source, `repositories.${index}.provisioning`, "Workspace repository provisioning must declare a supported strategy and state (planned, ready, failed, or cleaned).");
     }
     const identity = string(repository.resolved_identity);
     if (identity && string(repository.access_mode) !== "read-only") {
-      const scope = JSON.stringify(repository.write_scope ?? []);
-      if (writableIdentities.get(identity) === scope) pushTopologyIssue(issues, source, `repositories.${index}.write_scope`, `Shared repository '${identity}' has an unsafe overlapping write scope.`, scope);
-      writableIdentities.set(identity, scope);
+      const scope = normalizePathScope(repository.write_scope ?? []);
+      if (!scope.ok) {
+        pushTopologyIssue(issues, source, `repositories.${index}.write_scope`, "Workspace write scope must use canonical path patterns.", String(repository.write_scope));
+      } else {
+        const existing = writableIdentities.get(identity) ?? [];
+        const overlaps = existing.some((candidate) =>
+          scope.patterns.some((left) => candidate.some((right) => pathScopesOverlap(left, right))),
+        );
+        if (overlaps) pushTopologyIssue(issues, source, `repositories.${index}.write_scope`, `Shared repository '${identity}' has an unsafe overlapping write scope.`, JSON.stringify(scope.patterns));
+        writableIdentities.set(identity, [...existing, scope.patterns]);
+      }
     }
   }
   const cleanup = record(document.cleanup);
@@ -153,4 +161,5 @@ export function validateWorkspaceSet(document, source) {
 }
 import path from "node:path";
 
+import { normalizePathScope, pathScopesOverlap } from "./canonical-values.mjs";
 import { isPlainObject, issue } from "./utils.mjs";

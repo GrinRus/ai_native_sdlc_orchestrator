@@ -17,13 +17,6 @@ import {
 } from "./common.mjs";
 import { getProfileStages } from "./stages.mjs";
 
-export const DEFAULT_BACKLOG_REFS = Object.freeze([
-  "docs/backlog/mvp-implementation-backlog.md",
-  "docs/backlog/mvp-roadmap.md",
-  "scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md",
-]);
-
-
 /**
  * @param {string} hostRoot
  * @returns {string}
@@ -72,7 +65,7 @@ export function ensureRuntimeLayout(options) {
     ? path.isAbsolute(options.runtimeRootOverride)
       ? options.runtimeRootOverride
       : path.resolve(options.hostRoot, options.runtimeRootOverride)
-    : path.join(options.hostRoot, ".aor");
+    : path.resolve(process.env.AOR_HOME?.trim() || path.join(os.homedir(), ".aor"));
   const projectRuntimeRoot = path.join(runtimeRoot, "projects", options.hostProjectId);
   const reportsRoot = path.join(projectRuntimeRoot, "reports");
   const stateRoot = path.join(projectRuntimeRoot, "state");

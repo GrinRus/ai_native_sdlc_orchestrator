@@ -9,6 +9,7 @@ import { loadContractFile, validateContractDocument, validatePublicId } from "..
 import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 import { deriveWorkspaceProjectId, resolveAorHome, toLogicalEvidenceRef } from "./aor-home.mjs";
+import { copyCanonicalContainedPath, readCanonicalContainedFile, removeCanonicalContainedPath } from "./shared/canonical-paths.mjs";
 
 const DEFAULT_BOOTSTRAP_TEMPLATE_ID = "github-default";
 const DEFAULT_PROFILE_CANDIDATES = [
@@ -957,11 +958,8 @@ function createStagingRuntimeLayout(finalLayout) {
   if (fs.existsSync(finalLayout.projectRuntimeRoot)) {
     for (const entry of fs.readdirSync(finalLayout.projectRuntimeRoot)) {
       if (entry === "workspaces") continue;
-      fs.cpSync(
-        path.join(finalLayout.projectRuntimeRoot, entry),
-        path.join(stagingProjectRuntimeRoot, entry),
-        { recursive: true, force: false, errorOnExist: false, preserveTimestamps: true },
-      );
+      const copied = copyCanonicalContainedPath({ sourceRoot: finalLayout.projectRuntimeRoot, sourceRelativePath: entry, targetRoot: stagingProjectRuntimeRoot, targetRelativePath: entry, options: { recursive: true, force: false, errorOnExist: false, preserveTimestamps: true } });
+      if (!copied.ok) throw new Error(`Runtime staging source '${entry}' is not canonically owned (${copied.reason}).`);
     }
   }
   const stagingLayout = {
@@ -981,9 +979,14 @@ function createStagingRuntimeLayout(finalLayout) {
 
 function cleanupOwnedStagingTree(transaction) {
   if (!fs.existsSync(transaction.ownerMarker)) return;
-  const marker = JSON.parse(fs.readFileSync(transaction.ownerMarker, "utf8"));
+  const markerRoot = path.dirname(transaction.stagingLayout.projectRuntimeRoot);
+  const markerRelative = path.relative(markerRoot, transaction.ownerMarker).split(path.sep).join("/");
+  const markerRead = readCanonicalContainedFile({ root: markerRoot, relativePath: markerRelative, base: "repository-bound", maxBytes: 32 * 1024 });
+  if (!markerRead.ok) return;
+  const marker = JSON.parse(markerRead.bytes.toString("utf8"));
   if (marker.transaction_id !== transaction.transactionId) return;
-  fs.rmSync(transaction.stagingLayout.projectRuntimeRoot, { recursive: true, force: true });
+  const removal = removeCanonicalContainedPath({ root: markerRoot, target: transaction.stagingLayout.projectRuntimeRoot });
+  if (!removal.ok) throw new Error(`Runtime staging cleanup refused its owned root (${removal.reason}).`);
 }
 
 function publishStagedRuntime(finalLayout, transaction, options = {}) {
@@ -992,11 +995,8 @@ function publishStagedRuntime(finalLayout, transaction, options = {}) {
     injectInitializationFailure(options, "after-backup-rename");
     for (const entry of fs.readdirSync(transaction.stagingLayout.projectRuntimeRoot)) {
       if (entry === path.basename(transaction.ownerMarker) || entry === "workspaces") continue;
-      fs.cpSync(
-        path.join(transaction.stagingLayout.projectRuntimeRoot, entry),
-        path.join(finalLayout.projectRuntimeRoot, entry),
-        { recursive: true, force: true, errorOnExist: false, preserveTimestamps: true },
-      );
+      const copied = copyCanonicalContainedPath({ sourceRoot: transaction.stagingLayout.projectRuntimeRoot, sourceRelativePath: entry, targetRoot: finalLayout.projectRuntimeRoot, targetRelativePath: entry, options: { recursive: true, force: true, errorOnExist: false, preserveTimestamps: true } });
+      if (!copied.ok) throw new Error(`Runtime publication source '${entry}' is not canonically owned (${copied.reason}).`);
     }
     cleanupOwnedStagingTree(transaction);
     return;
@@ -1014,7 +1014,8 @@ function publishStagedRuntime(finalLayout, transaction, options = {}) {
     }
     throw error;
   }
-  fs.rmSync(path.join(finalLayout.projectRuntimeRoot, path.basename(transaction.ownerMarker)), { force: true });
+  const markerRemoval = removeCanonicalContainedPath({ root: finalLayout.projectRuntimeRoot, target: path.join(finalLayout.projectRuntimeRoot, path.basename(transaction.ownerMarker)) });
+  if (!markerRemoval.ok) throw new Error(`Runtime owner marker cleanup failed (${markerRemoval.reason}).`);
 }
 
 /**

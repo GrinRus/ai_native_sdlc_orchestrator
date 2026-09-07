@@ -4,26 +4,28 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 26,
-    "source_manifest_sha256": "99f8fc1bff30b017f4f5720c90222a1766216fc8865adf1fbc423c59f4a6dbcb"
+    "source_file_count": 29,
+    "source_manifest_sha256": "18358e3248b3afe06d9d312b1b5285e99f1dee917ec246f7f68b4fc578b16951"
   },
   "files": {
-    "canonical-values.mjs": "d38defd8b6eb9380d53b306bc07b55a8ee84013e084d4d123d8b89f8115b5650",
+    "canonical-values.mjs": "46b098e0ba673b2bfc6d82ee3bdd71ed5920ab85c5e03b3ada51479a25933c98",
     "context-size-validation.mjs": "47ee7e5e42ed36feaaa17706351e7b8f9d38974bf0d597305c3bb0c83282a8c5",
+    "delivery-contract-validation.mjs": "b3f412e88540e167b5873b23137c5f120521d178a7b466a9e60b9de784959775",
+    "evidence-reference.mjs": "1f1c29f069dad5eb7d0f77e1683b29e0f3d18b8ac849ba95df26fe3d6e30e625",
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
     "example-reference-validation.mjs": "2e392196356e875248078cea3d2ef4c1ffc909eea21411be636654a62a26365d",
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "78da2f0abb318019165a4f36e950f4bf5335c5e44f8fa15fc82556c5836c8729",
-    "index.d.ts": "d083d8858b59e722464427dd2a64b747ecbc5d02b85ab80687bf14207becb1ee",
-    "index.mjs": "0631348368f1288c1116ce6af4e41edda2a4667b5fc4d04f10a61779a7093f15",
+    "families.mjs": "41bf8f87bec1bccce0b7c61624e8be36cae45f78975574fad486d1065f5cc871",
+    "index.d.ts": "aa257b7602222af64b4b3a5c963f8475aea9c541b1179f23ed4e531dbc0ffb3b",
+    "index.mjs": "7139b31f836d42ccfd725f777bed9ba5145401bc97915f68559ea577d8b0159b",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
-    "loader.mjs": "089a787ef78d418fd13ce00a60daf2f5c124ec09b63776619a2840e651093b06",
+    "loader.mjs": "3ec905ab65481280f76976241ba83963a4d990aac770e177a82445bb70ecf409",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
-    "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
+    "project-topology.mjs": "ee8ab3c944f3513a393a79a9f7a8729ed6308451cf30d9c5dd1dfbbeb1e3ae8b",
     "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",
     "runner-output-contract-families.mjs": "734d4dcf4d0bcbf6810ce0e69435ee191eea6dc238d853c3168c41c293fc76fc",
     "runner-output-validation.mjs": "0c7c6331858b277dcd3cb8785e9e1a308eb4f0f55a56cdb6064cb7e15b36e5d3",
@@ -31,7 +33,8 @@
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
     "structured-task-plan.mjs": "6f6fc9c052a9806d69c285b206fc191dd9431a2eee8b4986036e1c371e21436a",
-    "task-contract-families.mjs": "2164f93ba8608ef667f4b39fc7231acb246e13d73e4505c01c80027072e5a5fc",
+    "task-contract-families.mjs": "c4dd99c32ef3813039b81f6a73460d6af68485a6d766943858f59d242093bb5f",
+    "task-projection-validation.mjs": "6d97496a34ecdde52b6fba2e0d34da34e596c20948d34c5e18e70b42e4df80b0",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
   },
@@ -207,6 +210,86 @@
         "created_at": "string"
       },
       "enumChecks": []
+    },
+    {
+      "family": "task-action-catalog",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/task-action-catalog.md",
+      "exampleGlob": "examples/tasks/task-action-catalog*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "catalog_id",
+        "actions",
+        "readback"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "catalog_id": "string",
+        "actions": "array",
+        "readback": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "task-projection",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/task-projection.md",
+      "exampleGlob": "examples/tasks/task-projection*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "task_id",
+        "project_id",
+        "display_title",
+        "status",
+        "intent_submission_ref",
+        "mission_id",
+        "flow_id",
+        "run_ids",
+        "lineage",
+        "source_items",
+        "attention_items",
+        "review",
+        "completion",
+        "lifecycle_path",
+        "runner_selection",
+        "primary_action",
+        "prepared_contract",
+        "completed_read_only",
+        "read_only"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "task_id": "string",
+        "project_id": "string",
+        "display_title": "string",
+        "status": "string",
+        "run_ids": "array",
+        "lineage": "object",
+        "source_items": "array",
+        "attention_items": "array",
+        "review": "object",
+        "completion": "object",
+        "lifecycle_path": "object",
+        "runner_selection": "object",
+        "primary_action": "object",
+        "prepared_contract": "object",
+        "completed_read_only": "boolean",
+        "read_only": "boolean"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "draft",
+            "prepared",
+            "active",
+            "attention",
+            "completed"
+          ]
+        }
+      ]
     },
     {
       "family": "task-source-item",
@@ -1067,7 +1150,18 @@
         "status": "string",
         "created_at": "string"
       },
-      "enumChecks": []
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "draft",
+            "ready-for-close",
+            "released",
+            "blocked",
+            "failed"
+          ]
+        }
+      ]
     },
     {
       "family": "delivery-plan",
@@ -1174,7 +1268,19 @@
         "created_at": "string",
         "coordination_transaction": "object"
       },
-      "enumChecks": []
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "draft",
+            "submitted",
+            "complete",
+            "partial",
+            "blocked",
+            "failed"
+          ]
+        }
+      ]
     },
     {
       "family": "incident-report",
@@ -2050,6 +2156,7 @@
       ],
       "fieldTypes": {
         "request_id": "string",
+        "idempotency_key": "string",
         "project_id": "string",
         "version": "number",
         "source_surface": "string",
@@ -2065,7 +2172,9 @@
         "created_at": "string",
         "updated_at": "string",
         "result_refs": "array",
-        "evidence_refs": "array"
+        "evidence_refs": "array",
+        "attempt": "number",
+        "execution": "object"
       },
       "enumChecks": [
         {
@@ -2113,6 +2222,7 @@
           "field": "status",
           "allowedValues": [
             "created",
+            "run-pending",
             "running",
             "completed",
             "failed",
@@ -2146,7 +2256,23 @@
         "required_output_schema_ref": "string",
         "required_output_mode": "string"
       },
-      "enumChecks": []
+      "enumChecks": [
+        {
+          "field": "step",
+          "allowedValues": [
+            "discovery",
+            "research",
+            "spec",
+            "planning",
+            "implement",
+            "review",
+            "qa",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      ]
     },
     {
       "family": "wrapper-profile",
@@ -3073,6 +3199,16 @@
       "regex_source": "^examples\\/reports\\/evidence-export-manifest[^/]*\\.ya?ml$",
       "regex_flags": "",
       "family": "evidence-export-manifest"
+    },
+    {
+      "regex_source": "^examples\\/tasks\\/task-action-catalog[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "task-action-catalog"
+    },
+    {
+      "regex_source": "^examples\\/tasks\\/task-projection[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "task-projection"
     },
     {
       "regex_source": "^examples\\/tasks\\/task-source-item[^/]*\\.ya?ml$",

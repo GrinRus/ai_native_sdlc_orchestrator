@@ -8,6 +8,7 @@ import { validateTestExecutionReport } from "./test-discovery.mjs";
 import { checkW59ClosureReport } from "./readiness/w59-closure.mjs";
 import { checkReadinessSourceOfTruth } from "./readiness/source-of-truth.mjs";
 import { checkW66QualificationClosure } from "./readiness/w66-closure.mjs";
+import { checkW71AuditDisposition, DEFAULT_W71_DISPOSITION_PATH } from "./readiness/w71-disposition.mjs";
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultProofFixturePath = path.posix.join(
   "scripts",
@@ -22,7 +23,7 @@ const defaultW57ClosurePath = "docs/research/08-w57-security-reliability-closure
 const defaultW58ClosurePath = "docs/research/09-w58-runtime-quality-closure.json";
 const defaultW59ClosurePath = "docs/research/10-w59-audit-closure.json", defaultW59IndependentReviewPath = "docs/research/11-w59-independent-s1-review.json";
 const defaultW66EvidenceIndexPath = "docs/research/24-w66-live-qualification-evidence-index.json";
-const defaultW66ClosurePath = "docs/research/25-w66-qualification-closure.json";
+const defaultW66ClosurePath = "docs/research/25-w66-qualification-closure.json", defaultW71DispositionPath = DEFAULT_W71_DISPOSITION_PATH;
 const ACTIVE_QUALIFICATION_HOLD = {
   finding_id: "W66-QUALIFICATION",
   state: "in-progress",
@@ -44,15 +45,12 @@ const W58_CLOSURE_FINDINGS = [
 function resolvePath(rootDir, file) {
   return path.isAbsolute(file) ? file : path.join(rootDir, file);
 }
-
 function readText(rootDir, file) {
   return fs.readFileSync(resolvePath(rootDir, file), "utf8");
 }
-
 function readJson(rootDir, file) {
   return JSON.parse(readText(rootDir, file));
 }
-
 function fileExists(rootDir, file) {
   return fs.existsSync(resolvePath(rootDir, file));
 }
@@ -561,7 +559,7 @@ function checkProductionProof(rootDir, proofFixturePath) {
   ]);
 }
 
-function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
+function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath, w71DispositionPath = defaultW71DispositionPath) {
   const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir, storyMatrixPath);
   const findings = [];
   if (rows.size !== 116) {
@@ -644,6 +642,29 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
     if (!/OpenCode/u.test(row.evidence) || !/does not certify|requires future OpenCode/u.test(row.evidence)) {
       findings.push(`${storyId} must explain that W25/W26 production proof does not certify OpenCode.`);
     }
+  }
+
+  if (fileExists(rootDir, w71DispositionPath)) {
+    let disposition;
+    try {
+      disposition = readJson(rootDir, w71DispositionPath);
+    } catch (error) {
+      findings.push(`W71 disposition cannot be read for story alignment: ${error.message}`);
+      disposition = null;
+    }
+    for (const downgrade of Array.isArray(disposition?.story_downgrades) ? disposition.story_downgrades : []) {
+      const row = rows.get(downgrade.story_id);
+      if (!row) {
+        findings.push(`${downgrade.story_id} is missing from the story matrix.`);
+        continue;
+      }
+      if (row.coverageStatus !== downgrade.to) findings.push(`${downgrade.story_id} must be ${downgrade.to} after W71 disposition.`);
+      for (const ownerSlice of downgrade.owner_slices ?? []) {
+        if (!row.gapSlices.includes(ownerSlice)) findings.push(`${downgrade.story_id} must cite ${ownerSlice} as its W71 gap owner.`);
+      }
+    }
+  } else {
+    findings.push(`${w71DispositionPath} is missing; story status cannot be checked against W71 disposition.`);
   }
 
   if (findings.length > 0) {
@@ -930,7 +951,9 @@ export function runProductionReadinessGate(options = {}) {
   const w59ClosurePath = options.w59ClosurePath ?? defaultW59ClosurePath, w59IndependentReviewPath = options.w59IndependentReviewPath ?? defaultW59IndependentReviewPath;
   const w66EvidenceIndexPath = options.w66EvidenceIndexPath ?? defaultW66EvidenceIndexPath;
   const w66ClosurePath = options.w66ClosurePath ?? defaultW66ClosurePath;
+  const w71DispositionPath = options.w71DispositionPath ?? defaultW71DispositionPath;
   const auditLedgerCheck = checkAuditRemediationLedger(rootDir, auditLedgerPath);
+  const w71DispositionCheck = checkW71AuditDisposition(rootDir, w71DispositionPath);
   const w66ClosureCheck = checkW66QualificationClosure({
     rootDir,
     closureReportPath: w66ClosurePath,
@@ -938,13 +961,14 @@ export function runProductionReadinessGate(options = {}) {
   });
   const checks = [
     auditLedgerCheck,
+    w71DispositionCheck,
     checkW57ClosureReport(rootDir, auditLedgerPath, w57ClosurePath),
     checkW58ClosureReport(rootDir, auditLedgerPath, w58ClosurePath),
     checkW59ClosureReport({ rootDir, auditLedgerPath, closureReportPath: w59ClosurePath, independentReviewPath: w59IndependentReviewPath }),
     w66ClosureCheck,
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
-    checkStoryHonesty(rootDir, storyMatrixPath),
+    checkStoryHonesty(rootDir, storyMatrixPath, w71DispositionPath),
     checkReadinessSourceOfTruth(rootDir),
     checkAuthHardening(rootDir),
     checkContractAndHarnessEvidence(rootDir),
@@ -956,7 +980,8 @@ export function runProductionReadinessGate(options = {}) {
   ];
   const gateExecutionStatus = checks.every((check) => check.status === "pass") ? "pass" : "fail";
   const blockingInvariants = [
-    ...(auditLedgerCheck.blocking_invariants ?? []),
+    ...(Array.isArray(auditLedgerCheck.blocking_invariants) ? auditLedgerCheck.blocking_invariants : []),
+    ...(Array.isArray(w71DispositionCheck.blocking_invariants) ? w71DispositionCheck.blocking_invariants : []),
     ...(w66ClosureCheck.qualified ? [] : [ACTIVE_QUALIFICATION_HOLD]),
   ];
   const releaseDisposition = gateExecutionStatus === "fail" ? "unknown" : blockingInvariants.length > 0 ? "audit-hold" : "cleared";
@@ -971,6 +996,7 @@ export function runProductionReadinessGate(options = {}) {
     proof_fixture_path: proofFixturePath,
     openapi_path: openApiPath,
     remediation_ledger_path: auditLedgerPath,
+    w71_disposition_path: w71DispositionPath,
     remediation_closure_reports: {
       W57: w57ClosurePath,
       W58: w58ClosurePath,
@@ -987,6 +1013,7 @@ function parseArgs(argv) {
     proofFixturePath: defaultProofFixturePath,
     openApiPath: defaultOpenApiPath,
     auditLedgerPath: defaultAuditLedgerPath,
+    w71DispositionPath: defaultW71DispositionPath,
     expectAuditHold: false,
     allowAuditHold: false,
     requireTestEvidence: true,
@@ -1005,6 +1032,9 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--audit-ledger") {
       args.auditLedgerPath = argv[index + 1];
+      index += 1;
+    } else if (arg === "--w71-disposition") {
+      args.w71DispositionPath = argv[index + 1];
       index += 1;
     } else if (arg === "--json") {
       args.json = true;

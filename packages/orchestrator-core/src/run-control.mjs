@@ -3,7 +3,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 
 import { normalizeIdentifierFragment, validatePublicId } from "../../contracts/src/index.mjs";
-import { redactSensitiveValue, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
+import {
+  redactSensitiveValue,
+  readJsonState,
+  updateJsonState,
+  withFileLock,
+  writeJsonAtomic,
+} from "../../observability/src/index.mjs";
 import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
 import { toLogicalEvidenceRef } from "./aor-home.mjs";
@@ -90,7 +96,7 @@ function toEvidenceRef(projectRoot, filePath) {
  * @returns {Record<string, unknown>}
  */
 function readJson(filePath) {
-  return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
+  return /** @type {Record<string, unknown>} */ (readJsonState(filePath));
 }
 
 /**
@@ -108,6 +114,19 @@ function writeJson(filePath, payload) {
  */
 function resolveRunControlStateFile(init, runId) {
   return path.join(init.runtimeLayout.stateRoot, `run-control-state-${normalizeId(runId)}.json`);
+}
+
+/**
+ * The per-run lock is shared by operator actions and provider status updates.
+ * Keeping one resolver prevents a heartbeat from racing the control owner.
+ */
+function resolveRunControlStateLock(init, runId) {
+  return path.join(init.runtimeLayout.stateRoot, `run-control-${normalizeId(runId)}.lock`);
+}
+
+function resolveRunControlStateLockFromFile(stateFile) {
+  const basename = path.basename(stateFile).replace(/^run-control-state-/u, "run-control-").replace(/\.json$/u, "");
+  return path.join(path.dirname(stateFile), `${basename}.lock`);
 }
 
 /**
@@ -602,7 +621,7 @@ export function applyRunControlAction(options) {
     error.code = "run-control-revision-invalid";
     throw error;
   }
-  const lockDirectory = path.join(init.runtimeLayout.stateRoot, `run-control-${normalizeId(runId)}.lock`);
+  const lockDirectory = resolveRunControlStateLock(init, runId);
     return withFileLock(lockDirectory, () => {
     const commandDirectory = path.join(init.runtimeLayout.stateRoot, "run-control-commands", normalizeId(runId));
     const commandFile = path.join(commandDirectory, `${normalizeId(commandId)}.json`);
@@ -641,6 +660,35 @@ export function applyRunControlAction(options) {
     return result;
     });
   });
+}
+
+/**
+ * Persist provider-owned status under the same per-run lock as operator
+ * controls. The complete run-control document is read and written atomically,
+ * so a heartbeat cannot roll back pause/resume/steer/cancel fields.
+ */
+export function updateRunControlProviderStepStatus({ stateFile, patch }) {
+  if (typeof stateFile !== "string" || stateFile.trim().length === 0) return null;
+  const normalizedStateFile = stateFile.trim();
+  const nextState = updateJsonState(
+    normalizedStateFile,
+    (current) => {
+      const existing = asRecord(current);
+      const providerStepStatus = mergeProviderStepStatus(asRecord(existing.provider_step_status), patch);
+      return {
+        ...existing,
+        provider_step_status: providerStepStatus,
+        updated_at: providerStepStatus.updated_at,
+      };
+    },
+    {
+      lockDirectory: resolveRunControlStateLockFromFile(normalizedStateFile),
+      fallback: {},
+      incrementRevision: false,
+      quarantine: true,
+    },
+  );
+  return asRecord(nextState.provider_step_status);
 }
 
 /**

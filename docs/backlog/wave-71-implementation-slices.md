@@ -70,7 +70,7 @@ substitutes.
 
 ## W71-S01 — Audit disposition, proof scope, and coordination baseline
 
-- **State:** ready
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-5, EPIC-7
 - **Hard dependencies:** W66-S25, W70-S10
 - **Remediation priority:** P0
@@ -138,7 +138,7 @@ visual/component history.
 
 ## W71-S02 — Symlink-safe path confinement and durable cleanup
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-5
 - **Hard dependencies:** W71-S01
 - **Remediation priority:** P0
@@ -196,7 +196,7 @@ restart cannot escape or misreport ownership.
 
 ## W71-S03 — Deterministic repository gate and dependency/process safety
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-5, EPIC-7
 - **Hard dependencies:** W71-S02
 - **Remediation priority:** P0
@@ -255,7 +255,7 @@ commands, and expose actual lint/type/test coverage.
 
 ## W71-S04 — Versioned Task contract and execution-route truth
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W71-S03
 - **Remediation priority:** P0
@@ -313,7 +313,7 @@ server-owned actions; preserve additive compatibility for existing clients.
 
 ## W71-S05 — Atomic intent and runtime state transactions
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W71-S04
 - **Remediation priority:** P0
@@ -372,7 +372,7 @@ corruption and persistence failures as recovery evidence.
 
 ## W71-S06 — Closed delivery, release, route, and scope validation
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-5
 - **Hard dependencies:** W71-S05
 - **Remediation priority:** P0
@@ -438,7 +438,7 @@ grammar for later locking and integration.
 
 ## W71-S07 — Server-owned Task start and action progression
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W71-S06
 - **Remediation priority:** P0
@@ -497,7 +497,7 @@ without editing the parallel workstream's visual composition.
 
 ## W71-S08 — Durable Ask AOR, review, and completion
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-2, EPIC-4, EPIC-5, EPIC-6
 - **Hard dependencies:** W71-S07
 - **Remediation priority:** P0
@@ -556,7 +556,7 @@ and keep completed Tasks immutable.
 
 ## W71-S09 — Canonical multirepo scope locks and isolated integration
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-3, EPIC-5
 - **Hard dependencies:** W71-S06
 - **Remediation priority:** P0
@@ -615,7 +615,7 @@ Git evidence and authoritative unit ownership.
 
 ## W71-S10 — Public workspace provision-to-integration lifecycle
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6
 - **Hard dependencies:** W71-S08, W71-S09
 - **Remediation priority:** P0
@@ -647,9 +647,9 @@ report through CAS, and materialize aggregate/per-repository delivery evidence.
    - Changes: Produce delivery/release inputs from measured integration evidence and block partial effects from appearing successful.
    - Validation: Contract and projection tests resolve every per-repository result and rollback/recovery reference.
 4. **Prove the public path.**
-   - Purpose: Demonstrate that production callers, not only unit tests, invoke provisioner and integrator.
-   - Changes: Build a disposable two-repository scenario using only installed public commands/API and deterministic adapters.
-   - Validation: The journal contains provision, child attempts, contention, retry, integration, aggregate checks, delivery evidence, cleanup, and no upstream writes.
+   - Purpose: Make production callers able to invoke the provisioner and integrator through stable public boundaries.
+   - Changes: Add executable CLI/API parity fixtures and explicit integration handoff seams; defer the installed two-repository scenario and full action journal to W71-S14, after the sibling UI merge.
+   - Validation: Public CLI/API tests exercise provisioning and authoritative integration without private imports; W71-S14 consumes the same contracts for the installed journal.
 
 ### Acceptance criteria
 
@@ -663,8 +663,16 @@ report through CAS, and materialize aggregate/per-repository delivery evidence.
 - CLI/API/OpenAPI provision/integrate contracts and parity tests
 - scheduler/integration CAS and recovery tests
 - aggregate/per-repository delivery evidence fixtures
-- installed two-repository black-box report and command journal
+- public CLI/API parity evidence; installed two-repository black-box report and command journal are explicitly handed off to W71-S14
 - `pnpm slice:gate`
+
+**Closure evidence (2026-09-06):** implementation merged in PR #311 as
+`b126282d`; the executable plan and UI no-overlap handoff are recorded in
+`docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md`.
+The public CLI, API, and shared-service tests pass, and the required Node 22
+Repo integrity run completed successfully (including browser acceptance and
+production-readiness checks). The installed two-repository journal remains an
+explicit W71-S14 input, so no installed-proof claim is promoted here.
 
 ### Out of scope
 
@@ -674,7 +682,7 @@ report through CAS, and materialize aggregate/per-repository delivery evidence.
 
 ## W71-S11 — Resolvable evidence and adversarial qualification proof
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W71-S10
 - **Remediation priority:** P0
@@ -729,6 +737,20 @@ adversarial proof on the final integrated commit before creating the freeze.
 - `pnpm w66:proof`
 - `pnpm slice:gate`
 
+**Closure evidence (2026-09-06):** implementation merged in PR #313 as
+`949c6068`; the executable plan and UI no-overlap handoff are recorded in
+`docs/backlog/handoffs/w71-s11-qualification-proof-execution-plan.md`. The
+shared evidence resolver now recomputes immutable bytes and qualification
+identity, stale cells are diagnostic-only, W66 reports validator-owned
+mutation/replay cases for all six families, and live-E2E runtime state defaults
+to central AOR Home with a clean target checkout. Focused qualification,
+boundary, and resolver tests pass (10/10 plus 7/7), `pnpm w66:proof` passes,
+contract-kernel parity passes, and the required Node 22 Repo integrity CI run
+passes. The local Node 25 full runner reached 110/110 repository-script tests
+but was interrupted in the CLI worker; this is retained as a local validation
+limitation, not a release-proof claim. Paid provider qualification and the
+installed real-control-plane freeze remain explicitly owned by W71-S14.
+
 ### Out of scope
 
 - Paid provider execution.
@@ -737,7 +759,7 @@ adversarial proof on the final integrated commit before creating the freeze.
 
 ## W71-S12 — Enforceable quality coverage and maintainability ratchets
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-7
 - **Hard dependencies:** W71-S11
 - **Remediation priority:** P1
@@ -788,6 +810,19 @@ structural refactoring into the ratchet rollout.
 - `pnpm quality:ratchet`
 - `pnpm slice:gate`
 
+Closure evidence: implementation PR #315 merged as `b0db379e` after Node 22
+Repo integrity, CodeQL, Dependency Review, and Scorecard passed. The merged
+quality surface now accounts for 320 production files and 441 manifest source
+entries, with non-increasing baseline metrics of 114,995 lines, 24,561
+complexity units, 139 long functions, maximum nesting 11, 1,001 duplicate
+windows, and zero dead-code markers. `pnpm lint`, `pnpm typecheck`,
+`pnpm quality:ratchet`, the gate/ratchet focused tests (8/8), and the five
+critical-path suites (positive and negative evidence) passed locally. The
+largest live-E2E hotspot remains intentionally unchanged and is the measured
+successor target for W71-S15. No `apps/web/**` files were changed; the sibling
+UI thread `Улучшить UI и UX` remains a no-overlap handoff at latest commit
+`59943bfa`.
+
 ### Out of scope
 
 - Eliminating every historical diagnostic in one slice.
@@ -797,7 +832,7 @@ structural refactoring into the ratchet rollout.
 
 ## W71-S15 — Live-E2E flow hotspot decomposition
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W71-S12
 - **Remediation priority:** P1
@@ -850,6 +885,19 @@ artifact behavior, and ratchet the original file plus new module boundaries.
 - `pnpm quality:ratchet`
 - `pnpm slice:gate`
 
+Closure evidence: implementation PR #317 merged as `71feaef5` after Node 22
+Repo integrity (7m59s), CodeQL, Dependency Review, and Scorecard passed. The
+artifact-consistency seam now owns matrix/coverage parity comparison behind a
+provider-neutral one-way import. `scripts/live-e2e/lib/flows.mjs` decreased
+from 7,717 to 7,574 lines and its expiring ceiling was lowered to 7,600.
+Focused characterization coverage passed 130/130 tests (including positive and
+mutated artifact parity), `pnpm lint`, `pnpm typecheck`, and
+`pnpm quality:ratchet` passed. Structural debt is non-increasing versus the
+S12 baseline: 114,936 lines, 24,242 complexity units, maximum complexity
+1,402, maximum nesting 11, 1,001 duplicate windows, and zero dead-code
+markers. No `apps/web/**` files or UI fixtures were changed; the sibling UI
+handoff remains `Улучшить UI и UX` at immutable commit `59943bfa`.
+
 ### Out of scope
 
 - Step-execution, run-control, contract-loader, adapter-SDK, CLI-test, or web hotspot decomposition.
@@ -858,7 +906,7 @@ artifact behavior, and ratchet the original file plus new module boundaries.
 
 ## W71-S13 — Source-of-truth and story-evidence alignment
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-5, EPIC-6, EPIC-7
 - **Hard dependencies:** W71-S15
 - **Remediation priority:** P1
@@ -917,12 +965,23 @@ produces the installed integrated proof.
 - New product outcomes beyond the audited Task and multirepo flows.
 - Live provider qualification.
 
+Closure evidence: implementation PR #319 merged as `7a0e22e1` after CodeQL,
+Dependency Review, OpenSSF Scorecard, and Node 22 Repo integrity passed. The
+reference gate now checks central AOR Home guidance, 15 W71 planning states,
+bidirectional contract/runbook indexes, and 116 story rows against the ordered
+unit → contract → fixture → mocked-browser → integrated-local → live-provider
+evidence tiers. Focused source-of-truth tests passed 5/5 and the full local
+`pnpm check` passed after the quality baseline update. No `apps/web/**` files
+were changed; the sibling UI handoff remains `59943bfa` for W71-S14 integration.
+
 ## W71-S14 — UI-refactor integration, installed black-box closure, and freeze
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7
 - **Hard dependencies:** W71-S13
-- **External blocker:** `Улучшить UI и UX` must be merged to `main` or provide an explicit immutable handoff commit before S14 starts.
+- **UI handoff:** explicit immutable commit `59943bfa` from `Улучшить UI и UX` is
+  bound for merge-first integration; no sibling UI work is assumed complete
+  until this commit is integrated and verified against the current `main`.
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** merged Command Desk/Task Workspace client integration,

@@ -86,7 +86,12 @@ export function handleIntentCommand({ command, flags, cwd, outputState }) {
   if (command === "task start") {
     const submissionId = resolveOptionalStringFlag("submission-id", flags["submission-id"]);
     if (!submissionId) throw new CliUsageError("Missing required flag '--submission-id' for 'aor task start'.");
-    outputState.task_start = confirmAndStartIntent({ registry: workspace, projectId, submissionId });
+    const expectedRevisionValue = resolveOptionalStringFlag("expected-revision", flags["expected-revision"]);
+    const expectedRevision = expectedRevisionValue === null ? undefined : Number(expectedRevisionValue);
+    if (expectedRevision !== undefined && (!Number.isInteger(expectedRevision) || expectedRevision < 0)) {
+      throw new CliUsageError("Flag '--expected-revision' must be a non-negative integer.");
+    }
+    outputState.task_start = confirmAndStartIntent({ registry: workspace, projectId, submissionId, expectedRevision });
     return true;
   }
   const flowId = resolveOptionalStringFlag("flow-id", flags["flow-id"]);

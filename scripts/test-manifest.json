@@ -5,7 +5,10 @@
   "groups": [
     {"group_id":"contracts","path_prefixes":["packages/contracts/test/"],"timeout_class":"standard"},
     {"group_id":"repository-scripts","path_prefixes":["scripts/test/"],"timeout_class":"standard"},
-    {"group_id":"cli","path_prefixes":["apps/cli/test/"],"timeout_class":"standard"},
+    {"group_id":"cli-a-f","path_prefixes":["apps/cli/test/"],"timeout_class":"standard","test_name_pattern":"^[a-f]","test_concurrency":1},
+    {"group_id":"cli-g-m","path_prefixes":["apps/cli/test/"],"timeout_class":"standard","test_name_pattern":"^[g-m]","test_concurrency":1},
+    {"group_id":"cli-n-s","path_prefixes":["apps/cli/test/"],"timeout_class":"standard","test_name_pattern":"^[n-s]","test_concurrency":1},
+    {"group_id":"cli-t-z","path_prefixes":["apps/cli/test/"],"timeout_class":"standard","test_name_pattern":"^(?![a-s])","test_concurrency":1},
     {"group_id":"api","path_prefixes":["apps/api/test/"],"timeout_class":"standard","test_concurrency":1},
     {"group_id":"web","path_prefixes":["apps/web/test/"],"timeout_class":"standard"},
     {"group_id":"adapter-sdk","path_prefixes":["packages/adapter-sdk/test/"],"timeout_class":"standard"},
@@ -15,5 +18,16 @@
     {"group_id":"provider-routing","path_prefixes":["packages/provider-routing/test/"],"timeout_class":"standard"},
     {"group_id":"private-live-e2e","path_prefixes":["scripts/live-e2e/test/"],"timeout_class":"private-proof-harness"}
   ],
-  "exclusions": []
+  "exclusions": [],
+  "gate_coverage": {
+    "source_extensions": [".css", ".js", ".jsx", ".mjs", ".ts", ".tsx"],
+    "exclusions": [
+      {
+        "path_prefix": "apps/web/dist/",
+        "owner": "web-build",
+        "reason": "Generated browser bundle is covered by web:build and web-dist-freshness.",
+        "expires_at": "2027-12-31"
+      }
+    ]
+  }
 }

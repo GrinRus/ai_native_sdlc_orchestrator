@@ -94,7 +94,7 @@ until W51-S02.
 - **Epic:** EPIC-0, EPIC-7
 - **State:** done
 - **Primary modules:** `scripts/live-e2e/**`,
-  `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs
+  `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`, root checks, live proof runs
 - **Hard dependencies:** W50-S02
 
 ### Local tasks
@@ -129,7 +129,7 @@ until W51-S02.
 - **Epic:** EPIC-0, EPIC-7
 - **State:** done
 - **Primary modules:** `docs/backlog/**`,
-  `docs/ops/live-e2e-proof-complete-findings.md`
+  `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`
 - **Hard dependencies:** W50-S03
 
 ### Local tasks

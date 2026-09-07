@@ -34,7 +34,7 @@ This document explains how to navigate the AOR repository and where each kind of
 
 ## What is not source of truth
 
-- runtime state in `.aor/`
+- runtime state in AOR Home and ignored maintainer rehearsal output in repo-local `.aor/`
 - ad hoc scratch notes
 - copied prompt text outside the platform-asset docs
 - stale local task notes that disagree with the owning slice document

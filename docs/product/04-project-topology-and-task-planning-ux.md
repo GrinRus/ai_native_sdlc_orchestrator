@@ -4,7 +4,8 @@
 
 This document defines the operator experience for planning detailed work and
 managing single-repo, monorepo, and bounded multirepo AOR projects. It extends
-the flow-centric console without making the web app an orchestration owner.
+the headless runtime contracts without making the web app an orchestration
+owner.
 
 The product outcome is that an operator can connect the real repository
 topology, review an execution-ready task plan, approve bounded scope, observe
@@ -17,6 +18,28 @@ inside the selected Task's activity, checks, evidence, and recovery surfaces.
 Graphs remain specialist inspection views: the dense task table, dependency
 list, and accessible status/recovery alternatives defined here are still
 required.
+
+## Current surface boundary
+
+The W60-W62 screen model below records the earlier installed console design.
+Its Project Structure, Execution Setup, and Flow Plan workbench screens have
+been retired. The current installed UI is defined by
+[Task Workspace](08-task-workspace-console-design.md); do not use the historical
+screen inventory as navigation instructions or evidence of current UI coverage.
+
+The supported headless operations remain:
+
+- `aor project repository|component|dependency` and `aor project topology` for
+  project topology;
+- `aor route select` and `aor route check` for approved route selection and
+  readiness;
+- `aor plan create|show|diff|revise|approve|status` for structured planning.
+
+Use the [topology onboarding runbook](../ops/project-topology-onboarding.md)
+and [task plan lifecycle runbook](../ops/structured-task-plan-lifecycle.md) for
+current command workflows. The lifecycle, evidence, safety, and accessibility
+requirements below remain applicable when exposed in Task Workspace; current
+installed integration proof belongs to W71 rather than the retired panels.
 
 ## Product brief
 
@@ -67,7 +90,7 @@ when they share mission, acceptance, and delivery coordination.
 | Reviewer / QA | Trace each task and top-level acceptance criterion to implementation, verification, and integration evidence. |
 | Operator / SRE | See one next action, current blockers, stale work, active attempts, and recovery actions without raw artifact inspection. |
 
-## Information architecture
+## Historical W60-W62 information architecture
 
 The top-level object remains the selected AOR project. The flow remains the
 primary lifecycle object inside that project.
@@ -87,7 +110,7 @@ Project Structure is project-scoped. Flow Plan and all later views are
 flow-scoped. Switching projects must clear flow, task, run, evidence, and form
 state before loading the next project.
 
-## Main journey
+## Historical W60-W62 journey
 
 1. The operator launches `aor app` and selects an existing project or chooses
    **Add AOR Project**.
@@ -117,11 +140,11 @@ state before loading the next project.
 12. Coordinated delivery shows one row per repository, aggregate readiness,
     partial-delivery recovery, and the exact next safe action.
 
-## Screen inventory
+## Historical W60-W62 screen inventory
 
 ### Add project flow
 
-The existing add-project drawer becomes a focused setup flow with these steps:
+The earlier add-project drawer used a focused setup flow with these steps:
 
 1. **Project identity:** display name, stable workspace project ID, AOR Home status, and
    existing-profile import.
@@ -140,11 +163,12 @@ The primary action advances one step. Back preserves entered values. Closing a
 dirty draft asks for confirmation. Initialization is never triggered by merely
 opening, validating, or navigating the flow.
 
-W61-S04 implements this baseline in the installed SPA. The setup dialog owns
-the six-step portable-topology review, keeps machine-local binding information
-separate, and exposes initialization only as an explicit confirmed action.
-Project Structure reads remain non-materializing when the approved profile is
-absent and return a stable empty model rather than creating `.aor`.
+W61-S04 implemented this baseline in the retired SPA. Its setup dialog owned
+the six-step portable-topology review, kept machine-local binding information
+separate, and exposed initialization only as an explicit confirmed action.
+The current topology read contract remains non-materializing when the approved
+profile is absent and returns a stable empty model rather than creating
+project runtime state.
 
 ### Project Structure
 
@@ -165,7 +189,7 @@ Destructive removal is replaced by disable/deprecate when historical evidence
 references the repository or component. Raw paths and refs are secondary debug
 details, not primary labels.
 
-The W61-S04 implementation provides Overview, Repositories, Components,
+The retired W61-S04 implementation provided Overview, Repositories, Components,
 Dependencies, and Validation views through the canonical topology API.
 Repository and component disable actions show a write-effect confirmation;
 validation, refresh, and navigation remain read-only with respect to project
@@ -173,8 +197,8 @@ runtime state.
 
 ### Execution Setup
 
-W61-S06 provides the headless contract and control-plane baseline used by the
-installed UI. `project-profile.default_route_profiles` remains the only
+W61-S06 provides the retained headless contract and control-plane baseline.
+`project-profile.default_route_profiles` remains the only
 persisted route selection. `execution-profile` derives approved route, runner,
 provider, requested/effective model, model source, capabilities, fallback, and
 readiness without exposing credentials or initializing `.aor`.
@@ -184,12 +208,12 @@ persists only runner/auth availability summaries in the Local Workspace
 registry and fails closed before provider spawn for missing runner/auth,
 unsupported model, capability mismatch, or policy denial.
 
-W61-S07 adds the project-scoped Execution Setup browser surface. It lists only
-approved route IDs returned by the canonical read model, labels deterministic
-routes as simulation, previews revisioned route changes, and requires explicit
-readiness checking before live execution is presented as ready. Project
-switches abort or ignore stale reads and mutations; no browser field accepts
-provider, model, credential, or environment values.
+W61-S07 added the retired project-scoped Execution Setup browser surface. It
+listed only approved route IDs returned by the canonical read model, labeled
+deterministic routes as simulation, previewed revisioned route changes, and
+required explicit readiness checking before live execution appeared ready.
+These safety requirements remain applicable to future Task-level setup;
+W71-S14 owns its current implementation and exact Prepared-to-Start proof.
 
 ### Flow Plan workbench
 
@@ -292,9 +316,8 @@ which locks remain active, and the recovery or rollback action.
 - Allowing UI-only plan edits would break headless parity and audit lineage.
 - A single generic status for task, unit, attempt, and run would make retry and
   recovery ambiguous.
-- Adding all new views directly to the current monolithic SPA module would
-  increase implementation risk; feature modules should be extracted during
-  implementation without changing current behavior first.
+- Coupling task presentation to runtime ownership would undermine detachable
+  UI behavior and headless parity.
 
 ## Acceptance criteria
 
@@ -302,8 +325,9 @@ which locks remain active, and the recovery or rollback action.
    multirepo projects without raw YAML editing.
 2. Portable profile data and machine-local bindings are visibly distinct and
    persisted in their owning stores.
-3. Project Structure makes repository, component, dependency, and validation
-   state inspectable and recoverable.
+3. Topology read models and their supported command or UI surfaces make
+   repository, component, dependency, and validation state inspectable and
+   recoverable.
 4. Medium+ task plans expose bounded scope, work items, dependencies,
    acceptance criteria, verification, expected evidence, and risks.
 5. Plan approval is blocked by incomplete traceability or invalid scope and is
@@ -332,13 +356,13 @@ which locks remain active, and the recovery or rollback action.
   plus workspace-level conflict evidence, otherwise non-`no-write` execution is
   blocked.
 
-## Backlog and contract handoff
+## Historical backlog handoff and retained contracts
 
-- W60 implements structured task plans, completeness, semantic evaluation,
+- W60 implemented structured task plans, completeness, semantic evaluation,
   exact-version approval, evidence-derived progress, and the Flow Plan
-  workbench.
+  workbench. The workbench is retired; its headless contracts remain.
 - W61 owns project/repository/component/binding contracts, local persistence,
-  topology management, and Project Structure UX.
+  and topology management. Its Project Structure UX is historical.
 - W62 owns workspace sets, impact DAGs, parent/child execution, integration,
   repair, coordinated delivery, and end-to-end proof.
 - W60 planning was requalified after W59 audit closure with headless, API, and

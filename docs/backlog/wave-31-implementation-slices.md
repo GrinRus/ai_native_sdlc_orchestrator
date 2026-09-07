@@ -53,8 +53,8 @@ the runtime headless-first, packet-first, and control-plane-owned.
 ### Done evidence
 - `packages/orchestrator-core/src/operator-cli/app-launcher.mjs`
 - `packages/orchestrator-core/src/control-plane/http/**`
-- `apps/web/src/spa.jsx`
-- `apps/web/src/spa.css`
+- [spa.jsx snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.jsx)
+- [spa.css snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.css)
 - `apps/web/dist`
 - CLI/API/web tests for app launch, app routes, and SPA controls
 - release pack and release smoke checks

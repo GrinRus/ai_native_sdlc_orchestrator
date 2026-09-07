@@ -3089,9 +3089,9 @@ test("W6 incident and audit command pack links run evidence to durable incident 
       "--run-id",
       runId,
     ]);
-    assert.equal(learningHandoffResult.exitCode, 0, learningHandoffResult.stderr);
-    const learningHandoffPayload = JSON.parse(learningHandoffResult.stdout);
-    assert.equal(fs.existsSync(learningHandoffPayload.learning_loop_handoff_file), true);
+    assert.equal(learningHandoffResult.exitCode, 1);
+    assert.equal(learningHandoffResult.stdout, "");
+    assert.match(learningHandoffResult.stderr, /Learning handoff for run .* is blocked:/);
 
     const stableDatasetPath = path.join(projectRoot, "examples/eval/dataset-run-regression.yaml");
     const stableDatasetBeforeBackfill = fs.readFileSync(stableDatasetPath, "utf8");
@@ -3129,7 +3129,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(backfillProposal.target.dataset_mutation_mode, "proposal-only");
     assert.equal(backfillProposal.mutation_policy.stable_dataset_mutation, "blocked");
     assert.equal(backfillProposal.source_artifacts.incident_id, incidentOpenPayload.incident_id);
-    assert.match(backfillProposal.source_artifacts.learning_handoff_ref, /learning-loop-handoff/);
+    assert.equal(backfillProposal.source_artifacts.learning_handoff_ref, null);
     assert.ok(backfillProposal.proposed_cases[0].linked_asset_refs.includes("evidence://external/manual-note"));
 
     const missingSuiteBackfill = invokeCli([
@@ -5479,6 +5479,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       ]);
       assert.equal(learningRun.exitCode, 0, learningRun.stderr);
       const learningPayload = JSON.parse(learningRun.stdout);
+      assert.equal(learningPayload.read_only, true);
       assert.equal(fs.existsSync(learningPayload.learning_loop_scorecard_file), true);
       assert.equal(fs.existsSync(learningPayload.learning_loop_handoff_file), true);
       assert.equal(fs.existsSync(learningPayload.runtime_harness_report_file), true);
@@ -5501,10 +5502,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         }).ok,
         true,
       );
-      assert.equal(learningScorecard.matrix_cell.provider_variant_id, "openai-primary");
-      assert.deepEqual(learningScorecard.coverage_follow_up, reviewReport.feature_traceability.coverage_follow_up);
-      assert.equal(learningHandoff.matrix_cell.feature_size, "small");
-      assert.equal(learningHandoff.coverage_follow_up.current_cell_required, true);
+      assert.equal(learningHandoff.source_kind, "delivery");
+      assert.equal(learningScorecard.run_id, runId);
     });
   });
 });

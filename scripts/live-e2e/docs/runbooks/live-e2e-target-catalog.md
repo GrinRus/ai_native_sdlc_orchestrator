@@ -510,4 +510,6 @@ All targets reuse the same baseline before execution-style stages:
 
 For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory factual evidence for full-journey observation and contributes directly to the step journal, run-health, and post-run quality assessment. Hard-target acceptance profiles may override this default to `blocking`; the Vitest large profile does so because a clean compatible-Node baseline `pnpm test` failure is a target baseline blocker before product execution, not acceptance evidence.
 
-See `scripts/live-e2e/docs/runbooks/live-e2e-no-write-preflight.md` for the reusable bounded procedure.
+See the [current installed-user preflight procedure](live-e2e-no-write-preflight.md)
+for profile review, isolated preparation, readiness gates, and evidence
+ownership. Its historical notes are not executable bounded acceptance recipes.

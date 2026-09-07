@@ -12,7 +12,7 @@ marking the W48-specific control proof rerun as accepted.
 - **Outcome:** Keep committed findings aligned with actual proof evidence and
   remove stale all-pass claims when run ids, summaries, quality reports, and
   gates are not present.
-- **Primary modules:** `docs/ops/live-e2e-proof-complete-findings.md`,
+- **Primary modules:** `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`,
   `docs/backlog/**`
 - **Hard dependencies:** W48-S04
 
@@ -109,7 +109,7 @@ marking the W48-specific control proof rerun as accepted.
 - **Outcome:** Run the W49 Full Control proof set and claim product acceptance
   only for final all-pass gates.
 - **Primary modules:** `scripts/live-e2e/**`,
-  `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs
+  `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`, root checks, live proof runs
 - **Hard dependencies:** W49-S03
 
 ### Local tasks

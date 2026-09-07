@@ -16,8 +16,14 @@ Read `strategic_snapshot` from output:
 - `planner_metrics.metrics.clean_close_rate`, `retry_rate`, `repair_rate`, and `blocker_rate` for planner health.
 - `planner_metrics.status=no-data` means no durable run, review, incident, or audit history exists yet; do not interpret this as a zero-risk or zero-success project.
 
-## Web surface
-Use the operator console (`apps/web`) and inspect the **Strategic Snapshot** panel.
+## API surface
+Read `GET /api/projects/:projectId/strategic-snapshot` from the local control
+plane. Planner metrics are also available through
+`GET /api/projects/:projectId/planner-metrics`.
+
+Task Workspace has no Strategic Snapshot or finance dashboard panel. Use the
+CLI/API reads above for strategic visibility; historical console screenshots
+and W21 panel evidence do not describe the current packaged UI.
 
 ## Interpretation guidance
 - High-risk runs include incident-linked runs or baseline regression signals.

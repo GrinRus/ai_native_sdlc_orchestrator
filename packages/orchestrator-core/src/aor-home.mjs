@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { validatePublicId } from "../../contracts/src/index.mjs";
+export { resolveEvidenceReference, storeEvidenceReference } from "../../contracts/src/evidence-reference.mjs";
 
 export function resolveAorHome(options = {}) {
   const env = options.env ?? process.env;

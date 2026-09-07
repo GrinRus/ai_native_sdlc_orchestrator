@@ -1,6 +1,6 @@
 # W65 specialist modes pilot
 
-W65-S04 requalifies the W63 Attention, Journey, and Evidence surfaces against the cutover parity baseline. The executable manifest is `apps/web/browser/fixtures/w65-specialist-modes-pilot.json`.
+W65-S04 requalifies the W63 Attention, Journey, and Evidence surfaces against the cutover parity baseline. The executable manifest is [w65-specialist-modes-pilot.json snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/fixtures/w65-specialist-modes-pilot.json).
 
 ## Disposition
 

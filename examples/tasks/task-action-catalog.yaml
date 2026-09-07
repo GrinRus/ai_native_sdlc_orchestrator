@@ -1,0 +1,32 @@
+schema_version: 1
+catalog_id: task-action-catalog
+actions:
+  - action_id: start
+    category: mutation
+    permission: mutate
+    dispatch: intent.start
+    payload:
+      expected_revision:
+        type: integer
+        required: false
+        ui_required: true
+    requires_confirmation: false
+  - action_id: discovery-run
+    category: mutation
+    permission: mutate
+    dispatch: lifecycle
+    lifecycle_command: discovery run
+    payload: {}
+    requires_confirmation: false
+  - action_id: request
+    category: mutation
+    permission: mutate
+    dispatch: operator-request
+    payload:
+      request_text:
+        type: string
+        required: true
+    requires_confirmation: false
+readback:
+  durable: true
+  fields: [task, intent_submission_ref, mission_id, flow_id, run_ids, revision, state, evidence_refs]

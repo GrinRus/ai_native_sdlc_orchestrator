@@ -57,7 +57,8 @@ exception distributes a pre-release snapshot; it does not grant production or
 stable release clearance, and malformed evidence or failed readiness checks
 still fail closed. The smoke test installs the generated tarball into a temporary npm
 project, runs `aor --help`, and runs `doctor` plus `onboard` against a temporary
-git repository while asserting that only `.aor/` runtime state changes. W30
+git repository while asserting that runtime state stays in isolated AOR Home
+and the target checkout remains unchanged. W30
 extends that smoke path to run `aor app --help` so optional API/web guidance is
 covered. W31 extends it further with
 `aor app --smoke --open false --json`, which starts the local packaged SPA,
@@ -67,7 +68,7 @@ service or making the web console required.
 W32 extends the source checkout and package smoke expectations with
 `aor request create --json`, `aor request run --json`, and sanitized
 operator-request API coverage so the packaged CLI proves bounded interactive
-runtime work without changing target files outside `.aor/`.
+runtime work without creating repo-local runtime state or changing target files.
 W70 replaces the historical W34/W36 bundle markers. `aor app --smoke --open
 false --json` must prove the packaged Task Workspace contains New task,
 Prepare task, and project-switcher markers and contains no retired Quiet
@@ -91,8 +92,9 @@ npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- \
 
 This proves the registry artifact and avoids npm resolving the local source
 checkout package context. For a clean target, the app smoke should pass without
-creating `$TMP/target/.aor`; explicit runtime initialization or `aor onboard`
-is the write boundary for first-run runtime state.
+creating `$TMP/target/.aor`. Explicit runtime initialization and `aor onboard`
+write project runtime state in AOR Home; repository config and evidence exports
+require separate explicit actions.
 
 W30 alpha hardening also requires the production-readiness gate to verify the
 ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations

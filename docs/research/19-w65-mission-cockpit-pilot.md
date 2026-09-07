@@ -5,7 +5,7 @@ adapter, installed scenario catalog, and fifteen-transition golden journey.
 No lifecycle command, packet, projection, or evidence owner changes in S03.
 
 The machine-readable matrix
-`apps/web/browser/fixtures/w65-mission-cockpit-pilot.json` covers first run,
+[w65-mission-cockpit-pilot.json snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/fixtures/w65-mission-cockpit-pilot.json) covers first run,
 invalid and complete Mission intake, partial `create -> next` recovery, active
 provider work, interactions and decisions, verification and bounded repair,
 review and no-write delivery, partial/offline reads, completed inspection, and

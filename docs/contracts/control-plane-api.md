@@ -20,6 +20,22 @@ Workspace-scoped source and write-back action boundary. Its primary
 `action=connect` payload uses `source.kind=local|git`; it never accepts a
 runtime-root override.
 
+The same route exposes `action=provision-workspace-set` for bounded execution
+setup. The request carries `project_id` and `run_id` plus optional
+`workspace_set_id`, `binding_ref`, `dry_run`, and `delivery_capable`; the
+service derives repositories from the registered project profile and local
+bindings, validates exact Git commits, and returns a schema-v2 workspace-set
+readback. A dry run never creates disposable checkouts. The equivalent
+headless command is `aor workspace provision --project-ref <path> --run-id
+<id>`.
+
+`action=integrate-parent-run` on the same project action boundary consumes
+durable child-output evidence, materializes the authoritative integration
+report, and applies it to the parent under optional `expected_revision` CAS.
+Repeating the action after a successful report is a read-only idempotent
+readback; missing or invalid outputs produce a blocked report rather than a
+partial success.
+
 W67 adds intent-first onboarding:
 
 - `POST /api/projects/:projectId/intent-submissions` stores text, bounded text
@@ -64,6 +80,12 @@ Flow lineage:
 - `GET /api/projects/:projectId/tasks` returns stable public `task_id` values,
   draft/prepared/active/attention/completed status projections, source refs, runtime lifecycle path, attention/blocker counts,
   runner-readiness metadata, and one server-owned primary action;
+- Every Task response is the versioned `task-projection` read model. Its
+  `prepared_contract` carries the exact normalized outcome, acceptance,
+  bounded scope, delivery mode, normalization revision, approved execution
+  route, readiness revision, and explicit write effects used by `start`.
+  `route.intake-normalize.*` remains preparation provenance and is never an
+  approved execution route;
 - `GET /api/projects/:projectId/tasks/:taskId` returns one projection or a
   structured `task.not_found` error;
 - `GET /api/projects/:projectId/tasks/:taskId/review` returns a separate
@@ -77,8 +99,12 @@ Flow lineage:
   mutation facade. It delegates `confirm`/`start` to the existing intent
   CAS/idempotency boundary, `pause`/`resume`/`cancel` to server-owned
   run-control, and `retry`/`request` to durable bounded operator requests.
-  Every response includes a query-safe durable readback; the route never
-  creates a second Task lifecycle owner or accepts raw provider flags;
+  The accepted action ids, permissions, payload requirements, and lifecycle
+  dispatch are published by the canonical [Task action catalog](task-action-catalog.md)
+  rather than a transport-local allowlist. Every response includes a
+  query-safe durable readback (Task, lineage, state, revision, and evidence
+  refs); the route never creates a second Task lifecycle owner or accepts raw
+  provider flags;
 - New Task preparation uses the existing intent boundary: the browser submits
   the outcome and validated source records to `POST
   /api/projects/:projectId/intent-submissions`, then refreshes the Task
@@ -88,6 +114,8 @@ Flow lineage:
   `revision` as `expected_revision`. The server forwards that guard to the
   intent confirmation boundary and rejects a stale prepared projection before
   creating or starting a Flow;
+- `start` is the only Task start action. The legacy `confirm-and-start` action
+  remains available only on the intent-submission compatibility route;
 - Task reads are strictly read-only. Create, prepare, revise, confirm, start,
   retry, and cancel continue through the existing intent boundary with its CAS
   and idempotency semantics; Task is not a second lifecycle owner;

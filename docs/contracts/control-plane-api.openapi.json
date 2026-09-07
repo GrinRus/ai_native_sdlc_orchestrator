@@ -2058,11 +2058,21 @@
           "action": {
             "type": "string",
             "enum": [
-              "connect", "connect-repository", "refresh-source", "disconnect", "delete-aor-data", "materialize-project-config", "export-evidence"
+              "connect", "connect-repository", "refresh-source", "disconnect", "delete-aor-data", "materialize-project-config", "export-evidence", "provision-workspace-set", "integrate-parent-run"
             ]
           },
           "source": { "type": "object", "required": ["kind"], "properties": { "kind": { "type": "string", "enum": ["local", "git"] }, "path": { "type": "string" }, "url": { "type": "string" } } },
           "project_id": { "type": "string" },
+          "run_id": { "type": "string", "description": "Run-owned workspace identity; required for provision-workspace-set." },
+          "workspace_set_id": { "type": "string" },
+          "binding_ref": { "type": "string" },
+          "dry_run": { "type": "boolean", "default": false },
+          "delivery_capable": { "type": "boolean", "default": false },
+          "parent_run_id": { "type": "string", "description": "Parent run identity; required for integrate-parent-run." },
+          "execution_plan_ref": { "type": "string" },
+          "workspace_set_ref": { "type": "string" },
+          "child_output_refs": { "type": "array", "items": { "type": "string" } },
+          "expected_revision": { "type": "integer", "minimum": 0 },
           "label": {
             "type": "string"
           }
@@ -2898,21 +2908,26 @@
         "type": "object",
         "required": ["action"],
         "properties": {
-          "action": { "type": "string", "enum": ["confirm", "start", "pause", "resume", "cancel", "retry", "request", "follow-up"] },
+          "action": { "type": "string", "enum": ["confirm", "start", "pause", "resume", "steer", "cancel", "retry", "request", "follow-up", "intent.resume", "discovery-run", "spec-build", "plan-create", "review-run", "delivery-prepare", "release-prepare", "learning-handoff", "mission-create", "handoff-approve", "review-decide", "inspect-active-run", "inspect-quality-repair", "fix-onboarding", "fix-delivery-blockers", "repair-mission-intake", "repair-review-gate", "resolve-review-hold", "hold-exhausted-quality-repair", "run-review-repair", "run-review-quality-repair", "run-qa-quality-repair", "qa-quality-repair", "start-new-flow", "complete-mission-intake", "closure-complete"] },
           "expected_revision": { "type": "integer", "minimum": 0 },
           "command_id": { "type": "string", "minLength": 1 },
           "request_text": { "type": "string", "minLength": 1 },
           "intent_type": { "type": "string", "enum": ["analyze", "explain", "review", "validate", "repair", "plan", "implement"] },
           "approval_ref": { "type": "string", "minLength": 1 },
           "reason": { "type": "string", "minLength": 1 },
-          "allowed_paths": { "type": "array", "items": { "type": "string" } }
+          "allowed_paths": { "type": "array", "items": { "type": "string" } },
+          "decision": { "type": "string", "minLength": 1 },
+          "run_id": { "type": "string", "minLength": 1 },
+          "mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first"] },
+          "input_packet": { "type": "string", "minLength": 1 }
         },
         "additionalProperties": false
       },
       "TaskProjection": {
         "type": "object",
-        "required": ["task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage", "source_items", "attention_items", "review", "completion", "lifecycle_path", "runner_selection", "primary_action", "completed_read_only", "read_only"],
+        "required": ["schema_version", "task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage", "source_items", "attention_items", "review", "completion", "lifecycle_path", "runner_selection", "primary_action", "prepared_contract", "completed_read_only", "read_only"],
         "properties": {
+          "schema_version": { "type": "integer", "const": 1 },
           "task_id": { "type": "string" },
           "project_id": { "type": "string" },
           "display_title": { "type": "string" },
@@ -2936,10 +2951,56 @@
           "blocker_count": { "type": "integer", "minimum": 0 },
           "evidence_refs": { "type": "array", "items": { "type": "string" } },
           "primary_action": { "$ref": "#/components/schemas/JsonObject" },
+          "prepared_contract": { "$ref": "#/components/schemas/TaskPreparedContract" },
           "runner_selection": { "$ref": "#/components/schemas/TaskRunnerSelection" },
           "updated_at": { "type": ["string", "null"], "format": "date-time" },
           "completed_read_only": { "type": "boolean" },
           "read_only": { "type": "boolean", "const": true }
+        },
+        "additionalProperties": true
+      },
+      "TaskPreparedContract": {
+        "type": "object",
+        "required": ["schema_version", "outcome", "acceptance_criteria", "scope", "delivery_mode", "normalization_revision", "approved_execution_route", "readiness_revision", "write_effects"],
+        "properties": {
+          "schema_version": { "type": "integer", "const": 1 },
+          "outcome": { "type": ["string", "null"] },
+          "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+          "scope": {
+            "type": "object",
+            "required": ["allowed_paths", "forbidden_paths"],
+            "properties": {
+              "allowed_paths": { "type": "array", "items": { "type": "string" } },
+              "forbidden_paths": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          },
+          "delivery_mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first-pr"] },
+          "normalization_revision": { "type": "integer", "minimum": 0 },
+          "approved_execution_route": {
+            "type": "object",
+            "required": ["route_id", "step", "source", "readiness"],
+            "properties": {
+              "route_id": { "type": ["string", "null"] },
+              "step": { "type": ["string", "null"], "enum": ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness", null] },
+              "source": { "type": "string", "enum": ["project-default", "task-override"] },
+              "readiness": { "type": "string", "enum": ["ready", "unknown", "stale", "unavailable", "blocked"] }
+            },
+            "additionalProperties": true
+          },
+          "readiness_revision": { "type": ["integer", "null"], "minimum": 0 },
+          "write_effects": {
+            "type": "object",
+            "required": ["mode", "write_capable", "target_write_allowed", "upstream_writes_allowed", "direct_edits_allowed"],
+            "properties": {
+              "mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first-pr"] },
+              "write_capable": { "type": "boolean" },
+              "target_write_allowed": { "type": "boolean" },
+              "upstream_writes_allowed": { "type": "boolean" },
+              "direct_edits_allowed": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
         },
         "additionalProperties": true
       },

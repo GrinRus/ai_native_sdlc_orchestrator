@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -89,6 +90,133 @@ test("multirepo coordination blocks overlapping active locks with deterministic 
     assert.equal(conflict.report.lock_state.status, "conflict");
     assert.deepEqual(conflict.report.blocking_reasons, ["lock-conflict"]);
     assert.equal(conflict.report.lock_state.conflicts[0].reason, "active-lock-overlaps-requested-scope");
+  });
+});
+
+test("multirepo coordination uses segment-aware wildcard-middle overlap and rejects invalid scopes", () => {
+  withTempRepo((repoRoot) => {
+    materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: profilePath,
+      action: "acquire",
+      runId: "w71-s09.lock.wildcard-a",
+      ownerRef: "operator://wildcard-a",
+      repoIds: ["backend"],
+      pathGlobs: ["apps/**/api"],
+      repoValidationRefs: ["backend=validation://repos/backend/profile-entry"],
+      now: "2026-05-06T08:00:00.000Z",
+    });
+    const conflict = materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: profilePath,
+      action: "acquire",
+      runId: "w71-s09.lock.wildcard-b",
+      ownerRef: "operator://wildcard-b",
+      repoIds: ["backend"],
+      pathGlobs: ["apps/api/**"],
+      repoValidationRefs: ["backend=validation://repos/backend/profile-entry"],
+      now: "2026-05-06T08:01:00.000Z",
+    });
+    assert.equal(conflict.report.lock_state.status, "conflict");
+    assert.ok(conflict.report.blocking_reasons.includes("lock-conflict"));
+
+    const invalid = materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: profilePath,
+      action: "acquire",
+      runId: "w71-s09.lock.invalid",
+      ownerRef: "operator://invalid",
+      repoIds: ["backend"],
+      pathGlobs: ["apps/**api"],
+      repoValidationRefs: ["backend=validation://repos/backend/profile-entry"],
+      now: "2026-05-06T08:02:00.000Z",
+    });
+    assert.equal(invalid.report.status, "blocked");
+    assert.ok(invalid.report.blocking_reasons.includes("lock-scope-invalid"));
+  });
+});
+
+test("multirepo coordination quarantines corrupt lock state instead of treating it as empty", () => {
+  withTempRepo((repoRoot) => {
+    const first = materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: profilePath,
+      action: "acquire",
+      runId: "w71-s09.lock.corrupt-seed",
+      ownerRef: "operator://corrupt-seed",
+      repoIds: ["backend"],
+      pathGlobs: ["apps/api/**"],
+      repoValidationRefs: ["backend=validation://repos/backend/profile-entry"],
+      now: "2026-05-06T08:00:00.000Z",
+    });
+    fs.writeFileSync(first.lockStateFile, "{not-json\n", "utf8");
+    assert.throws(
+      () => materializeMultirepoCoordinationStatus({
+        projectRef: repoRoot,
+        cwd: repoRoot,
+        projectProfile: profilePath,
+        action: "acquire",
+        runId: "w71-s09.lock.corrupt-retry",
+        ownerRef: "operator://corrupt-retry",
+        repoIds: ["backend"],
+        pathGlobs: ["apps/api/**"],
+        repoValidationRefs: ["backend=validation://repos/backend/profile-entry"],
+        now: "2026-05-06T08:01:00.000Z",
+      }),
+      (error) => error.code === "state-corrupt" && typeof error.recovery_ref === "string",
+    );
+    assert.equal(fs.existsSync(first.lockStateFile), false);
+    assert.equal(fs.existsSync(first.lockStateFile.replace(/\.json$/u, "")), false);
+    assert.ok(fs.readdirSync(path.dirname(first.lockStateFile)).some((entry) => entry.startsWith("multirepo-locks.json.corrupt-")));
+  });
+});
+
+test("multirepo lock acquisition has one winner under concurrent processes", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const modulePath = new URL("../src/multirepo-coordination.mjs", import.meta.url).pathname;
+    const workerSource = `import { materializeMultirepoCoordinationStatus } from ${JSON.stringify(modulePath)};
+const input = JSON.parse(process.env.AOR_LOCK_CASE);
+try {
+  const result = materializeMultirepoCoordinationStatus(input);
+  process.stdout.write(JSON.stringify({ status: result.report.status, lock: result.report.lock_state.status }));
+} catch (error) {
+  process.stdout.write(JSON.stringify({ error: error.code ?? error.message }));
+  process.exitCode = 1;
+}`;
+    const base = {
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: profilePath,
+      action: "acquire",
+      repoIds: ["backend"],
+      pathGlobs: ["apps/api/**"],
+      repoValidationRefs: ["backend=validation://repos/backend/profile-entry"],
+      now: "2026-05-06T08:00:00.000Z",
+    };
+    materializeMultirepoCoordinationStatus({ ...base, action: "inspect", runId: "w71-s09.lock.concurrent-bootstrap" });
+    const runWorker = (runId, ownerRef) => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--input-type=module", "-e", workerSource], {
+        cwd: workspaceRoot,
+        env: { ...process.env, AOR_LOCK_CASE: JSON.stringify({ ...base, runId, ownerRef }) },
+      });
+      let output = "";
+      child.stdout.on("data", (chunk) => { output += chunk; });
+      child.on("error", reject);
+      child.on("close", (code) => {
+        try { resolve({ code, result: JSON.parse(output) }); } catch (error) { reject(error); }
+      });
+    });
+    const [first, second] = await Promise.all([
+      runWorker("w71-s09.lock.concurrent-a", "operator://concurrent-a"),
+      runWorker("w71-s09.lock.concurrent-b", "operator://concurrent-b"),
+    ]);
+    assert.deepEqual(new Set([first.result.status, second.result.status]), new Set(["ready", "blocked"]));
+    assert.equal(first.code, 0);
+    assert.equal(second.code, 0);
   });
 });
 

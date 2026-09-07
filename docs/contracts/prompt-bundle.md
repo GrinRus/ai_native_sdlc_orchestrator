@@ -13,7 +13,7 @@ First-class guidance asset for a step class. It defines role instructions, prior
 
 ## Notes
 Prompt bundles should stay lightweight, versioned, and independently certifiable.
-Runtime asset resolution should use `project-profile.default_prompt_bundles.<step>` unless a step-level prompt override is provided.
+Runtime asset resolution uses `project-profile.default_prompt_bundles.<step>` unless a step-level prompt override is provided.
 
 `step_class` identifies the execution class, not necessarily the workflow step
 that selected the prompt. Discovery, research, and spec may each resolve a
@@ -28,6 +28,12 @@ before adapter invocation while keeping the same `artifact` execution class.
 use one shared artifact prompt across discovery, research, and spec. Step-
 specific artifact prompts must validate through this same contract family and
 must not require a new loader enum or wrapper class.
+
+For wording-only edits, version and compatibility decisions, and representative
+evaluation, use the [asset authoring and evidence guidance](../architecture/15-platform-assets-and-prompt-lifecycle.md#authoring-prompt-and-context-changes).
+The versioned ref selects the bundle, while its content digest and compiled
+fingerprint identify the material that was evaluated. Prompt instructions do not
+override wrapper permissions, route selection, or step-policy bounds.
 
 ## Example
 See `examples/prompts/*.yaml`.

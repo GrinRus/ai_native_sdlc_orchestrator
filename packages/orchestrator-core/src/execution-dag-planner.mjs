@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 
+import { pathScopesOverlap } from "../../contracts/src/index.mjs";
+
 function records(value) {
   return Array.isArray(value) ? value.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry)) : [];
 }
@@ -14,6 +16,10 @@ function unique(values) {
 
 function overlaps(left, right) {
   return left.some((value) => right.some((candidate) => value === candidate || value.startsWith(`${candidate}/`) || candidate.startsWith(`${value}/`)));
+}
+
+function scopeArraysOverlap(left, right) {
+  return left.some((pattern) => right.some((candidate) => pathScopesOverlap(pattern, candidate)));
 }
 
 function repositoryMap(topology) {
@@ -35,7 +41,7 @@ function concurrencyReasons(unit, allUnits) {
   for (const candidate of allUnits) {
     if (candidate.unit_id === unit.unit_id) continue;
     const sharedRepository = overlaps(strings(scope.repo_ids), strings(candidate.scope?.repo_ids));
-    if (sharedRepository && overlaps(strings(scope.allowed_paths), strings(candidate.scope?.allowed_paths))) reasons.push("path-overlap");
+    if (sharedRepository && scopeArraysOverlap(strings(scope.allowed_paths), strings(candidate.scope?.allowed_paths))) reasons.push("path-overlap");
     if (overlaps(strings(scope.component_ids), strings(candidate.scope?.component_ids))) reasons.push("shared-component");
     if (overlaps(strings(unit.conflict_keys), strings(candidate.conflict_keys))) reasons.push("conflict-key");
     if (overlaps(strings(unit.command_locks), strings(candidate.command_locks))) reasons.push("command-lock");

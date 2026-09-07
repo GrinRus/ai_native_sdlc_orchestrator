@@ -126,10 +126,11 @@ try {
             status: "pass",
             scenarios,
             project_isolation: { project_count: listed.projects.length, selected_project_id: listed.selected_project_id ?? null },
-            browser_evidence_refs: [
-              "apps/web/browser/operator-console.spec.mjs",
-              "apps/web/src/project-structure.jsx",
-              "apps/web/src/execution-setup.jsx",
+            browser_evidence_refs: [],
+            browser_assessment: { status: "not-run", reason: "This CLI proof does not launch the installed UI." },
+            supporting_evidence_refs: [
+              "packages/orchestrator-core/test/topology-control-plane.test.mjs",
+              "packages/orchestrator-core/test/execution-profile-control-plane.test.mjs",
             ],
             credentialed_provider_calls: false,
             external_network_calls: false,

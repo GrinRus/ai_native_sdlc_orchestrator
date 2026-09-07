@@ -1,7 +1,8 @@
 # Repo-aware execution proof
 
-Use this runbook to reproduce the bounded W62 closure without credentials,
-provider network calls, or upstream writes.
+Use this runbook to exercise the retained W62 component fixtures without
+credentials, provider network calls, or upstream writes. It does not reproduce
+the current installed multirepo lifecycle; W71 owns that integration proof.
 
 ## Proof boundary
 
@@ -10,13 +11,15 @@ The runner covers two curated models:
 - a monorepo with independently scoped components;
 - a bounded two-repository graph with an explicit contract dependency.
 
-For both, it validates exact task-to-unit coverage, deterministic workspace and
-parent-run lineage, at least one safe parallel pair, conflict serialization,
-failed-attempt retry identity, transitive stale invalidation, bounded repair,
-passing integration ownership, and aggregate/per-repository delivery truth.
-Runtime-heavy behavior is owned by the focused suites referenced in
-`docs/research/14-w62-repo-aware-execution-closure.json`; the proof command uses
-the same production DAG, stale-boundary, and browser projection functions.
+For both, the command exercises the production execution-DAG and stale-boundary
+functions. It records task/unit coverage, declared parallel/conflicting scopes,
+and transitive invalidation in deterministic component fixtures.
+
+The report explicitly uses `evidence_kind=deterministic-component-fixture`,
+`browser_assessment.status=not-run`, and `quality_assessment.status=fixture-only`.
+It does not create a delivery manifest, execute public integration, or claim
+browser parity. The linked core tests provide supporting component evidence;
+W71-S10 and W71-S14 own installed provision-to-integration and delivery closure.
 
 ## Reproduce
 

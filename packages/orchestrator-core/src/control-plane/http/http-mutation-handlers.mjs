@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { HttpRequestBodyError, asString, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
 import {
   toInteractionAnswerResponse,
@@ -7,12 +9,14 @@ import {
 } from "./http-presenters.mjs";
 import { InteractionAnswerError, submitInteractionAnswer } from "../interaction-answer.mjs";
 import { runLifecycleCommand } from "../lifecycle-command.mjs";
+import { resolveAorHome, resolveLogicalEvidenceRef } from "../../aor-home.mjs";
 import { requestRunJobCancel } from "../../run-job.mjs";
 import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from "../../operator-request.mjs";
 import { applyRunControlAction } from "../run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
 import { readFlowProjection } from "../flow-projections.mjs";
 import { listTaskProjections } from "../read-surface.mjs";
+import { validateTaskActionPayload } from "../task-action-catalog.mjs";
 import {
   approveTaskPlan,
   createTaskPlan,
@@ -22,6 +26,7 @@ import {
 import { applyTopologyAction, TopologyManagementError } from "../topology-management.mjs";
 import { applyExecutionProfileAction, ExecutionProfileError } from "../execution-profile.mjs";
 import { connectAdditionalRepository, createProjectConnectionJob, deleteProjectData, disconnectProject, refreshProjectSource } from "../project-source.mjs";
+import { materializeParentIntegration, provisionProjectWorkspaceSet, workspaceSetDigest } from "../../workspace-set-service.mjs";
 import { openNativeFolderPicker } from "../folder-picker.mjs";
 import { exportEvidence, materializeProjectConfig, ProjectWritebackError } from "../../project-writeback.mjs";
 import {
@@ -297,6 +302,68 @@ export async function handleProjectAction({ request, response, registry }) {
       sendError(response, 400, "project_id_required", `Project action '${action ?? "missing"}' requires project_id.`);
       return;
     }
+    if (action === "provision-workspace-set") {
+      const context = registry.getContext(projectId);
+      if (!context) {
+        sendError(response, 404, "project_not_found", `Project '${projectId}' was not found.`);
+        return;
+      }
+      const result = provisionProjectWorkspaceSet({
+        ...context.runtimeOptions,
+        projectRef: context.projectRoot,
+        projectProfile: context.canonicalProfilePath,
+        runId: asString(payload.run_id),
+        workspaceSetId: asString(payload.workspace_set_id) ?? undefined,
+        bindingRef: asString(payload.binding_ref) ?? undefined,
+        dryRun: payload.dry_run === true,
+        deliveryCapable: payload.delivery_capable === true,
+        bindings: registry.getProjectInput(projectId)?.bindings ?? [],
+        command: "POST /api/projects/actions action=provision-workspace-set",
+      });
+      sendJson(response, result.dryRun ? 200 : 201, {
+        project_id: result.workspaceSet.project_id,
+        run_id: result.workspaceSet.run_id,
+        workspace_set: result.workspaceSet,
+        workspace_set_file: result.workspaceSetFile,
+        workspace_set_ref: result.workspaceSet.workspace_set_ref,
+        workspace_set_digest: workspaceSetDigest(result.workspaceSet),
+        dry_run: result.dryRun,
+        idempotent: result.idempotent,
+      });
+      return;
+    }
+    if (action === "integrate-parent-run") {
+      const context = registry.getContext(projectId);
+      if (!context) {
+        sendError(response, 404, "project_not_found", `Project '${projectId}' was not found.`);
+        return;
+      }
+      const childOutputRefs = Array.isArray(payload.child_output_refs)
+        ? payload.child_output_refs.filter((value) => typeof value === "string")
+        : [];
+      const result = materializeParentIntegration({
+        ...context.runtimeOptions,
+        projectRef: context.projectRoot,
+        projectProfile: context.canonicalProfilePath,
+        parentRunId: asString(payload.parent_run_id),
+        executionPlanRef: asString(payload.execution_plan_ref) ?? undefined,
+        workspaceSetRef: asString(payload.workspace_set_ref) ?? undefined,
+        childOutputRefs,
+        expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
+        command: "POST /api/projects/actions action=integrate-parent-run",
+      });
+      sendJson(response, result.idempotent ? 200 : 201, {
+        project_id: result.init.projectId,
+        parent_run: result.parent,
+        parent_run_file: result.parentFile,
+        integration_report: result.report,
+        integration_report_file: result.reportFile,
+        integration_report_ref: result.reportRef ?? null,
+        integration_authority_file: result.authorityFile ?? null,
+        idempotent: result.idempotent,
+      });
+      return;
+    }
     if (action === "refresh-source") sendJson(response, 200, refreshProjectSource({ registry, projectId }));
     else if (action === "connect-repository") sendJson(response, 201, connectAdditionalRepository({ registry, projectId, source: payload.source, label: asString(payload.label) ?? undefined }));
     else if (action === "disconnect") sendJson(response, 200, disconnectProject({ registry, projectId }));
@@ -367,16 +434,32 @@ export async function handleIntentSubmissionAction({ request, response, params, 
   }
 }
 
+function resolveTaskInputPacketPath(reference, runtimeOptions, workspaceProjectId) {
+  return resolveLogicalEvidenceRef({
+    projectRoot: runtimeOptions.projectRef ?? runtimeOptions.cwd ?? process.cwd(),
+    projectRuntimeRoot: path.join(runtimeOptions.runtimeRoot ?? resolveAorHome(), "projects", workspaceProjectId),
+    workspaceProjectId,
+    reference,
+  });
+}
+
 export async function handleTaskAction({ request, response, params, registry, runtimeOptions }) {
   const payload = await readMutationPayload(request, response);
   if (!payload) return;
   const action = asString(payload.action);
-  if (!["confirm", "start", "pause", "resume", "cancel", "retry", "request", "follow-up"].includes(action)) {
-    sendError(response, 400, "task.invalid_action", `Unsupported Task action '${action ?? "missing"}'.`);
+  const actionValidation = validateTaskActionPayload(action, payload);
+  if (!actionValidation.ok) {
+    sendError(response, 400, actionValidation.code === "task.unknown_action" ? "task.invalid_action" : actionValidation.code, actionValidation.message, {
+      action_catalog: true,
+      field_errors: actionValidation.field_errors,
+    });
     return;
   }
+  const definition = actionValidation.definition;
   const task = listTaskProjections({
     ...runtimeOptions,
+    registry,
+    projectId: params.projectId,
     intentSubmissions: listIntentSubmissions({ registry, projectId: params.projectId }).submissions,
   }).tasks.find((candidate) => candidate.task_id === params.taskId);
   if (!task) {
@@ -414,7 +497,40 @@ export async function handleTaskAction({ request, response, params, registry, ru
       });
       return;
     }
+    const durableReadback = (result = null, status = null) => {
+      const tasks = listTaskProjections({
+        ...runtimeOptions,
+        registry,
+        projectId: params.projectId,
+        intentSubmissions: listIntentSubmissions({ registry, projectId: params.projectId }).submissions,
+      });
+      const refreshed = tasks.tasks.find((candidate) => candidate.task_id === task.task_id)
+        ?? (result?.flow_id ? tasks.tasks.find((candidate) => candidate.flow_id === result.flow_id) : null)
+        ?? task;
+      return {
+        durable: true,
+        task: refreshed,
+        task_id: refreshed.task_id,
+        intent_submission_ref: refreshed.intent_submission_ref ?? null,
+        mission_id: refreshed.mission_id ?? null,
+        flow_id: refreshed.flow_id ?? result?.flow_id ?? null,
+        run_ids: refreshed.run_ids ?? [],
+        revision: refreshed.revision ?? null,
+        state: refreshed.status_detail ?? refreshed.status ?? null,
+        evidence_refs: refreshed.evidence_refs ?? [],
+        ...(status ? { result_status: status } : {}),
+      };
+    };
     if (["confirm", "start"].includes(action)) {
+      if (action === "start" && task.status === "prepared") {
+        const route = task.prepared_contract?.approved_execution_route;
+        if (!route?.route_id || route.readiness !== "ready") {
+          sendError(response, 409, "task.execution_route_not_ready", "Task start requires an approved execution route with a ready readiness revision.", {
+            recovery_actions: [{ action: "refresh", payload: { resource: `task://${task.task_id}`, current_revision: task.revision ?? null } }],
+          });
+          return;
+        }
+      }
       const submissionId = asString(task.lineage?.intent_submission_id);
       if (!submissionId) {
         sendError(response, 409, "task.confirm_unavailable", "This Task is not an intent-backed prepared submission.");
@@ -423,7 +539,22 @@ export async function handleTaskAction({ request, response, params, registry, ru
       const result = action === "confirm"
         ? confirmIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision })
         : confirmAndStartIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision });
-      sendJson(response, action === "start" ? 202 : 200, { task_id: task.task_id, action, confirmation: result, readback: { durable: true, task_id: task.task_id, flow_id: result.flow_id ?? null } });
+      sendJson(response, action === "start" ? 202 : 200, { task_id: task.task_id, action, confirmation: result, readback: durableReadback(result, action === "start" ? "accepted" : "confirmed") });
+      return;
+    }
+    if (definition.dispatch === "intent.prepare") {
+      const submissionId = asString(task.lineage?.intent_submission_id);
+      if (!submissionId) {
+        sendError(response, 409, "task.prepare_unavailable", "This Task has no intent submission that can be resumed.");
+        return;
+      }
+      const result = prepareIntentSubmission({ registry, projectId: params.projectId, submissionId });
+      sendJson(response, 202, {
+        task_id: task.task_id,
+        action,
+        preparation: result,
+        readback: durableReadback(result, "accepted"),
+      });
       return;
     }
     if (action === "request" || action === "retry") {
@@ -441,18 +572,69 @@ export async function handleTaskAction({ request, response, params, registry, ru
         targetFlowId: task.flow_id ?? undefined,
         targetRefs: asStringArray(task.evidence_refs),
         allowedPaths: asStringArray(payload.allowed_paths),
+        idempotencyKey: asString(payload.idempotency_key) ?? asString(payload.command_id) ?? undefined,
         deliveryMode: "no-write",
       });
-      sendJson(response, 201, {
+      sendJson(response, result.idempotent ? 200 : 201, {
         task_id: task.task_id,
         action,
         operator_request: {
           request_id: result.requestId,
           operator_request_ref: result.operatorRequestRef,
           status: result.status,
+          idempotent: result.idempotent === true,
           document: result.operatorRequest,
         },
-        readback: { durable: true, task_id: task.task_id, flow_id: task.flow_id },
+        readback: durableReadback(result),
+      });
+      return;
+    }
+    if (definition.dispatch === "readback") {
+      sendJson(response, 200, { task_id: task.task_id, action, accepted: true, readback: durableReadback(null, "read-only") });
+      return;
+    }
+    if (definition.dispatch === "lifecycle") {
+      if (task.primary_action?.action_id !== action) {
+        sendError(response, 409, "task.action_not_current", `Task action '${action}' is not the server-published next action.`, {
+          current_action: task.primary_action?.action_id ?? null,
+          recovery_actions: [{ action: "refresh", payload: { resource: `task://${task.task_id}`, current_revision: task.revision ?? null } }],
+        });
+        return;
+      }
+      const flags = {};
+      if (action === "discovery-run" && task.intent_submission_ref) {
+        flags["input-packet"] = resolveTaskInputPacketPath(task.intent_submission_ref, runtimeOptions, params.projectId);
+      }
+      if (["review-run", "learning-handoff"].includes(action) && task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];
+      if (["delivery-prepare", "release-prepare"].includes(action)) {
+        if (task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];
+        flags.mode = task.prepared_contract?.delivery_mode ?? "no-write";
+        flags["require-review-decision"] = true;
+      }
+      for (const [key, value] of Object.entries(payload)) {
+        if (["action", "expected_revision", "command_id", "request_text", "allowed_paths", "intent_type"].includes(key)) continue;
+        if (value !== undefined) flags[key] = value;
+      }
+      const lifecycle = runLifecycleCommand({
+        ...runtimeOptions,
+        cwd: runtimeOptions.cwd ?? runtimeOptions.projectRef,
+        projectRef: runtimeOptions.projectRef,
+        command: definition.lifecycle_command,
+        flags,
+      });
+      if (!lifecycle.ok) {
+        sendError(response, lifecycle.statusCode ?? 409, lifecycle.error?.code ?? "task.lifecycle_blocked", lifecycle.error?.detail ?? "Published Task action is blocked.", {
+          action_id: action,
+          evidence_refs: lifecycle.result?.evidence_refs ?? [],
+          recovery_actions: [{ action: "retry", payload: { task_id: task.task_id, action } }],
+        });
+        return;
+      }
+      sendJson(response, lifecycle.statusCode === 202 ? 202 : 200, {
+        task_id: task.task_id,
+        action,
+        lifecycle_command: lifecycle.result,
+        readback: durableReadback(lifecycle.result, "accepted"),
       });
       return;
     }
@@ -478,8 +660,12 @@ export async function handleTaskAction({ request, response, params, registry, ru
       });
       return;
     }
-    sendJson(response, 200, { task_id: task.task_id, action, run_control: result, readback: { durable: true, task_id: task.task_id, run_id: runId } });
+    sendJson(response, 200, { task_id: task.task_id, action, run_control: result, readback: durableReadback({ flow_id: task.flow_id, run_id: runId }, result.blocked ? "blocked" : "accepted") });
   } catch (error) {
+    if (error instanceof IntentServiceError) {
+      sendError(response, error.statusCode ?? 409, error.code, error.message, error.details);
+      return;
+    }
     if (error instanceof OperatorRequestError) {
       sendError(response, error.statusCode, error.code, error.message);
       return;
@@ -657,16 +843,18 @@ export async function handleOperatorRequestCreate({ request, response, runtimeOp
       intentType: asString(payload.intent_type) ?? "",
       requestText: asString(payload.request_text) ?? asString(payload.request) ?? "",
       targetFlowId: asString(payload.target_flow_id) ?? undefined,
+      idempotencyKey: asString(payload.idempotency_key) ?? undefined,
       targetRefs: asStringArray(payload.target_refs),
       allowedPaths: asStringArray(payload.allowed_paths),
       deliveryMode: asString(payload.delivery_mode) ?? undefined,
     });
-    sendJson(response, 201, {
+    sendJson(response, result.idempotent ? 200 : 201, {
       operator_request: {
         request_id: result.requestId,
         operator_request_ref: result.operatorRequestRef,
         operator_request_file: result.operatorRequestFile,
         status: result.status,
+        idempotent: result.idempotent === true,
         document: result.operatorRequest,
       },
     });

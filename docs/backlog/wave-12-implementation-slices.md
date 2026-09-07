@@ -114,7 +114,7 @@ Remove public live-E2E product surfaces, move rehearsal to repo-maintainer-only 
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
 - **Outcome:** Refresh proof fixtures and operator runbooks so catalog-backed evidence references the installed-user black-box proof runner and removed public commands do not appear in proof docs.
-- **Primary modules:** `docs/ops/**`, `examples/live-e2e/fixtures/**`, `packages/observability`, `scripts/live-e2e/**`
+- **Primary modules:** `docs/ops/**`, `scripts/live-e2e/fixtures/**`, `packages/observability`, `scripts/live-e2e/**`
 - **Hard dependencies:** W12-S03
 - **Primary user-story surfaces:** operator / SRE, delivery engineer, finance / audit / hygiene
 

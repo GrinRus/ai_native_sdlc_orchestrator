@@ -3,9 +3,21 @@
 ## Purpose
 Provide one installed-user black-box proof runner for catalog-backed full-journey profiles and guided installed-user journeys.
 
+For an assessment-only request, inspect existing profiles and public evidence;
+do not start, resume, repair, or record a run. The launch and continuation
+commands below apply when the user has authorized that operation. Keep the
+selected provider, profile, budgets, and delivery policy explicit. A failed
+attempt does not authorize credential changes, commits, broader permissions,
+or additional paid reruns. Preparing assessment artifacts or recording completed
+evidence is a local write and should match the requested outcome.
+
+Use the [current preflight procedure](live-e2e-no-write-preflight.md) before an
+authorized run. Contributor changes use the validation matrix in
+`CONTRIBUTING.md`; they do not require live provider proof by default.
+
 Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
-Every run starts by proving the AOR launcher before target execution. Source-channel acceptance and production-proof profiles create `${TMPDIR:-/tmp}/aor-live-e2e/<run-id>/`, copy the current AOR source into `aor-source`, run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm aor --help`, `pnpm aor project init --help`), and then use a run-scoped session launcher from that isolated source install. Manual resume may reuse the install proof only after the cached launcher also passes `aor project init --help`, so a stale or partially materialized dependency tree fails before lifecycle commands run. Runtime state is stored under `<workspace>/runtime`; target checkouts live under `<workspace>/runtime/projects/<id>/target-checkouts`. `--runtime-root` and `--aor-install-mode repo-local` are explicit dev/debug overrides, not acceptance defaults. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
+Every run starts by proving the AOR launcher before target execution. Source-channel acceptance and production-proof profiles create `${TMPDIR:-/tmp}/aor-live-e2e/<run-id>/`, copy the current AOR source into `aor-source`, run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm aor --help`, `pnpm aor project init --help`), and then use a run-scoped session launcher from that isolated source install. Manual resume may reuse the install proof only after the cached launcher also passes `aor project init --help`, so a stale or partially materialized dependency tree fails before lifecycle commands run. Internal proof state is stored under `<workspace>/runtime`; target checkouts live under `<workspace>/runtime/projects/<id>/target-checkouts`. The session launcher sets a separate isolated `AOR_HOME` for mutable product state. Explicit ignored `.aor/` rehearsal output and permitted target preparation files do not redefine the installed-user `${AOR_HOME:-$HOME/.aor}` layout. `--runtime-root` and `--aor-install-mode repo-local` are explicit dev/debug overrides, not acceptance defaults. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
 
 Profiles whose provider CLI, target test harness, or local tooling derives state from the checkout path may set `live_e2e.target_checkout_root_mode: short-physical`. In that mode the runner still stores AOR reports and state under the normal isolated workspace, but clones the target repository into a short physical temp checkout. Use this only for path-length-sensitive targets or providers; no-upstream-write, delivery guardrails, and target `.aor/` runtime ownership remain unchanged.
 
@@ -487,6 +499,9 @@ upstream write occurs.
 ## Step evaluator
 Use the step evaluator when the run must fail closed if any controller phase evidence is missing:
 
+This starts or continues live execution. Xlarge profiles remain manual-only and
+are rejected by this entrypoint; use the manual step-quality workflow for them.
+
 ```bash
 node ./scripts/live-e2e/step-evaluator.mjs \
   --project-ref . \
@@ -496,12 +511,13 @@ node ./scripts/live-e2e/step-evaluator.mjs \
 The evaluator uses the same controller as `run-profile.mjs`, runs in automatic mode until terminal success or an unresolved action, and rejects reports where any observed step lacks `plan`, execution, inspection, classification, or decision evidence. When a public step completes with deterministic `pass`, `warn`, or `resumed` evidence but is waiting for a skill-agent operator decision, the evaluator writes that operator decision through the same `live-e2e-operator-decision-*` artifact boundary used by `manual-live-e2e.mjs --prepare-decision`; it does not mutate the target checkout or inject private handoff data. For `medium+ product-change` steps, the evaluator then waits for a linked `live-e2e-step-quality-assessment-request-*` and accepted evaluator-authored `live-e2e-step-quality-assessment-report-*` before the controller may continue. `aor harness certify` remains the public replay/certification command inside the SDLC flow; the step evaluator is the live E2E decision-loop wrapper.
 
 ## Qualification loop
-Use the qualification loop helper for the outer fix-and-rerun workflow:
+Use the qualification loop helper for an authorized medium/large attempt.
+Inspection of an existing attempt does not require launching this command:
 
 ```bash
 node ./scripts/live-e2e/qualification-loop.mjs \
   --project-ref . \
-  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-medium-open-code.yaml
+  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml
 ```
 
 The helper accepts only medium or large profiles. Xlarge profiles are
@@ -511,19 +527,30 @@ E2E, writes `live-e2e-qualification-analysis-*`, and exits as:
 - `2` / `needs_fix`: AOR code or live E2E flow likely needs a patch before rerun;
 - `3` / `blocked`: environment, provider, auth, permission, or safety setup prevented a valid evaluation.
 
-When the helper exits `blocked` because an acceptance profile is waiting for required skill-agent decisions, complete the same run with `manual-live-e2e.mjs`. After the terminal manual resume writes a passing run summary and final observation report, reconcile that same evidence into the qualification set without starting a new target workspace:
+When the helper exits `blocked` because an acceptance profile is waiting for required skill-agent decisions, complete the same authorized run with `manual-live-e2e.mjs`. After terminal manual resume, assess the outcome and pass the final all-pass gate. When qualification recording is requested, reconcile that evidence without starting a new target workspace:
 
 ```bash
 node ./scripts/live-e2e/qualification-loop.mjs \
   --project-ref . \
   --profile ./scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml \
   --qualification-set-file /tmp/aor-live-e2e-qualification-set.json \
-  --record-run-summary-file <live-e2e-run-summary-file>
+  --record-run-summary-file <live-e2e-run-summary-file> \
+  --final-assessment-report-file <live-e2e-quality-assessment-report>
 ```
 
 Record mode applies the same medium/large and pass/fix/block classification gates as a fresh run, reads the observation report from the summary unless `--record-observation-report-file` is supplied, and upserts the qualification-set attempt by `run_id` so a manually resumed run replaces its earlier blocked accounting entry. The recorded summary must match the selected profile's `profile_id`, `target_catalog_id`, `feature_mission_id`, `scenario_family`, `provider_variant_id`, and `feature_size`. Run summaries include `commit_sha` and `branch_name`; record mode requires `commit_sha` to be on the current branch lineage and rejects cross-profile, cross-provider, corrupt, stale, or xlarge-only qualification evidence before writing the qualification set.
 
-The launching agent performs the fix and commit. Final qualification requires at least five full positive medium/large runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`. `qwen-primary` is extended candidate evidence and does not count toward the required qualification set until a future promotion changes its coverage tier.
+For `needs_fix`, inspect the analysis artifact and perform only the correction
+authorized by the task. For `blocked`, report the setup, permission, or evidence
+gap before judging product quality. Neither result instructs the agent to change
+credentials, commit, or spend another provider attempt automatically.
+
+Current W66 qualification requires four cells: OpenAI and Anthropic at medium
+and large, on one AOR commit and one pinned target commit, with all-pass final
+assessment. OpenCode and Qwen are extended paths. The former five-run counting
+rule is historical and does not close W66. Use the
+[provider qualification runbook](live-e2e-provider-qualification.md) for the
+current cell and freshness requirements.
 
 W40 adds an optional provider qualification matrix for installed-user alpha
 operations. That matrix is separate from historical final-qualification counts:
@@ -917,7 +944,8 @@ The run summary links `live_e2e_run_health_report_file`. This report is the only
 Run-health must not evaluate produced code, artifact content, test adequacy, security, performance, AOR operator UI/UX, accessibility, or release readiness. A run can have `overall_status=warn` from factual diagnostic evidence while still being eligible for post-run assessment, and a run can have passing run-health while the post-run quality assessment still reports weak or failing outcome quality.
 
 ## Post-Run Quality Assessment
-After the full flow, the launching SWE agent prepares an assessment request:
+When outcome assessment artifacts are requested, prepare an assessment request
+after a completed full flow with eligible run-health and observation evidence:
 
 ```bash
 node ./scripts/live-e2e/quality-assessment.mjs prepare \
@@ -956,15 +984,16 @@ closure evidence.
 The assessment report must cover artifact content, implementation correctness/completeness, maintainability, tests, security, performance risk, verification quality, delivery safety, AOR operator UI/UX, AOR operator accessibility, evidence strength, and acceptance criteria traceability. Every dimension records `status`, `evidence_strength`, inspected refs, findings, and follow-ups. The AOR operator UI/UX dimensions also record required subdimensions for task success, flow navigation, next actions, blockers, recovery, state feedback, visual responsiveness, raw JSON independence, keyboard navigation, focus, contrast/readability, semantic structure, screen-reader labels, and accessible error feedback. Missing or weak signals must stay visible in `gap_report`.
 
 Headless full-journey profiles normally do not produce AOR operator UI/UX or
-accessibility evidence. When strict quality closure needs those dimensions, run
-the matching guided installed-user proof for the same AOR commit and pass that
+accessibility evidence. When strict quality closure needs those dimensions, use
+an existing matching guided installed-user proof for the same AOR commit, or
+run it when that additional proof is authorized, and pass that
 guided run summary to `quality-assessment prepare` with
 `--paired-aor-operator-ui-run-summary-file`. This paired evidence may be used
 only for AOR operator UI/UX and accessibility; target repository UI remains part
 of implementation and verification evidence when the mission requires it.
 
 ## Operator checks
-- Summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
+- Summary and scorecard refs resolve in the selected internal proof workspace; product evidence refs resolve in the isolated session `AOR_HOME`.
 - `target_checkout_root` exists and is a cloned checkout, not the control-plane repository root.
 - `review-report.code_quality.target_checkout_root` and Runtime Harness
   `mission_semantics.git_status_root` point at that same checkout.

@@ -1,27 +1,32 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
+import { assertProcessSuccess, runCheckedProcess } from "./process-runner.mjs";
+import { SUPPORTED_NODE_ENGINE } from "./release-lib.mjs";
+
+const supportedNode = /^22\./u.test(process.versions.node);
+if (!supportedNode) {
+  throw new Error(`release smoke requires Node.js ${SUPPORTED_NODE_ENGINE}; got ${process.version}.`);
+}
+
 function runChecked(command, args, options = {}) {
-  const env = {
-    ...process.env,
-    ...(options.env ?? {}),
-  };
+  const env = { ...process.env, ...(options.env ?? {}) };
   delete env.AOR_BOOTSTRAP_ASSETS_ROOT;
   delete env.AOR_EXAMPLES_ROOT;
 
-  const run = spawnSync(command, args, {
+  const result = runCheckedProcess({
+    label: `${command} ${args.join(" ")}`,
+    command,
+    args,
     cwd: options.cwd ?? process.cwd(),
-    encoding: "utf8",
     env,
+    timeoutMs: options.timeoutMs ?? 120_000,
   });
-  if (run.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed\nstdout:\n${run.stdout}\nstderr:\n${run.stderr}`);
-  }
-  return run;
+  assertProcessSuccess(result);
+  return { ...result, status: result.exit_code };
 }
 
 function parseJsonOutput(stdout) {

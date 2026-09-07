@@ -4,9 +4,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validatePublicId } from "../../contracts/src/index.mjs";
+import { readCanonicalContainedFile, removeCanonicalContainedPath } from "./shared/canonical-paths.mjs";
 
 const SUPPORTED_WORKSPACE_MODES = new Set(["ephemeral", "workspace-clone", "worktree"]);
 const SUPPORTED_CLEANUP_ACTIONS = new Set(["delete", "retain", "none"]);
+const CLEANUP_STATES = new Set(["pending", "deleting", "deleted", "delete-failed"]);
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -57,6 +59,17 @@ function runGit(cwd, args, allowFailure = false) {
     throw new Error(`Git command failed in '${cwd}': git ${args.join(" ")} (${(result.stderr || result.stdout || "unknown error").trim()})`);
   }
   return result;
+}
+
+function atomicJson(filePath, value) {
+  const temporary = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+  fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
+  fs.renameSync(temporary, filePath);
+}
+
+function writeCleanupState(filePath, state, details = {}) {
+  if (!CLEANUP_STATES.has(state)) throw new Error(`Unsupported workspace cleanup state '${state}'.`);
+  atomicJson(filePath, { schema_version: 1, state, updated_at: new Date().toISOString(), ...details });
 }
 
 function gitValue(cwd, args) {
@@ -183,7 +196,10 @@ function isPythonVirtualEnvironmentRoot(candidate) {
 
 function mirrorProjectTree(sourceRoot, targetRoot, runtimeRoot) {
   for (const entry of fs.readdirSync(targetRoot)) {
-    if (entry !== ".git") fs.rmSync(path.join(targetRoot, entry), { recursive: true, force: true });
+    if (entry !== ".git") {
+      const removal = removeCanonicalContainedPath({ root: targetRoot, target: path.join(targetRoot, entry) });
+      if (!removal.ok) throw new Error(`Workspace mirror cleanup refused '${entry}' (${removal.reason}).`);
+    }
   }
   for (const entry of fs.readdirSync(sourceRoot)) {
     const sourceEntry = path.join(sourceRoot, entry);
@@ -220,11 +236,13 @@ function provisionGitWorkspace({ sourceRoot, executionRoot, requestedMode, sourc
       mirrorProjectTree(sourceRoot, executionRoot, runtimeRoot);
       return { strategy: "detached-worktree", ref: sourceGit.head, provisioning: "git-worktree" };
     }
-    fs.rmSync(executionRoot, { recursive: true, force: true });
+    const removal = removeCanonicalContainedPath({ root: path.dirname(executionRoot), target: executionRoot });
+    if (!removal.ok) throw new Error(`Failed to remove incomplete worktree (${removal.reason}).`);
   }
   const clone = runGit(sourceRoot, ["clone", "--no-hardlinks", "--no-checkout", "--", sourceRoot, executionRoot], true);
   if (clone.status !== 0) {
-    fs.rmSync(executionRoot, { recursive: true, force: true });
+    const removal = removeCanonicalContainedPath({ root: path.dirname(executionRoot), target: executionRoot });
+    if (!removal.ok) throw new Error(`Failed to remove incomplete clone (${removal.reason}).`);
     return null;
   }
   runGit(executionRoot, ["checkout", "--detach", sourceGit.head]);
@@ -232,9 +250,9 @@ function provisionGitWorkspace({ sourceRoot, executionRoot, requestedMode, sourc
   return { strategy: "independent-clone", ref: sourceGit.head, provisioning: "git-clone" };
 }
 
-function cleanupWorkspace({ executionRoot, sourceRoot, workspacesRoot, ownerMarker, strategy, action, outcome }) {
+function cleanupWorkspace({ executionRoot, sourceRoot, workspacesRoot, ownerMarker, cleanupStatePath, strategy, action, outcome }) {
   if (action === "none" || action === "retain") {
-    return { outcome, action, status: action === "retain" ? "retained" : "skipped", performed: false, exists_after: fs.existsSync(executionRoot), error: null };
+    return { outcome, action, status: action === "retain" ? "retained" : "skipped", state: "pending", performed: false, exists_after: fs.existsSync(executionRoot), error: null };
   }
   try {
     const canonicalSource = fs.realpathSync.native(sourceRoot);
@@ -243,21 +261,30 @@ function cleanupWorkspace({ executionRoot, sourceRoot, workspacesRoot, ownerMark
     if (lexicalExecution === canonicalSource || !isPathInsideRoot(lexicalExecution, canonicalManagedRoot)) {
       throw new Error("Refusing to delete a workspace outside the managed workspace root or equal to the primary checkout.");
     }
-    const marker = JSON.parse(fs.readFileSync(ownerMarker, "utf8"));
+    const markerRelative = path.relative(canonicalManagedRoot, ownerMarker).split(path.sep).join("/");
+    const markerRead = readCanonicalContainedFile({ root: canonicalManagedRoot, relativePath: markerRelative, base: "repository-bound", maxBytes: 32 * 1024 });
+    if (!markerRead.ok) throw new Error(`Workspace owner marker cannot be safely read (${markerRead.reason}).`);
+    const marker = JSON.parse(markerRead.bytes.toString("utf8"));
     if (marker.execution_root !== lexicalExecution || marker.source_root !== canonicalSource) {
       throw new Error("Workspace owner marker does not match the cleanup target.");
     }
     if (fs.existsSync(executionRoot) && fs.lstatSync(executionRoot).isSymbolicLink()) {
       throw new Error("Refusing to follow a symlinked workspace during cleanup.");
     }
+    writeCleanupState(cleanupStatePath, "deleting", { outcome, action, execution_root: lexicalExecution, source_root: canonicalSource });
     if (strategy === "detached-worktree" && fs.existsSync(executionRoot)) {
       runGit(canonicalSource, ["worktree", "remove", "--force", executionRoot], true);
     }
-    fs.rmSync(executionRoot, { recursive: true, force: true });
-    fs.rmSync(ownerMarker, { force: true });
-    return { outcome, action, status: "deleted", performed: true, exists_after: false, error: null };
+    const removal = removeCanonicalContainedPath({ root: canonicalManagedRoot, target: executionRoot });
+    if (!removal.ok) throw new Error(`Workspace cleanup refused its execution root (${removal.reason}).`);
+    const markerRemoval = removeCanonicalContainedPath({ root: canonicalManagedRoot, target: ownerMarker });
+    if (!markerRemoval.ok) throw new Error(`Workspace owner marker cleanup failed (${markerRemoval.reason}).`);
+    writeCleanupState(cleanupStatePath, "deleted", { outcome, action, execution_root: lexicalExecution, source_root: canonicalSource });
+    return { outcome, action, status: "deleted", state: "deleted", performed: true, exists_after: false, error: null };
   } catch (error) {
-    return { outcome, action, status: "delete-failed", performed: false, exists_after: fs.existsSync(executionRoot), error: error instanceof Error ? error.message : String(error) };
+    const message = error instanceof Error ? error.message : String(error);
+    try { writeCleanupState(cleanupStatePath, "delete-failed", { outcome, action, error: message }); } catch { /* preserve the original cleanup failure */ }
+    return { outcome, action, status: "delete-failed", state: "delete-failed", performed: false, exists_after: fs.existsSync(executionRoot), error: message };
   }
 }
 
@@ -294,6 +321,7 @@ export function prepareWorkspaceIsolation(options) {
   const workspaceId = `${requestedMode}-${options.runId}-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
   const executionRoot = path.join(canonicalWorkspacesRoot, workspaceId);
   const ownerMarker = path.join(canonicalWorkspacesRoot, `.${workspaceId}.owner.json`);
+  const cleanupStatePath = path.join(canonicalWorkspacesRoot, `.${workspaceId}.cleanup.json`);
   const sourceGit = inspectGitCheckout(sourceRoot);
   let checkout = provisionGitWorkspace({ sourceRoot, executionRoot, requestedMode, sourceGit, runtimeRoot });
   if (!checkout) checkout = snapshotNonGitTree(sourceRoot, executionRoot, runtimeRoot);
@@ -303,11 +331,12 @@ export function prepareWorkspaceIsolation(options) {
   }
   const executionGit = sourceGit ? verifyIndependentGitDirs(sourceGit, canonicalExecutionRoot) : inspectGitCheckout(canonicalExecutionRoot);
   fs.writeFileSync(ownerMarker, `${JSON.stringify({ source_root: sourceRoot, execution_root: canonicalExecutionRoot, strategy: checkout.strategy, requested_mode: requestedMode }, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+  writeCleanupState(cleanupStatePath, "pending", { execution_root: canonicalExecutionRoot, source_root: sourceRoot });
   const cleanupPolicy = resolveCleanupPolicy(options.runtimeDefaults);
   let finalized = null;
   const performCleanup = (outcome, action) => {
     if (finalized) return finalized;
-    finalized = cleanupWorkspace({ executionRoot: canonicalExecutionRoot, sourceRoot, workspacesRoot: canonicalWorkspacesRoot, ownerMarker, strategy: checkout.strategy, action, outcome });
+    finalized = cleanupWorkspace({ executionRoot: canonicalExecutionRoot, sourceRoot, workspacesRoot: canonicalWorkspacesRoot, ownerMarker, cleanupStatePath, strategy: checkout.strategy, action, outcome });
     return finalized;
   };
   return {
@@ -320,6 +349,7 @@ export function prepareWorkspaceIsolation(options) {
     provisioned: true,
     cleanupPolicy,
     ownerMarker,
+    cleanupStatePath,
     cleanup: performCleanup,
     finalize: (outcome) => {
       const action = outcome === "success" ? cleanupPolicy.on_success : outcome === "abort" ? cleanupPolicy.on_abort : cleanupPolicy.on_failure;
@@ -333,21 +363,24 @@ export function resumeWorkspaceIsolation(options) {
   const projectRuntimeRoot = canonicalDirectory(options.projectRuntimeRoot, "Project runtime root");
   const workspacesRootCandidate = path.join(projectRuntimeRoot, "workspaces");
   const executionRootCandidate = path.resolve(options.executionRoot);
-  if (
-    !fs.existsSync(workspacesRootCandidate) ||
-    executionRootCandidate === sourceRoot ||
-    !isPathInsideRoot(executionRootCandidate, workspacesRootCandidate)
-  ) {
+  if (!fs.existsSync(workspacesRootCandidate)) {
     throw new Error("Only an owned disposable workspace can be resumed.");
   }
   const workspacesRoot = canonicalDirectory(workspacesRootCandidate, "Managed workspaces root");
+  if (!isPathInsideRoot(workspacesRoot, projectRuntimeRoot) || workspacesRoot === projectRuntimeRoot || executionRootCandidate === sourceRoot || !isPathInsideRoot(executionRootCandidate, workspacesRoot)) {
+    throw new Error("Only an owned disposable workspace can be resumed.");
+  }
   const executionRoot = canonicalDirectory(options.executionRoot, "Disposable execution root");
   if (executionRoot === sourceRoot || !isPathInsideRoot(executionRoot, workspacesRoot)) {
     throw new Error("Only an owned disposable workspace can be resumed.");
   }
   const workspaceId = path.basename(executionRoot);
   const ownerMarker = path.join(workspacesRoot, `.${workspaceId}.owner.json`);
-  const marker = JSON.parse(fs.readFileSync(ownerMarker, "utf8"));
+  const cleanupStatePath = path.join(workspacesRoot, `.${workspaceId}.cleanup.json`);
+  const markerRelative = path.relative(workspacesRoot, ownerMarker).split(path.sep).join("/");
+  const markerRead = readCanonicalContainedFile({ root: workspacesRoot, relativePath: markerRelative, base: "repository-bound", maxBytes: 32 * 1024 });
+  if (!markerRead.ok) throw new Error(`Disposable workspace owner marker cannot be safely read (${markerRead.reason}).`);
+  const marker = JSON.parse(markerRead.bytes.toString("utf8"));
   if (marker.execution_root !== executionRoot || marker.source_root !== sourceRoot) {
     throw new Error("Disposable workspace owner marker does not match the requested source and execution roots.");
   }
@@ -359,7 +392,7 @@ export function resumeWorkspaceIsolation(options) {
   let finalized = null;
   const performCleanup = (outcome, action) => {
     if (finalized) return finalized;
-    finalized = cleanupWorkspace({ executionRoot, sourceRoot, workspacesRoot, ownerMarker, strategy, action, outcome });
+    finalized = cleanupWorkspace({ executionRoot, sourceRoot, workspacesRoot, ownerMarker, cleanupStatePath, strategy, action, outcome });
     return finalized;
   };
   return {
@@ -377,6 +410,7 @@ export function resumeWorkspaceIsolation(options) {
     provisioned: true,
     cleanupPolicy,
     ownerMarker,
+    cleanupStatePath,
     cleanup: performCleanup,
     finalize: (outcome) => {
       const action = outcome === "success" ? cleanupPolicy.on_success : outcome === "abort" ? cleanupPolicy.on_abort : cleanupPolicy.on_failure;
@@ -387,9 +421,13 @@ export function resumeWorkspaceIsolation(options) {
 
 export function resumeWorkspaceSetIsolation(options) {
   const projectRuntimeRoot = canonicalDirectory(options.projectRuntimeRoot, "Project runtime root");
-  const workspaceSetsRoot = path.join(projectRuntimeRoot, "workspace-sets");
+  const workspaceSetsRootCandidate = path.join(projectRuntimeRoot, "workspace-sets");
   const executionRoot = canonicalDirectory(options.executionRoot, "Workspace-set execution root");
-  if (!fs.existsSync(workspaceSetsRoot) || !isPathInsideRoot(executionRoot, canonicalDirectory(workspaceSetsRoot, "Workspace sets root"))) {
+  if (!fs.existsSync(workspaceSetsRootCandidate)) {
+    throw new Error("Only an owned workspace-set repository can be reused.");
+  }
+  const workspaceSetsRoot = canonicalDirectory(workspaceSetsRootCandidate, "Workspace sets root");
+  if (!isPathInsideRoot(workspaceSetsRoot, projectRuntimeRoot) || workspaceSetsRoot === projectRuntimeRoot || !isPathInsideRoot(executionRoot, workspaceSetsRoot)) {
     throw new Error("Only an owned workspace-set repository can be reused.");
   }
   const relative = path.relative(workspaceSetsRoot, executionRoot);
@@ -397,7 +435,10 @@ export function resumeWorkspaceSetIsolation(options) {
   if (!workspaceDirectory) throw new Error("Workspace-set execution root has no owning workspace.");
   const workspaceRoot = canonicalDirectory(path.join(workspaceSetsRoot, workspaceDirectory), "Workspace-set root");
   const ownerMarker = path.join(workspaceRoot, ".aor-workspace-set-owner.json");
-  const marker = JSON.parse(fs.readFileSync(ownerMarker, "utf8"));
+  const markerRelative = path.relative(workspaceSetsRoot, ownerMarker).split(path.sep).join("/");
+  const markerRead = readCanonicalContainedFile({ root: workspaceSetsRoot, relativePath: markerRelative, base: "repository-bound", maxBytes: 32 * 1024 });
+  if (!markerRead.ok) throw new Error(`Workspace-set owner marker cannot be safely read (${markerRead.reason}).`);
+  const marker = JSON.parse(markerRead.bytes.toString("utf8"));
   if (path.resolve(marker.workspace_root) !== workspaceRoot || !marker.workspace_set_id || !marker.project_id || !marker.run_id) {
     throw new Error("Workspace-set owner marker does not match the requested execution root.");
   }

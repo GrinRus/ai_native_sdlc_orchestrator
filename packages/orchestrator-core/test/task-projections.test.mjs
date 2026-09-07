@@ -27,8 +27,11 @@ test("Task projection has stable lineage identity and delegates lifecycle to Flo
   assert.equal(task.status, "active");
   assert.deepEqual(task.lineage, {
     intent_submission_ref: baseFlow.intake_packet_ref,
+    intent_submission_id: null,
+    normalization_revision: null,
     mission_id: "mission-1",
     flow_id: baseFlow.flow_id,
+    run_ids: ["run.task-projection.v1"],
   });
   assert.equal(task.lifecycle_path.owner, "runtime");
   assert.equal(task.primary_action.operator_control, "Run discovery");
@@ -116,9 +119,48 @@ test("intent submissions project into draft, prepared, and attention Task states
   assert.deepEqual(projection.tasks.slice(0, 3).map((task) => task.status), ["draft", "prepared", "attention"]);
   assert.equal(projection.prepared_task_ids.length, 1);
   assert.equal(projection.tasks[1].lineage.flow_id, null);
-  assert.equal(projection.tasks[1].primary_action.action_id, "confirm");
+  assert.equal(projection.tasks[1].primary_action.action_id, "start");
   assert.equal(projection.tasks[1].primary_action.operator_control, "Start task");
   assert.equal(projection.tasks[2].runner_selection.readiness, "blocked");
   const repositorySource = projection.tasks[1].source_items.find((source) => source.kind === "repository-markdown");
   assert.equal(repositorySource.stale, true);
+});
+
+test("prepared Task uses the approved execution profile and never exposes intake provenance as route", () => {
+  const projection = listTaskProjections({
+    projectId: "project-alpha",
+    projectRef: ".",
+    executionProfile: {
+      revision: 9,
+      routes: [{ step: "implement", route_id: "route.implement.default", readiness: "ready", requested_model: "coding-primary", effective_model: "coding-primary" }],
+    },
+    intentSubmissions: [{
+      submission: {
+        submission_id: "intent-prepared",
+        status: "prepared",
+        request_text: "Implement a bounded change",
+        created_at: "2026-08-13T10:00:00.000Z",
+        updated_at: "2026-08-13T10:01:00.000Z",
+        attachments: [],
+        normalization_refs: ["evidence://projects/project-alpha/reports/normalization-v2.json"],
+      },
+      normalization: {
+        title: "Implement a bounded change",
+        outcome: "Implement the requested change.",
+        acceptance: ["Focused test passes."],
+        scope: ["packages/**"],
+        work_type: "code-change",
+        delivery_mode: "patch-only",
+        revision: 2,
+        provider: { route_id: "route.intake-normalize.default", adapter_id: "codex-cli" },
+      },
+    }],
+  });
+  const task = projection.tasks[0];
+  assert.equal(task.prepared_contract.approved_execution_route.route_id, "route.implement.default");
+  assert.equal(task.runner_selection.route_id, "route.implement.default");
+  assert.equal(task.prepared_contract.readiness_revision, 9);
+  assert.equal(task.prepared_contract.write_effects.upstream_writes_allowed, false);
+  assert.equal(task.primary_action.action_id, "start");
+  assert.equal(task.primary_action.available, true);
 });

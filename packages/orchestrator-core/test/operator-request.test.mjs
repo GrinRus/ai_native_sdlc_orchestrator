@@ -233,6 +233,80 @@ test("operator request create/run routes request ref through compiled context an
   });
 });
 
+test("operator request creation is idempotent and a stale running request resumes once", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const first = createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      targetStage: "spec",
+      intentType: "analyze",
+      requestText: "Analyze README exactly once.",
+      targetRefs: ["README.md"],
+      idempotencyKey: "operator-request-test-once",
+    });
+    const second = createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      targetStage: "spec",
+      intentType: "analyze",
+      requestText: "Analyze README exactly once.",
+      targetRefs: ["README.md"],
+      idempotencyKey: "operator-request-test-once",
+    });
+    assert.equal(second.idempotent, true);
+    assert.equal(second.requestId, first.requestId);
+    assert.equal(fs.readdirSync(first.init?.runtimeLayout?.reportsRoot ?? path.dirname(first.operatorRequestFile)).filter((entry) => entry.startsWith("operator-request-") && entry.endsWith(".json")).length, 1);
+
+    const document = JSON.parse(fs.readFileSync(first.operatorRequestFile, "utf8"));
+    document.status = "running";
+    document.attempt = 1;
+    document.execution = { attempt: 1, status: "running", recovery_action: "request run" };
+    fs.writeFileSync(first.operatorRequestFile, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+    const resumed = runOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      requestRef: first.operatorRequestRef,
+      targetStep: "spec",
+    });
+    assert.equal(resumed.status, "completed");
+    assert.equal(resumed.idempotent, false);
+    assert.equal(JSON.parse(fs.readFileSync(first.operatorRequestFile, "utf8")).attempt, 2);
+    const replay = runOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      requestRef: first.operatorRequestRef,
+      targetStep: "spec",
+    });
+    assert.equal(replay.status, "completed");
+    assert.equal(replay.idempotent, true);
+    assert.equal(replay.runId, resumed.runId);
+  });
+});
+
+test("operator request idempotency keys reject a materially different replay", async () => {
+  await withTempRepo((repoRoot) => {
+    createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      targetStage: "spec",
+      intentType: "analyze",
+      requestText: "Original request.",
+      idempotencyKey: "operator-request-test-conflict",
+    });
+    assert.throws(
+      () => createOperatorRequest({
+        cwd: repoRoot,
+        projectRef: repoRoot,
+        targetStage: "spec",
+        intentType: "analyze",
+        requestText: "Different request.",
+        idempotencyKey: "operator-request-test-conflict",
+      }),
+      (error) => error?.code === "operator_request.idempotency_conflict" && error?.statusCode === 409,
+    );
+  });
+});
+
 test("patch-only operator requests require scope and emit patch evidence without mutating source files", async () => {
   await withTempRepo(async (repoRoot) => {
     assert.throws(

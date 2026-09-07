@@ -2,6 +2,11 @@
 
 W65-S07 passes the combined W63/W65 installed Chromium catalog with Quiet Cockpit as the only packaged renderer. All 15 browser cases pass, including the selector-free fifteen-transition safe no-write golden lifecycle.
 
+This records the W65-S07 result for its accepted renderer. Current
+`pnpm test:web:browser` validates Task Workspace; it does not rerun the retired
+W63/W65 matrix. Historical source and fixtures are retained through the
+[W65 evidence index](23-w65-post-cutover-evidence-index.json).
+
 ## Quality verdict
 
 - Desktop, tablet, mobile, keyboard-only, reduced-motion, and 200% reflow profiles pass without page-level overflow or focus leakage.

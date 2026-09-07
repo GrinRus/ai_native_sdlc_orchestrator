@@ -19,7 +19,7 @@ without terminal-only ambiguity.
 
 ## Adopted target design
 
-`docs/product/05-quiet-cockpit-console-design.md` is the W63 product and UX
+[W63 Quiet Cockpit design snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/05-quiet-cockpit-console-design.md) is the W63 product and UX
 target. Quiet Cockpit is the eventual default selected-Flow shell; Attention,
 Journey, and Evidence are flow-scoped specialist modes over the same
 runtime-owned packets, reports, policies, and mutations. They do not introduce

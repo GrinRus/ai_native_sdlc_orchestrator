@@ -1,17 +1,18 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import process from "node:process";
 
 import { packedFilesFromNpmPackJson, validatePackedFiles } from "./release-lib.mjs";
+import { runCheckedProcess } from "./process-runner.mjs";
 
-const packRun = spawnSync("npm", ["pack", "--dry-run", "--json"], {
+const packRun = runCheckedProcess({
+  label: "npm pack --dry-run",
+  command: "npm",
+  args: ["pack", "--dry-run", "--json"],
   cwd: process.cwd(),
-  encoding: "utf8",
 });
-
-if (packRun.status !== 0) {
-  process.stderr.write(packRun.stderr || packRun.stdout || "npm pack --dry-run failed.\n");
-  process.exit(packRun.status ?? 1);
+if (!packRun.ok) {
+  process.stderr.write(`${packRun.message}\n${packRun.stderr || packRun.stdout || "npm pack --dry-run failed."}\n`);
+  process.exit(1);
 }
 
 const jsonStart = packRun.stdout.indexOf("[");

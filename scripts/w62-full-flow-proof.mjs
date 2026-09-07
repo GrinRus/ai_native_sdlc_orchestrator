@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 
 import { enrichExecutionDag, executionDagDigest, validateExecutionDagCoverage } from "../packages/orchestrator-core/src/execution-dag-planner.mjs";
 import { computeStaleBoundary } from "../packages/orchestrator-core/src/integration-service.mjs";
-import { deliveryTransactionRows } from "../apps/web/src/execution-orchestration-model.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputIndex = process.argv.indexOf("--output");
@@ -59,28 +58,6 @@ function scenario({ id, repositories, tasks }) {
     execution_unit_id: unit.unit_id,
     depends_on: unit.depends_on,
   })), [{ execution_unit_id: dag.units[0].unit_id }]);
-  const integrationReportRef = `evidence://reports/integration-report-${parentRunId}.json`;
-  const manifest = {
-    schema_version: 2,
-    manifest_id: `delivery.${id}`,
-    status: "submitted",
-    repo_deliveries: repositories.map((repository) => ({
-      repo_id: repository.repo_id,
-      transaction_stage: "complete",
-      changed_paths: [`${repository.workspace_mount}/proof.txt`],
-      writeback_result: "patch-materialized",
-      rollback_refs: [],
-    })),
-    coordination_transaction: {
-      status: "complete",
-      integration_report_ref: integrationReportRef,
-      completed_repo_ids: repositories.map((entry) => entry.repo_id),
-      failed_repo_ids: [],
-      rollback_refs: [],
-    },
-  };
-  const projection = deliveryTransactionRows([manifest])[0];
-  if (projection.status !== "complete" || projection.partial) throw new Error(`${id} delivery projection is not complete.`);
 
   return {
     id,
@@ -90,11 +67,9 @@ function scenario({ id, repositories, tasks }) {
     task_ids: tasks.map((entry) => entry.task_id),
     execution_unit_ids: dag.units.map((entry) => entry.unit_id),
     execution_plan: {
-      ref: `evidence://plans/execution-plan-${id}.json`,
       dag_digest: executionDagDigest(dag),
       coverage: "complete",
     },
-    workspace_set_ref: `evidence://workspace-sets/workspace-set-${id}.json`,
     parent_run_id: parentRunId,
     scheduler: {
       parallel_approved_units: parallel.map((entry) => entry.unit_id),
@@ -107,9 +82,6 @@ function scenario({ id, repositories, tasks }) {
       stale_units: staleUnits,
       repair_budget: { consumed: 1, maximum: 1, exhausted_path_status: "blocked" },
     },
-    integration_report_ref: integrationReportRef,
-    delivery_manifest_ref: `evidence://delivery/${manifest.manifest_id}.json`,
-    delivery_projection: projection,
     no_upstream_write: true,
   };
 }
@@ -118,6 +90,8 @@ const report = {
   schema_version: 1,
   wave_id: "W62",
   status: "pass",
+  evidence_kind: "deterministic-component-fixture",
+  exercised_components: ["execution-dag", "stale-boundary"],
   scenarios: [
     scenario({
       id: "monorepo",
@@ -145,18 +119,16 @@ const report = {
       ],
     }),
   ],
-  public_surface_parity: ["CLI", "HTTP", "SSE", "browser", "Runtime Harness"],
+  public_surface_parity: [],
   inspected_evidence_refs: [
     "packages/orchestrator-core/test/execution-dag-planner.test.mjs",
     "packages/orchestrator-core/test/workspace-set-provisioner.test.mjs",
     "packages/orchestrator-core/test/parent-run-scheduler.test.mjs",
     "packages/orchestrator-core/test/integration-service.test.mjs",
     "packages/orchestrator-core/test/delivery-driver.test.mjs",
-    "apps/web/test/execution-orchestration.test.mjs",
-    "apps/web/browser/operator-console.spec.mjs",
   ],
-  browser_assessment: { status: "pass", keyboard: true, responsive: true, recovery_actions: "contract-owned" },
-  quality_assessment: { status: "pass", inspected_evidence_count: 7 },
+  browser_assessment: { status: "not-run", reason: "This component fixture does not launch the installed UI." },
+  quality_assessment: { status: "fixture-only", inspected_evidence_count: 5 },
   credentialed_provider_calls: false,
   external_provider_network: false,
   upstream_writes: false,

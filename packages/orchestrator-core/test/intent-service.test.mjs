@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { createLocalProjectRegistry } from "../src/control-plane/local-project-registry.mjs";
+import { listTaskProjections } from "../src/control-plane/task-projections.mjs";
 import {
   IntentServiceError,
   answerIntentQuestions,
@@ -21,6 +23,28 @@ import {
 } from "../src/intent-service.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const intentModuleUrl = new URL("../src/intent-service.mjs", import.meta.url).href;
+
+function runPreparationWorker(projectRoot, aorHome, submissionId, projectId) {
+  const source = `
+    import { createLocalProjectRegistry } from ${JSON.stringify(new URL("../src/control-plane/local-project-registry.mjs", import.meta.url).href)};
+    import { prepareIntentSubmission } from ${JSON.stringify(intentModuleUrl)};
+    const registry = createLocalProjectRegistry({ cwd: process.argv[1], projects: [], persistence: { mode: "persistent", root: process.argv[2] } });
+    const result = prepareIntentSubmission({ registry, projectId: process.argv[4], submissionId: process.argv[3], normalization: ${JSON.stringify({ title: "Concurrent preparation", outcome: "Prepare once.", acceptance: ["One revision."], scope: ["src/**"], work_type: "review", constraints: [], assumptions: [], open_questions: [], confidence: 0.9 })} });
+    process.stdout.write(JSON.stringify({ revision: result.report.revision, idempotent: result.idempotent }));
+  `;
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "--eval", source, projectRoot, aorHome, submissionId, projectId], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("exit", (code) => code === 0 ? resolve(JSON.parse(stdout)) : reject(new Error(`worker exited ${code}: ${stderr}`)));
+  });
+}
 
 test("intent provider extraction rejects arbitrary nested JSON and preserves bounded parse status", () => {
   const candidate = {
@@ -99,6 +123,25 @@ test("intent submission stores bounded text inputs under central AOR Home", asyn
   });
 });
 
+test("concurrent intent preparation reuses one ordered normalization revision", async () => {
+  await withTempRepo({ prefix: "aor-intent-concurrency-", workspaceRoot }, async (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-concurrency-home-"));
+    try {
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const projectId = registry.defaultProjectId;
+      const created = createIntentSubmission({ registry, projectId, requestText: "Prepare concurrently.", autoPrepare: false });
+      const results = await Promise.all(Array.from({ length: 4 }, () => runPreparationWorker(projectRoot, aorHome, created.submission.submission_id, projectId)));
+      assert.equal(results.filter((result) => result.idempotent === false).length, 1);
+      assert.equal(results.filter((result) => result.idempotent === true).length, 3);
+      const current = readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id });
+      assert.equal(current.normalization.revision, 1);
+      assert.equal(current.submission.normalization_refs.length, 1);
+    } finally {
+      fs.rmSync(aorHome, { recursive: true, force: true });
+    }
+  });
+});
+
 test("intent attachment validation covers empty input, traversal names, UTF-8 replacement, total size, and restart recovery", async () => {
   await withTempRepo({ prefix: "aor-intent-boundaries-", workspaceRoot }, (projectRoot) => {
     const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-boundaries-home-"));
@@ -141,6 +184,12 @@ test("repository Markdown sources are pinned, sanitized, and fail closed on unsa
       assert.equal(source.stale, false);
       fs.appendFileSync(path.join(projectRoot, "docs", "requirements.md"), "\nChanged after pin.\n", "utf8");
       assert.equal(readIntentSubmission({ registry, projectId: registry.defaultProjectId, submissionId: created.submission.submission_id }).submission.markdown_sources[0].stale, true);
+      const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-markdown-outside-"));
+      try {
+        fs.writeFileSync(path.join(outsideRoot, "secret.md"), "secret\n", "utf8");
+        fs.symlinkSync(path.join(outsideRoot, "secret.md"), path.join(projectRoot, "docs", "external.md"), "file");
+        assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "docs/external.md" }], autoPrepare: false }), (error) => error.code === "intent_source.invalid_path");
+      } finally { fs.rmSync(outsideRoot, { recursive: true, force: true }); }
       assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "../outside.md" }], autoPrepare: false }), (error) => error.code === "intent_source.invalid_path");
       assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "missing.md" }], autoPrepare: false }), (error) => error.code === "intent_source.not_found");
     } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
@@ -205,8 +254,41 @@ test("normalization blockers remain retryable and confirmation is idempotent", a
       const first = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       const second = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       assert.equal(second.mission.command_output?.mission_id ?? second.mission.command, first.mission.command_output?.mission_id ?? first.mission.command);
-      assert.equal(readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission.status, "confirmed");
+      const durable = readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission;
+      assert.equal(durable.status, "confirmed");
+      assert.equal(durable.confirmation.start_transaction.status, "completed");
+      assert.equal(durable.confirmation.start_transaction.transaction_id, first.start_transaction.transaction_id);
+      assert.equal(durable.confirmation.start_transaction.idempotency_key, first.start_transaction.idempotency_key);
+      const taskProjection = listTaskProjections({
+        registry,
+        projectId,
+        projectRef: projectRoot,
+        runtimeRoot: aorHome,
+        intentSubmissions: listIntentSubmissions({ registry, projectId }).submissions,
+      });
+      assert.equal(taskProjection.tasks.filter((task) => task.flow_id === first.flow_id).length, 1);
+      assert.equal(taskProjection.tasks.some((task) => task.lineage.intent_submission_id === created.submission.submission_id && task.flow_id === null), false);
     } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
+  });
+});
+
+test("listing intent submissions fails closed when a state document is corrupt", () => {
+  withTempRepo({ prefix: "aor-intent-corrupt-list-", workspaceRoot }, (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-corrupt-list-home-"));
+    try {
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const projectId = registry.defaultProjectId;
+      const created = createIntentSubmission({ registry, projectId, requestText: "Corrupt this state.", autoPrepare: false });
+      const stateFile = created.submission_file;
+      fs.writeFileSync(stateFile, "{not-json\n", "utf8");
+      assert.throws(
+        () => listIntentSubmissions({ registry, projectId }),
+        (error) => error.code === "state-corrupt" && error.state_file === stateFile && typeof error.recovery_ref === "string",
+      );
+      assert.equal(fs.existsSync(stateFile), false);
+    } finally {
+      fs.rmSync(aorHome, { recursive: true, force: true });
+    }
   });
 });
 

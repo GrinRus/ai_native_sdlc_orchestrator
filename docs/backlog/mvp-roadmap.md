@@ -1114,8 +1114,8 @@ authoring contracts, stack discovery, generated project profiles, multi-root
 execution semantics, operator-visible plan surfaces, migration examples, real
 archetype smoke coverage, and expanded public/private boundary guards.
 
-**Current lane:** After W44 disposition, W54 is the selected implementation lane.
-W44/W45 remain valid deferred backlog tracks and are not W54 prerequisites.
+**Historical entry:** W54 was selected after W44 disposition. W44/W45 were
+independent deferred tracks rather than W54 prerequisites.
 
 **Exit criteria:**
 - Command groups can describe working directories, dependencies, detection
@@ -1187,10 +1187,9 @@ concurrent evidence identity, while keeping every project-scoped command and
 evidence reference anchored to the explicitly selected Project rather than the
 launcher working directory.
 
-**Current lane:** W57-S01 is the only ready slice. W57-S09 follows it to make the
-repository gate complete before contract/runtime remediation starts.
-Credentialed live execution and write-capable delivery remain outside the
-supported release claim until W57 closure evidence exists.
+**Historical entry:** W57-S01 established the audit disposition; W57-S09 then
+completed repository test discovery before contract/runtime remediation. Both
+slices are done. Current qualification remains governed by W66 and W71.
 
 **Exit criteria:**
 - The local app threat model is loopback-only and same-origin; hosted frontend
@@ -1340,7 +1339,7 @@ Mission, take truthful runtime-owned actions, recover safely, inspect evidence,
 and complete the canonical safe no-write lifecycle on desktop or mobile without
 a required terminal handoff.
 
-**Adopted target design:** `docs/product/05-quiet-cockpit-console-design.md`
+**Adopted target design:** [W63 Quiet Cockpit design snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/05-quiet-cockpit-console-design.md)
 defines Quiet Cockpit with flow-scoped Attention, Journey, and Evidence modes.
 W63 implemented and accepted the target under an explicit reversible selector;
 W65 subsequently completed the packaged cutover and retirement. The concept
@@ -1376,8 +1375,8 @@ outcomes but should not be mixed into W57 security repairs or W59 audit closure:
 recoverable alpha publication, verification-to-delivery decomposition, and
 operator decision-projection decomposition.
 
-**Current lane:** Every W64 slice depends on W59-S07 and may execute in parallel
-with W60-W63 and the later W65 cutover once their own dependencies are stable.
+**Historical sequencing:** Every W64 slice depended on W59-S07 and could run in
+parallel with W60-W63 and the later W65 cutover once its dependencies were stable.
 W64 does not delay those product waves through an artificial dependency.
 
 **Exit criteria:**

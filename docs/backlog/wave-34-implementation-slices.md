@@ -62,7 +62,7 @@ terminal verdict artifact.
 - **Primary user story surfaces:** PBO-09, OPS-01, OPS-11.
 
 ### Local tasks
-1. Promote `docs/product/03-flow-centric-console-design.md` from design reference into the W34 product source-of-truth language.
+1. Promote [W34 flow-centric design snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/03-flow-centric-console-design.md) from design reference into the W34 product source-of-truth language.
 2. Define active flow, completed flow, selected flow, follow-up source, and new-flow creation semantics in product and architecture docs.
 3. Extend the control-plane contract docs with flow read projections and new-flow lifecycle semantics.
 4. Add canonical example payloads for active flow, completed flow, flow list, and flow-targeted operator request summaries.
@@ -130,7 +130,7 @@ terminal verdict artifact.
 - **Epic:** EPIC-6 Operator surface
 - **State:** done
 - **Outcome:** The packaged local SPA implements the accepted flow-centric shell with project/runtime context, flow selector, active cockpit, stage rail, and safety/evidence right rail.
-- **Primary modules:** `apps/web/**`, `apps/cli/**`, `docs/product/03-flow-centric-console-design.md`, tests
+- **Primary modules:** `apps/web/**`, `apps/cli/**`, [W34 flow-centric design snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/03-flow-centric-console-design.md), tests
 - **Hard dependencies:** W34-S02
 - **Primary user story surfaces:** PBO-09, OPS-01, OPS-10.
 

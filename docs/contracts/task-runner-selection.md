@@ -6,6 +6,10 @@ task override selects an existing approved `route_id` (or reports `null` while
 readiness is unknown) and does not create a new execution owner or bypass route
 policy.
 
+The route is resolved from the execution profile for the Task's execution step.
+The read-only `route.intake-normalize.*` used to prepare an intent is provenance
+only and must never populate `route_id` here.
+
 The projection carries readiness and requested/effective model and reasoning
 effort metadata. Explicit values remain adapter-owned opaque strings; omitted
 values use the runner-native default. Raw provider flags, credentials, auth

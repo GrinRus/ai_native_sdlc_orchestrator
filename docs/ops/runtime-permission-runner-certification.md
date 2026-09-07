@@ -9,7 +9,9 @@ This lane is for post-merge certification after the runtime permission mediation
 - Use the existing `examples/adapters/*.yaml` profiles.
 - Do not change schemas, CLI/API flags, continuation strategies, or policy rule shapes.
 - Keep `session-resume`, `tool-call-scoped`, and operator-configurable policy files out of this lane.
-- Store runner output under a temporary runtime root or `.aor/`; do not commit runtime state.
+- Store runner output under an isolated AOR Home runtime root (`AOR_HOME`, default
+  `~/.aor`) or an explicitly labelled ignored rehearsal `.aor/` output; do not
+  commit runtime state.
 
 ## Smoke Procedure
 1. Confirm installed runner versions:

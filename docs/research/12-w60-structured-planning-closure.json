@@ -40,9 +40,9 @@
     {
       "id": "installed-plan-workbench",
       "evidence_refs": [
-        "apps/web/browser/operator-console.spec.mjs",
-        "apps/web/src/plan-workbench.jsx",
-        "apps/web/src/plan-workbench-views.jsx"
+        "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/operator-console.spec.mjs",
+        "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/plan-workbench.jsx",
+        "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/plan-workbench-views.jsx"
       ]
     }
   ],

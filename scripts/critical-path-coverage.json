@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "type": "critical-path-coverage",
+  "paths": [
+    {"id":"task-lifecycle-invariant","source":"packages/orchestrator-core/src/task-progress-projection.mjs","test":"packages/orchestrator-core/test/task-projections.test.mjs","positive_marker":"completed Flow projects","negative_marker":"partial completion evidence remains blocked"},
+    {"id":"permission-boundary-invariant","source":"packages/orchestrator-core/src/runtime-permission-policy.mjs","test":"packages/orchestrator-core/test/runtime-permission-policy.test.mjs","positive_marker":"auto-approves bounded reads","negative_marker":"denies aliases"},
+    {"id":"evidence-integrity-invariant","source":"packages/contracts/src/evidence-reference.mjs","test":"packages/orchestrator-core/test/evidence-reference.test.mjs","positive_marker":"returns immutable bytes","negative_marker":"rejects traversal"},
+    {"id":"workspace-isolation-invariant","source":"packages/orchestrator-core/src/workspace-set-provisioner.mjs","test":"packages/orchestrator-core/test/workspace-set-provisioner.test.mjs","positive_marker":"provisions mixed isolated repositories","negative_marker":"partial provisioning rolls back"},
+    {"id":"delivery-integrity-invariant","source":"packages/orchestrator-core/src/delivery-driver.mjs","test":"packages/orchestrator-core/test/delivery-driver.test.mjs","positive_marker":"emits patch artifact","negative_marker":"fails when final diff omits Runtime Harness meaningful paths"}
+  ]
+}

@@ -574,10 +574,9 @@ function buildDraftSubdimensions(keys, refs, category) {
 
 /**
  * @param {Record<string, unknown>} request
- * @param {string} reportFile
  * @returns {Record<string, unknown>}
  */
-function buildDraftAssessmentReport(request, reportFile) {
+function buildDraftAssessmentReport(request) {
   const runIdentity = asRecord(request.run_identity);
   const dimensions = Object.fromEntries(
     REQUIRED_DIMENSIONS.map((dimensionKey) => {
@@ -966,7 +965,7 @@ function prepareCli(rawArgs) {
   writeJson(requestFile, request);
   let draftAssessmentReportFile = null;
   if (writeDraftReport) {
-    const draftReport = buildDraftAssessmentReport(request, expectedAssessmentReportFile);
+    const draftReport = buildDraftAssessmentReport(request);
     const draftValidation = validateContractDocument({
       family: "live-e2e-quality-assessment-report",
       document: draftReport,

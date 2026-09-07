@@ -1,4 +1,5 @@
 import { asNonEmptyString, asRecord, asStringArray, nowIso } from "./common.mjs";
+import { normalizeQualificationIdentity, qualificationIdentityMismatches } from "./qualification-evidence.mjs";
 
 export const PROVIDER_QUALIFICATION_STATUSES = Object.freeze(["qualified", "candidate", "blocked", "not-run"]);
 export const FAILURE_OWNERS = Object.freeze(["aor", "target_repository", "provider", "environment", "operator"]);
@@ -154,8 +155,23 @@ export function classifyProviderQualification(options) {
   const providerAttempts = options.attempts.filter(
     (attempt) => asNonEmptyString(attempt.provider_variant_id) === options.providerVariantId,
   );
-  const latestAttempt = providerAttempts.at(-1) ?? null;
-  const passingRunCount = providerAttempts.filter((attempt) => normalizeQualificationAttemptStatus(attempt) === "passed").length;
+  const expectedIdentity = normalizeQualificationIdentity(options.qualificationIdentity);
+  const freshness = providerAttempts.map((attempt) => {
+    const actualIdentity = normalizeQualificationIdentity({
+      ...attempt,
+      source_commit: attempt.source_commit ?? attempt.commit_sha,
+      profile_sha256: attempt.profile_sha256 ?? attempt.profile_digest,
+      proof_sha256: attempt.proof_sha256 ?? attempt.adversarial_proof_sha256,
+    });
+    const mismatches = Object.keys(expectedIdentity).length > 0
+      ? qualificationIdentityMismatches(actualIdentity, expectedIdentity)
+      : {};
+    return { attempt, current: Object.keys(mismatches).length === 0, mismatches };
+  });
+  const currentAttempts = freshness.filter((entry) => entry.current).map((entry) => entry.attempt);
+  const staleAttempts = freshness.filter((entry) => !entry.current);
+  const latestAttempt = currentAttempts.at(-1) ?? providerAttempts.at(-1) ?? null;
+  const passingRunCount = currentAttempts.filter((attempt) => normalizeQualificationAttemptStatus(attempt) === "passed").length;
   const requiredPassCount = Number.isFinite(Number(options.requiredPassCount))
     ? Math.max(0, Math.trunc(Number(options.requiredPassCount)))
     : 1;
@@ -174,14 +190,20 @@ export function classifyProviderQualification(options) {
       passing_run_count: passingRunCount,
       latest_attempt: latestAttempt,
       failure_context: failureContext,
+      freshness_status: "current",
+      stale_attempt_count: staleAttempts.length,
+      invalidation_reason: null,
     };
   }
-  if (providerAttempts.length === 0) {
+  if (providerAttempts.length === 0 || (currentAttempts.length === 0 && staleAttempts.length > 0)) {
     return {
       qualification_status: "not-run",
       passing_run_count: passingRunCount,
       latest_attempt: null,
       failure_context: failureContext,
+      freshness_status: staleAttempts.length > 0 ? "stale" : "not-run",
+      stale_attempt_count: staleAttempts.length,
+      invalidation_reason: staleAttempts.length > 0 ? "qualification identity changed; prior evidence is diagnostic-only" : null,
     };
   }
   if (latestStatus === "blocked" || latestStatus === "needs_fix") {
@@ -190,6 +212,9 @@ export function classifyProviderQualification(options) {
       passing_run_count: passingRunCount,
       latest_attempt: latestAttempt,
       failure_context: failureContext,
+      freshness_status: "current",
+      stale_attempt_count: staleAttempts.length,
+      invalidation_reason: null,
     };
   }
   return {
@@ -197,6 +222,9 @@ export function classifyProviderQualification(options) {
     passing_run_count: passingRunCount,
     latest_attempt: latestAttempt,
     failure_context: failureContext,
+    freshness_status: "current",
+    stale_attempt_count: staleAttempts.length,
+    invalidation_reason: null,
   };
 }
 
@@ -208,6 +236,7 @@ export function classifyProviderQualification(options) {
  *   releaseBlockingProviderIds?: string[],
  *   scope?: string,
  *   generatedAt?: string,
+ *   qualificationIdentity?: Record<string, unknown>,
  * }} options
  */
 export function buildProviderQualificationMatrix(options = {}) {
@@ -216,6 +245,7 @@ export function buildProviderQualificationMatrix(options = {}) {
     : DEFAULT_PROVIDER_QUALIFICATION_PROVIDERS
   ).map((entry) => asRecord(entry));
   const attempts = Array.isArray(options.attempts) ? options.attempts.map((entry) => asRecord(entry)) : [];
+  const qualificationIdentity = normalizeQualificationIdentity(options.qualificationIdentity);
   const requiredProviderCounts = asRecord(options.requiredProviderCounts);
   const releaseBlockingProviderIds = new Set(asStringArray(options.releaseBlockingProviderIds));
 
@@ -226,6 +256,7 @@ export function buildProviderQualificationMatrix(options = {}) {
       providerVariantId,
       attempts,
       requiredPassCount: requiredPassCount || 1,
+      qualificationIdentity,
     });
     const latestAttempt = classified.latest_attempt;
     const failureContext = classified.failure_context;
@@ -246,6 +277,10 @@ export function buildProviderQualificationMatrix(options = {}) {
       failure_class: failureContext.failure_class,
       blocker_reason: failureContext.blocker_reason,
       evidence_refs: failureContext.evidence_refs,
+      freshness_status: classified.freshness_status,
+      stale_attempt_count: classified.stale_attempt_count,
+      invalidation_reason: classified.invalidation_reason,
+      qualification_identity: qualificationIdentity,
     };
   });
 

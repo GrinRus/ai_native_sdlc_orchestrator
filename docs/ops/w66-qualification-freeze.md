@@ -1,18 +1,25 @@
 # W66 qualification freeze
 
-W66-S08 closes deterministic remediation while preserving `audit-hold`. It
-does not call a provider and cannot grant release clearance.
+Freeze provider qualification inputs only after W71-S14 has integrated the UI
+handoff, passed the installed real-control-plane journeys, and regenerated
+adversarial proof for the final integrated commit. The current entry conditions
+are defined in `docs/backlog/wave-71-implementation-slices.md` and
+`docs/backlog/wave-66-implementation-slices.md`.
 
-After the implementation is merged to one clean commit, pin the exact `ky`
-target commit and create the runtime-owned manifest:
+W66-S25 remains historical prerequisite evidence. Neither its old proof nor
+restored provider quota bypasses W71-S14. Freezing inputs makes no provider call
+and does not grant release clearance.
+
+Once that entry gate is satisfied, pin the exact `ky` target commit and create
+the qualification manifest:
 
 ```bash
 node ./scripts/w66-adversarial-proof.mjs \
-  --source-commit <40-character-s25-commit> \
-  --output .aor/w66/s25-adversarial-proof.json
+  --source-commit <40-character-final-integrated-commit> \
+  --output .aor/w66/adversarial-proof.json
 pnpm w66:freeze -- \
   --target-commit <40-character-ky-commit> \
-  --proof-file .aor/w66/s25-adversarial-proof.json
+  --proof-file .aor/w66/adversarial-proof.json
 ```
 
 The command writes `.aor/w66/qualification-manifest.json` exclusively. It
@@ -23,10 +30,10 @@ The manifest records SHA-256 digests for:
 - OpenAI medium and large profiles;
 - Anthropic medium and large profiles.
 
-When `--proof-file` is supplied, the replacement manifest also binds the
-passing W66-S25 adversarial proof digest to the frozen AOR commit. All evidence
-from before S20 remains diagnostic-only; S09 can select only a fresh
-same-commit four-cell matrix after this proof.
+Supply `--proof-file` to bind the passing final-commit adversarial proof digest
+to the frozen AOR commit. W71-S14 also owns the accepted package, UI handoff,
+profile, and artifact identities; these commands alone do not close that slice.
+All earlier qualification evidence remains diagnostic-only for W66-S09.
 
 S09 must validate the manifest again before the installed baseline and before
 each sequential cell. Any source commit, target commit, or profile digest

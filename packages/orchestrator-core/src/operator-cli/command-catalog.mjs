@@ -1,4 +1,4 @@
-import { RUN_INTEGRATION_COMMAND_DEFINITION, RUN_RETRY_COMMAND_DEFINITION, RUN_START_COMMAND_DEFINITION } from "./scheduler-command-definitions.mjs";
+import { RUN_INTEGRATION_COMMAND_DEFINITION, RUN_RETRY_COMMAND_DEFINITION, RUN_START_COMMAND_DEFINITION, WORKSPACE_PROVISION_COMMAND_DEFINITION } from "./scheduler-command-definitions.mjs";
 
 export const RUNTIME_ROOT_DIRNAME = ".aor";
 const COMMAND_DEFINITIONS = Object.freeze([
@@ -298,10 +298,10 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intent-first",
     status: "implemented",
     summary: "Confirm a prepared intent submission and idempotently start its Flow.",
-    inputs: ["--submission-id <id>", "--project-id <id> (optional)", "--help"],
+    inputs: ["--submission-id <id>", "--project-id <id> (optional)", "--expected-revision <n> (optional)", "--help"],
     outputs: ["task_start", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["submission-id"],
-    contractFamilies: ["intent-submission", "intake-request-body"],
+    contractFamilies: ["intent-submission", "intake-request-body", "task-projection"],
   },
   {
     command: "evidence export",
@@ -1088,6 +1088,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
   },
   RUN_RETRY_COMMAND_DEFINITION,
   RUN_INTEGRATION_COMMAND_DEFINITION,
+  WORKSPACE_PROVISION_COMMAND_DEFINITION,
   {
     command: "run answer",
     category: "execution-lifecycle",
@@ -1171,6 +1172,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--stage <stage>",
       "--intent <analyze|explain|revise-document|create-document|repair|validate|plan|implement|review>",
       "--request <text>",
+      "--idempotency-key <key> (optional, duplicate submissions reuse the existing request)",
       "--target-flow-id <flow_id> (optional)",
       "--target-ref <ref[,ref...]> (optional, repeatable)",
       "--allowed-path <glob[,glob...]> (optional, repeatable)",
@@ -1184,6 +1186,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "operator_request_ref",
       "operator_request_file",
       "operator_request_status",
+      "operator_request_idempotent",
       "operator_request",
       "read_only",
       "future_control_hooks",

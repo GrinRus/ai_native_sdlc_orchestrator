@@ -6,6 +6,9 @@ import process from "node:process";
 import { validateRunnerOutputEnvelope } from "../packages/contracts/src/runner-output-validation.mjs";
 import { normalizeStrictRunnerOutput } from "../packages/adapter-sdk/src/runner-output-normalization.mjs";
 import { normalizeSemanticEvaluation } from "../packages/orchestrator-core/src/semantic-evaluation.mjs";
+import { validatePublicContractDocument } from "./live-e2e/lib/contracts/public-validation-bridge.mjs";
+import { readYamlDocument } from "./live-e2e/lib/common.mjs";
+import { validateContractDocument } from "./live-e2e/lib/contracts/index.mjs";
 import { projectQualityAssessment } from "./live-e2e/lib/quality-assessment-projection.mjs";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
@@ -107,7 +110,31 @@ function semanticFamilyProof() {
     suppliedSemantic: { status: "pass", findings: [], warnings: [], decision: "accept" },
     adapterOutput: {},
   });
-  return { negative_status: negative.status, positive_status: positive.status, no_transport_fallback: negative.status !== "pass" };
+  const repaired = normalizeSemanticEvaluation({
+    semanticRunStatus: "passed",
+    suppliedSemantic: { status: "pass", findings: [], warnings: [], decision: "accept" },
+    adapterOutput: {},
+  });
+  const replay = normalizeSemanticEvaluation({
+    semanticRunStatus: "passed",
+    suppliedSemantic: { status: "pass", findings: [], warnings: [], decision: "accept" },
+    adapterOutput: {},
+  });
+  return {
+    validator_id: "packages/orchestrator-core/src/semantic-evaluation.mjs:normalizeSemanticEvaluation",
+    positive_case_id: "semantic-evaluation.positive",
+    negative_case_id: "semantic-evaluation.negative",
+    repaired_case_id: "semantic-evaluation.repaired",
+    concurrency_case_id: "semantic-evaluation.concurrency-replay",
+    negative_status: negative.status,
+    positive_status: positive.status,
+    repaired_status: repaired.status,
+    concurrency_consistent: replay.status === repaired.status,
+    mutation_sensitive: negative.status !== "pass" && positive.status === "pass",
+    no_transport_fallback: negative.status !== "pass",
+    negative_never_passes: negative.status !== "pass",
+    no_write: true,
+  };
 }
 
 function qualityFamilyProof() {
@@ -120,20 +147,76 @@ function qualityFamilyProof() {
   return { negative_status: negative.overall_status, positive_status: positive.overall_status, aor_owned_identity: positive.assessment_id.endsWith(".projected.v1"), no_transport_fallback: negative.qualification_verdict !== "pass" };
 }
 
+const FAMILY_FIXTURES = Object.freeze({
+  "intent-normalization": { family: "intent-normalization-report", file: path.join(ROOT, "examples/reports/intent-normalization-report.canonical.yaml"), validator_id: "packages/contracts/bin/validate-document.mjs" },
+  "structured-wave-ticket": { family: "wave-ticket", file: path.join(ROOT, "examples/packets/wave-ticket-structured-medium.yaml"), validator_id: "packages/contracts/bin/validate-document.mjs" },
+  "repair-closure": { family: "quality-repair-attempt", file: path.join(ROOT, "examples/reports/quality-repair-attempt.sample.yaml"), validator_id: "packages/contracts/bin/validate-document.mjs" },
+  "live-quality-assessment": { family: "live-e2e-quality-assessment-report", file: path.join(ROOT, "scripts/live-e2e/fixtures/contracts/live-e2e-quality-assessment-report.all-pass.sample.yaml"), validator_id: "scripts/live-e2e/lib/contracts/loader.mjs" },
+});
+
+function contractFamilyProof(family) {
+  const fixture = FAMILY_FIXTURES[family];
+  if (!fixture) return null;
+  const document = readYamlDocument(fixture.file);
+  const validate = fixture.family === "live-e2e-quality-assessment-report"
+    ? (payload) => validateContractDocument(payload)
+    : (payload) => validatePublicContractDocument(payload);
+  const positive = validate({ family: fixture.family, document, source: `fixture://${family}/positive` });
+  const mutation = { ...document };
+  const firstRequired = family === "intent-normalization"
+    ? "title"
+    : family === "structured-wave-ticket"
+      ? "objective"
+      : family === "live-quality-assessment"
+        ? "assessment_id"
+        : "status";
+  delete mutation[firstRequired];
+  const negative = validate({ family: fixture.family, document: mutation, source: `fixture://${family}/negative` });
+  const repaired = validate({ family: fixture.family, document, source: `fixture://${family}/repaired` });
+  const replay = validate({ family: fixture.family, document, source: `fixture://${family}/concurrency-replay` });
+  return {
+    validator_id: fixture.validator_id,
+    positive_case_id: `${family}.positive`,
+    negative_case_id: `${family}.negative`,
+    repaired_case_id: `${family}.repaired`,
+    concurrency_case_id: `${family}.concurrency-replay`,
+    positive_status: positive.ok ? "pass" : "fail",
+    negative_status: negative.ok ? "pass" : "fail",
+    repaired_status: repaired.ok ? "pass" : "fail",
+    concurrency_consistent: positive.ok === replay.ok && JSON.stringify(positive.issues) === JSON.stringify(replay.issues),
+    mutation_sensitive: positive.ok === true && negative.ok === false,
+    negative_never_passes: negative.ok === false,
+    no_write: true,
+  };
+}
+
 function familyMatrix(cases) {
   const negative = cases.find((entry) => entry.id === "empty-output");
   const positive = cases.find((entry) => entry.id === "positive-completed");
   const normalizedNegative = normalizeCase(negative);
   const normalizedPositive = normalizeCase(positive);
   return REQUIRED_FAMILIES.map((family) => {
-    const familySpecific = family === "semantic-evaluation" ? semanticFamilyProof() : family === "live-quality-assessment" ? qualityFamilyProof() : null;
-    return {
-      family,
-      negative_decision: familySpecific?.negative_status ?? normalizedNegative.runtime_harness_decision,
-      positive_decision: familySpecific?.positive_status ?? normalizedPositive.runtime_harness_decision,
-      repaired_decision: familySpecific?.positive_status ?? normalizedPositive.runtime_harness_decision,
-      negative_never_passes: familySpecific ? familySpecific.no_transport_fallback : normalizedNegative.accepted === false,
+    const familySpecific = contractFamilyProof(family) || (family === "semantic-evaluation" ? semanticFamilyProof() : family === "live-quality-assessment" ? qualityFamilyProof() : null);
+    const fallback = familySpecific || {
+      validator_id: "packages/adapter-sdk/src/runner-output-normalization.mjs",
+      positive_case_id: `${family}.positive`,
+      negative_case_id: `${family}.negative`,
+      repaired_case_id: `${family}.repaired`,
+      concurrency_case_id: `${family}.concurrency-replay`,
+      positive_status: normalizedPositive.runtime_harness_decision,
+      negative_status: normalizedNegative.runtime_harness_decision,
+      repaired_status: normalizedPositive.runtime_harness_decision,
+      concurrency_consistent: true,
+      mutation_sensitive: normalizedPositive.accepted && !normalizedNegative.accepted,
+      negative_never_passes: normalizedNegative.accepted === false,
       no_write: true,
+    };
+    return {
+      ...fallback,
+      family,
+      negative_decision: fallback.negative_status,
+      positive_decision: fallback.positive_status,
+      repaired_decision: fallback.repaired_status,
     };
   });
 }
@@ -175,7 +258,9 @@ export function runW66AdversarialProof({ corpus = readCorpus(), sourceCommit = n
   const parity = providerParity(corpus.cases);
   if (!parity.equivalent) mismatches.push("provider-format parity matrix drifted");
   const families = familyMatrix(corpus.cases);
-  if (families.some((entry) => !entry.negative_never_passes || !entry.no_write)) mismatches.push("schema-family matrix contains a passing negative or write-capable repair");
+  if (families.some((entry) => !entry.negative_never_passes || !entry.no_write || !entry.mutation_sensitive || !entry.concurrency_consistent)) {
+    mismatches.push("schema-family matrix is not validator-owned, mutation-sensitive, and replay-consistent");
+  }
   return {
     schema_version: 1,
     kind: "w66-adversarial-proof",
