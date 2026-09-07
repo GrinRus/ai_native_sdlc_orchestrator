@@ -36,7 +36,11 @@ import {
   materializeTargetCheckout,
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
-import { materializeAndAttachDependencySnapshot, resolveStabilizedSetupCommands } from "./dependency-snapshot.mjs";
+import {
+  materializeAndAttachDependencySnapshot,
+  resolveStabilizedSetupCommands,
+  stabilizeDependencySetupCommands,
+} from "./dependency-snapshot.mjs";
 import { prepareBrowserCachePreflight } from "./browser-cache.mjs";
 import { runLiveAdapterPreflight } from "./preflight.mjs";
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
@@ -4238,10 +4242,19 @@ export function executeInstalledUserFlow(options) {
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
     artifacts.target_commit_sha = targetCheckout.targetCommitSha;
+    artifacts.target_commit_date = targetCheckout.targetCommitDate;
+    const installedTargetSetupCommands = stabilizeDependencySetupCommands(
+      asStringArray(asRecord(options.profile.verification).setup_commands),
+      {
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+        targetCommitDate: targetCheckout.targetCommitDate,
+      },
+    );
+    const installedTargetVerificationCommands = asStringArray(asRecord(options.profile.verification).commands);
     materializeAndAttachDependencySnapshot({
       targetCheckout,
-      setupCommands: asStringArray(asRecord(options.profile.verification).setup_commands),
-      verificationCommands: asStringArray(asRecord(options.profile.verification).commands),
+      setupCommands: installedTargetSetupCommands,
+      verificationCommands: installedTargetVerificationCommands,
       runtimeRoot: options.layout.projectRuntimeRoot,
       reportsRoot: options.layout.reportsRoot,
       runId: options.runId,
@@ -4254,8 +4267,8 @@ export function executeInstalledUserFlow(options) {
       reportsRoot: options.layout.reportsRoot,
       runId: options.runId,
       commands: uniqueStrings([
-        ...asStringArray(asRecord(options.profile.verification).setup_commands),
-        ...asStringArray(asRecord(options.profile.verification).commands),
+        ...installedTargetSetupCommands,
+        ...installedTargetVerificationCommands,
       ]),
       env,
     });
@@ -4979,11 +4992,9 @@ function executeFullJourneyFlowImplementation(options) {
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
     artifacts.target_commit_sha = targetCheckout.targetCommitSha;
+    artifacts.target_commit_date = targetCheckout.targetCommitDate;
     artifacts.guided_journey_enabled = guidedJourneyEnabled;
-    targetHeadBefore = runGitOutput({
-      cwd: targetCheckout.targetCheckoutRoot,
-      args: ["rev-parse", "HEAD"],
-    });
+    targetHeadBefore = runGitOutput({ cwd: targetCheckout.targetCheckoutRoot, args: ["rev-parse", "HEAD"] });
     const catalogVerification = asRecord(options.catalogEntry.verification);
     const resolvedVerification = {
       ...catalogVerification,
@@ -4991,6 +5002,7 @@ function executeFullJourneyFlowImplementation(options) {
       setup_commands: resolveStabilizedSetupCommands(
         asStringArray(asRecord(options.profile.verification).setup_commands),
         asStringArray(catalogVerification.setup_commands),
+        { targetCheckoutRoot: targetCheckout.targetCheckoutRoot, targetCommitDate: targetCheckout.targetCommitDate },
       ),
     };
     const targetEnvironmentMode = asNonEmptyString(catalogVerification.execution_environment) || "default";
