@@ -495,9 +495,12 @@ export function handleRunControlCommand(context) {
 
     if (parentStart) {
       const projectRoot = resolveProjectRef(projectRef, cwd);
+      const projectState = readProjectState({ cwd, projectRef, runtimeRoot });
+      const evidenceRoot = path.dirname(path.dirname(projectState.runtime_layout.project_runtime_root));
       const executionPlanPath = resolveOptionalRefOrPathFlag({
         cwd,
         projectRoot,
+        evidenceRoot,
         flagName: "execution-plan-ref",
         flagValue: executionPlanRef,
       });
@@ -511,12 +514,8 @@ export function handleRunControlCommand(context) {
       }
       const workspaceSetPath = resolveOptionalRefOrPathFlag({
         cwd,
-        projectRoot: workspaceSetRef.startsWith("evidence://") &&
-          !workspaceSetRef.slice("evidence://".length).startsWith(".aor/")
-          ? /** @type {{ projectRuntimeRoot: string }} */ (
-              readProjectState({ cwd, projectRef, runtimeRoot }).runtime_layout
-            ).projectRuntimeRoot
-          : projectRoot,
+        projectRoot,
+        evidenceRoot,
         flagName: "workspace-set-ref",
         flagValue: workspaceSetRef,
       });
@@ -531,6 +530,7 @@ export function handleRunControlCommand(context) {
       const started = startParentRun({
         cwd,
         projectRef,
+        projectProfile,
         runtimeRoot,
         parentRunId: runId,
         executionPlan: loadedPlan.document,
@@ -548,6 +548,7 @@ export function handleRunControlCommand(context) {
             "start",
             "--project-ref",
             started.init.projectRoot,
+            ...(started.init.projectProfilePath ? ["--project-profile", started.init.projectProfilePath] : []),
             "--run-id",
             child.child_run_id,
             "--execution-plan-ref",

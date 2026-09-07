@@ -406,15 +406,17 @@ export function resolveProviderExecutionStatus(projectRoot, stepArtifacts) {
 }
 
 /**
- * @param {{ cwd: string, projectRoot: string, flagValue: string | undefined, flagName: string }} options
+ * @param {{ cwd: string, projectRoot: string, evidenceRoot?: string, flagValue: string | undefined, flagName: string }} options
  * @returns {string | undefined}
  */
-export function resolveOptionalRefOrPathFlag(options) {
+export function resolveOptionalRefOrPathFlag({ projectRoot, evidenceRoot = projectRoot, ...options }) {
   if (!options.flagValue) {
     return undefined;
   }
   if (options.flagValue.startsWith("evidence://")) {
-    return path.resolve(options.projectRoot, options.flagValue.slice("evidence://".length));
+    const logicalPath = options.flagValue.slice("evidence://".length);
+    const referenceRoot = logicalPath.startsWith(".aor/") ? projectRoot : evidenceRoot;
+    return path.resolve(referenceRoot, logicalPath);
   }
   return path.isAbsolute(options.flagValue)
     ? options.flagValue
