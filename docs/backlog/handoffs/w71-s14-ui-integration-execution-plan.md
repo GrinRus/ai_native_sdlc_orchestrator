@@ -12,10 +12,11 @@
   server-owned lifecycle semantics, upstream writes, or claiming fresh W66
   provider qualification.
 - Acceptance: the merged product preserves server-owned Task truth; no-write,
-  patch/recovery/Ask AOR, and two-repository flows are proven through public
-  installed surfaces; UI accessibility/responsive/keyboard/offline checks pass;
-  evidence resolves to immutable bytes; and the freeze explicitly remains
-  blocked only by the fresh provider matrix.
+  patch/recovery/Ask AOR, and the installed control-plane boundary are proven
+  through public surfaces; UI accessibility/responsive/keyboard/offline checks
+  pass; evidence resolves to immutable bytes; and any missing two-repository
+  provision-to-delivery coverage is recorded as an explicit S14 blocker rather
+  than promoted to a pass.
 
 ## Neighbor UI coordination
 
@@ -23,12 +24,10 @@
   (`01a061b2-119a-7272-91d0-13add13d75c2`), checkout
   `/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator`.
 - Immutable handoff: `59943bfaa7af0c97b1eff38e7093aced069d0fb9`,
-  `feat(web): align command desk target geometry`, local branch
-  `codex/command-desk-ui`.
-- Coordination mode: `merge-first`. The handoff is a UI-only commit whose
-  parent is outside current `main`; integrate the exact commit and review the
-  resulting diff before any UI acceptance claim. Do not merge the entire stale
-  sibling branch or overwrite current runtime/contracts.
+  `feat(web): align command desk target geometry`, already merged to `main`.
+- Coordination mode: `merge-first` satisfied, then `no-overlap` for the
+  remaining S14 work. The sibling branch is evidence only; do not edit
+  UI-owned paths or overwrite current runtime/contracts.
 
 ## Implementation plan
 
@@ -68,28 +67,35 @@
   disposable `AOR_HOME`. Public control-plane journeys covered no-write and
   patch-only preparation, revision-aware route readback, route persistence
   across reload, readiness recovery, durable Ask AOR, a successful second
-  repository connection, and the Task `discovery-run` lifecycle action.
+  repository connection, and the Task `discovery-run` lifecycle action. The
+  second-repository evidence stops at connection/provisioning; a complete
+  two-repository provision → conflict/retry → integration → delivery/cleanup
+  run is not yet proven.
 - Browser checks used the running app without API route fulfilment: desktop
   keyboard focus, 390x844 mobile overflow, 200% zoom overflow, reduced-motion
   emulation, zero console errors, and zero POSTs during read/reload checks.
 - The immutable record is
   `docs/research/27-w71-s14-installed-control-plane-evidence.json`.
-- The final integrated product commit is `91beaaef9c7b206840333ae7ebf3aefd48460a7d`;
-  its fresh 16-case adversarial proof is `sha256:d56e8f73af9e03e9192b0765418c18e90280048ed788e98e217a9b21bab22285`,
+- The runtime/control-plane candidate commit represented by the freeze is
+  `4906ca6a250ac314206068b3d85f44a604ea024e`; its fresh 16-case adversarial
+  proof is
+  `sha256:cf0c5c3efac571ba87bd1e89ef0b4653be35519cc6669022c59e7da8fab88997`,
   and its same-commit qualification manifest is
-  `sha256:39cab25abe76fb7784a3f575efa7a93418c39574816867f3d6deb4357f1e93cc`.
-  Provider calls remain prohibited, so the W66 provider matrix is still an
-  explicit release hold.
-- Final package checks also pass: `pnpm test:web:browser` (3/3),
-  `pnpm release:pack` (442 files), and `pnpm release:smoke` (neutral launcher
-  and target repository remained clean).
+  `sha256:7755a5a3cbbbba025cdc6d19b9284e962d58f34bd822d68b26cb2958d92882ad`.
+  The durable review decision and learning handoff passed. The historical
+  run-health record still contains the earlier missing-review-decision failure
+  and diagnostic warning; it was not rewritten or used as fresh provider proof.
+- Package/browser checks previously passed on the merged UI baseline. The
+  current diagnostic remains non-green because of retry timing and missing
+  local Playwright browser executables; no provider rerun is claimed.
 
 ## Exit condition
 
 S14 may be marked done only after the merged installed proof and immutable
-freeze manifest are present. The integrated-local proof is complete for the
-public no-write/control-plane boundary, but the slice remains release-blocked
-until the separately authorized W66-S09 provider matrix is available. A blocked
-readiness result is acceptable only when it identifies that external provider
-quota/matrix as the remaining release blocker and contains no stale UI or W71
-source-of-truth claim.
+freeze manifest are present **and** the public two-repository
+provision-to-integration-to-delivery journey is closed. The current
+integrated-local evidence is valid for the no-write/control-plane boundary and
+is intentionally partial; W71-AUD-006 through W71-AUD-008 remain open. The
+slice is also release-blocked until the separately authorized W66-S09 provider
+matrix is available. Readiness must identify both the open S14 coverage and
+the external provider hold without stale UI or W71 source-of-truth claims.

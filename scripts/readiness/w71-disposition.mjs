@@ -2,8 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const DEFAULT_W71_DISPOSITION_PATH = "docs/research/26-w71-audit-disposition.json";
+export const DEFAULT_S14_EVIDENCE_PATH = "docs/research/27-w71-s14-installed-control-plane-evidence.json";
 
 const CLOSED_STATES = new Set(["resolved", "superseded"]);
+const INTEGRATED_TIERS = new Set(["baseline", "integrated-local"]);
+const INTEGRATED_EVIDENCE_STATUSES = new Set([
+  "integrated-local-pass-with-provider-hold",
+  "integrated-local-pass-with-open-s14-gaps",
+]);
 const EXPECTED_FINDINGS = new Set(
   Array.from({ length: 12 }, (_, index) => `W71-AUD-${String(index + 1).padStart(3, "0")}`),
 );
@@ -24,7 +30,23 @@ function fail(summary, findings, evidence) {
   return { id: "w71-audit-disposition", status: "fail", summary, findings, evidence };
 }
 
-export function checkW71AuditDisposition(rootDir, dispositionPath = DEFAULT_W71_DISPOSITION_PATH) {
+function integratedEvidenceFindings(rootDir, evidenceRef = DEFAULT_S14_EVIDENCE_PATH) {
+  try {
+    const evidence = readJson(rootDir, evidenceRef);
+    return [
+      [INTEGRATED_EVIDENCE_STATUSES.has(evidence.status), "Integrated-local W71 evidence must declare a supported integrated-local pass status."],
+      [evidence.qualification_freeze?.adversarial_proof_status === "pass", "Integrated-local W71 evidence must include a passing adversarial proof."],
+      [String(evidence.qualification_freeze?.manifest_sha256).startsWith("sha256:"), "Integrated-local W71 evidence must include a digest-addressed qualification manifest."],
+    ].filter(([valid]) => !valid).map(([, message]) => message);
+  } catch (error) {
+    return [`Integrated-local W71 evidence is invalid: ${error.message}`];
+  }
+}
+
+export function checkW71AuditDisposition(
+  rootDir,
+  dispositionPath = DEFAULT_W71_DISPOSITION_PATH,
+) {
   const findings = [];
   if (!fileExists(rootDir, dispositionPath)) {
     return fail("Post-W70 W71 audit disposition is missing.", [`${dispositionPath} is missing.`], [dispositionPath]);
@@ -44,9 +66,9 @@ export function checkW71AuditDisposition(rootDir, dispositionPath = DEFAULT_W71_
   if (disposition.release_disposition !== "audit-hold" || disposition.release_clearance !== false) {
     findings.push("W71 disposition must preserve release_disposition=audit-hold and release_clearance=false.");
   }
-  if (disposition.evidence_policy?.current_integrated_tier !== "baseline") {
-    findings.push("W71 disposition must keep current_integrated_tier=baseline until integrated proof lands.");
-  }
+  const currentIntegratedTier = disposition.evidence_policy?.current_integrated_tier;
+  findings.push(...["W71 disposition current_integrated_tier must be baseline or integrated-local."]
+    .filter(() => !INTEGRATED_TIERS.has(currentIntegratedTier)));
   if (disposition.evidence_policy?.historical_provider_evidence_is_current !== false) {
     findings.push("Historical provider evidence must not be treated as current W71 integrated proof.");
   }
@@ -87,6 +109,10 @@ export function checkW71AuditDisposition(rootDir, dispositionPath = DEFAULT_W71_
   }
   for (const id of EXPECTED_FINDINGS) if (!byId.has(id)) findings.push(`W71 disposition must include ${id}.`);
   for (const id of byId.keys()) if (!EXPECTED_FINDINGS.has(id)) findings.push(`Unexpected W71 finding '${id}' appears in the disposition.`);
+
+  const evidenceRef = disposition.evidence_policy?.integrated_evidence_ref;
+  findings.push(...integratedEvidenceFindings(rootDir, evidenceRef)
+    .filter(() => currentIntegratedTier === "integrated-local"));
 
   const storyDowngrades = Array.isArray(disposition.story_downgrades) ? disposition.story_downgrades : [];
   for (const downgrade of storyDowngrades) {

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "evidence_id": "w71-s14-installed-control-plane-2026-09-06-r2",
+  "evidence_id": "w71-s14-installed-control-plane-2026-09-07-r3",
   "kind": "w71-s14-installed-control-plane-evidence",
-  "captured_at": "2026-09-06T20:35:17Z",
-  "source_commit": "91beaaef9c7b206840333ae7ebf3aefd48460a7d",
+  "captured_at": "2026-09-07T11:30:00Z",
+  "source_commit": "4906ca6a250ac314206068b3d85f44a604ea024e",
   "ui_handoff": {
     "thread_id": "01a061b2-119a-7272-91d0-13add13d75c2",
     "branch": "codex/command-desk-ui",
@@ -57,7 +57,8 @@
       "surface": "public project connect job",
       "connection_job_status": "succeeded",
       "project_count_after_connection": 2,
-      "result": "pass"
+      "result": "partial",
+      "coverage": "second-repository connection only; installed provision-to-integration and delivery closure remain open under W71-AUD-008"
     },
     "lifecycle_packet_resolution": {
       "surface": "browser-facing Task discovery-run action",
@@ -77,18 +78,18 @@
     "post_requests_during_read_reload": 0
   },
   "qualification_freeze": {
-    "aor_commit": "91beaaef9c7b206840333ae7ebf3aefd48460a7d",
+    "aor_commit": "4906ca6a250ac314206068b3d85f44a604ea024e",
     "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
     "adversarial_proof_status": "pass",
-    "adversarial_proof_sha256": "sha256:d56e8f73af9e03e9192b0765418c18e90280048ed788e98e217a9b21bab22285",
-    "manifest_sha256": "sha256:39cab25abe76fb7784a3f575efa7a93418c39574816867f3d6deb4357f1e93cc",
+    "adversarial_proof_sha256": "sha256:cf0c5c3efac571ba87bd1e89ef0b4653be35519cc6669022c59e7da8fab88997",
+    "manifest_sha256": "sha256:7755a5a3cbbbba025cdc6d19b9284e962d58f34bd822d68b26cb2958d92882ad",
     "required_provider_cells": [
       "openai-primary.medium",
       "openai-primary.large",
       "anthropic-primary.medium",
       "anthropic-primary.large"
     ],
-    "status": "ready-for-fresh-provider-matrix",
+    "status": "blocked-by-open-s14-gaps",
     "network_policy": "provider-calls-prohibited",
     "write_policy": "no-upstream-write"
   },
@@ -99,7 +100,8 @@
   },
   "limitations": [
     "Live provider Prepare-to-Work and fresh W66 provider matrix remain outside this no-write evidence and require separately authorized provider cells.",
-    "Offline/reconnect state-machine assertions remain covered by the installed browser fixture; this record does not claim a provider-backed offline run."
+    "Offline/reconnect state-machine assertions remain covered by the installed browser fixture; this record does not claim a provider-backed offline run.",
+    "The installed evidence proves the real same-origin control-plane/read-model boundary and second-repository connection, but not the complete two-repository provision-to-integration-to-delivery journey; W71-AUD-006 through W71-AUD-008 remain open."
   ],
-  "status": "integrated-local-pass-with-provider-hold"
+  "status": "integrated-local-pass-with-open-s14-gaps"
 }
