@@ -212,6 +212,7 @@ export function materializeTargetCheckout(options) {
       targetRepoRef,
       targetRepoUrl,
       targetCommitSha: currentCommit,
+      targetCommitDate: runGitChecked({ cwd: targetCheckoutRoot, args: ["show", "-s", "--format=%cI", currentCommit], operation: "target commit timestamp" }).stdout.trim(),
     };
   }
   fs.rmSync(targetCheckoutRoot, { recursive: true, force: true });
@@ -248,6 +249,7 @@ export function materializeTargetCheckout(options) {
     targetRepoRef,
     targetRepoUrl,
     targetCommitSha,
+    targetCommitDate: runGitChecked({ cwd: targetCheckoutRoot, args: ["show", "-s", "--format=%cI", targetCommitSha], operation: "target commit timestamp" }).stdout.trim(),
   };
 }
 
@@ -557,6 +559,7 @@ function resolveGeneratedWorkspaceMode(profile, mission) {
  *   catalogVerification: Record<string, unknown>,
  *   profileVerification: Record<string, unknown>,
  *   mission?: Record<string, unknown>,
+ *   targetCheckout?: ReturnType<typeof materializeTargetCheckout>,
  * }} options
  */
 function resolveGeneratedProfileVerification(options) {
@@ -572,6 +575,10 @@ function resolveGeneratedProfileVerification(options) {
     ...options.profileVerification,
     setup_commands: stabilizeDependencySetupCommands(
       profileSetupCommands.length > 0 ? profileSetupCommands : catalogSetupCommands,
+      {
+        targetCheckoutRoot: options.targetCheckout?.targetCheckoutRoot,
+        targetCommitDate: options.targetCheckout?.targetCommitDate,
+      },
     ),
     commands:
       profileVerificationCommands.length > 0
@@ -681,6 +688,7 @@ export function materializeGeneratedProjectProfile(options) {
       catalogVerification: asRecord(asRecord(options.catalogEntry).verification),
       profileVerification: asRecord(options.profile.verification),
       mission: asRecord(options.mission),
+      targetCheckout: options.targetCheckout,
     }),
   }));
   hydrateRepoVerificationCommands(selectedRepo, generatedVerification);

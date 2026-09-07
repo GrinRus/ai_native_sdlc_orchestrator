@@ -99,6 +99,13 @@ Catalog target `verification` keeps the existing command shape:
   target source-change evidence. Playwright binaries are the exception: the
   runner places them in a content-addressed cache keyed by the target manifest
   and platform so a new run id does not trigger a full browser download.
+- When an npm setup command runs against a target without a root
+  `package-lock.json` or `npm-shrinkwrap.json`, the runner adds an auditable
+  `--before` cutoff derived from the frozen target commit timestamp (the next
+  UTC day). This keeps semver ranges from resolving packages published after
+  the target revision; lockfile-backed npm installs and commands that already
+  declare `--before` are left unchanged. The effective command and resolution
+  policy are included in the dependency snapshot evidence.
 
 Feature missions may add `post_run_quality`:
 - `primary_commands` are the deterministic mission-blocking post-run quality gate for that mission.
