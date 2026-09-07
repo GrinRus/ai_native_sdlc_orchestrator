@@ -108,7 +108,7 @@ function digestCheckoutFiles(root, gitArgs) {
     hash.update("\0");
     const filePath = path.join(root, relativePath);
     const stat = fs.lstatSync(filePath);
-    hash.update(stat.isSymbolicLink() ? `link:${fs.readlinkSync(filePath)}` : fs.readFileSync(filePath));
+    hash.update([() => "directory", () => fs.readFileSync(filePath), () => `link:${fs.readlinkSync(filePath)}`][Number(!stat.isDirectory()) + Number(stat.isSymbolicLink())]());
     hash.update("\0");
   }
   return { count: files.length, digest: hash.digest("hex") };

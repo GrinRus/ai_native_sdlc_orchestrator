@@ -111,7 +111,7 @@ export function validateExecutionDagCoverage({ tasks, units, nonRunTasks = [], a
     for (const dependency of strings(unit.depends_on)) {
       if (!unitsById.has(dependency)) findings.push({ code: "unknown-unit-dependency", unit_id: unit.unit_id, dependency });
     }
-    if (approvedScope) {
+    if (strings(approvedScope?.repo_ids).length > 0) {
       for (const repoId of strings(unit.scope?.repo_ids)) {
         if (!strings(approvedScope.repo_ids).includes(repoId)) findings.push({ code: "scope-expansion", unit_id: unit.unit_id, resource: repoId });
       }
