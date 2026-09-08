@@ -2062,11 +2062,11 @@ export function collectGuidedBrowserTaskProof(options) {
     accessibility_summary_file: options.accessibilitySummaryFile,
     visual_guardrail_file: options.visualSnapshotFile,
     screenshot_file: screenshotFile,
-    timeout_ms: 20_000,
+    timeout_ms: 8_000,
   };
   const { result, attempts } = runGuidedBrowserTaskCollector({
     pythonBin, collectorScriptFile, payload, env: collectorEnv,
-    timeoutMs: 120_000,
+    timeoutMs: 180_000,
     proofFile: options.browserTaskProofFile,
   });
   const stdout = asNonEmptyString(result.stdout);
