@@ -1212,7 +1212,25 @@ function controllerObservedStep(stepController, step, iteration = 1) {
     (entry) => asNonEmptyString(entry.step_id) === step && (Number(entry.iteration) || 1) === iteration,
   );
 }
-
+export function resolveImplementationResume(stepController) {
+  const ordered = [].concat(stepController?.getStepJournal?.()).map(asRecord).sort((left, right) => Number(left.sequence) - Number(right.sequence));
+  const latest = ordered.findLast((entry) => ["execution", "review", "qa"].includes(asNonEmptyString(entry.step_id)));
+  const latestIteration = Math.max(1, ...ordered.map((entry) => Number(entry.iteration)).filter(Number.isFinite));
+  const latestAction = asNonEmptyString(asRecord(latest).decision?.action);
+  const nextIteration = latestIteration + Number(["review", "qa"].includes(asNonEmptyString(latest?.step_id))) * Number(latestAction === "retry_public_step");
+  const executionRoot = ordered.filter((entry) => asNonEmptyString(entry.step_id) === "execution").flatMap((entry) => asStringArray(entry.artifact_refs)).filter((ref) => ref.includes("step-result-routed-")).filter(fileExists).map(readJson).map((evidence) => asNonEmptyString(asRecord(evidence.mission_semantics).git_status_root)).filter(fs.existsSync).at(-1);
+  return { nextIteration, executionRoot };
+}
+function prepareImplementationLoopResume({ artifacts, policy, stepController, promotionEvidenceRefs, targetCheckoutRoot, runId }) {
+  const resume = resolveImplementationResume(stepController);
+  const previous = asRecord(artifacts.implementation_loop);
+  artifacts.implementation_loop = { ...previous, enabled: policy.enabled, max_iterations: policy.maxIterations, review_repair_actions: policy.reviewRepairActions, cycle_steps: policy.cycleSteps, repair_sources: policy.repairSources, proof_expectations: policy.proofExpectations, acceptance_repair_drill: policy.acceptanceRepairDrill, iterations: previous.iterations };
+  ["implementation_loop_blocked", "implementation_loop_blocked_reason", "implementation_loop_exhausted", "implementation_loop_failure_summary", "failure_owner", "failure_phase", "failure_class"].forEach((field) => delete artifacts[field]);
+  return {
+    firstIteration: resume.nextIteration, latestExecutionRoot: [resume.executionRoot, targetCheckoutRoot].find(Boolean), latestImplementationRunId: deriveRuntimeRunId(runId, Math.max(1, resume.nextIteration - 1)),
+    latestPromotionEvidenceRefs: uniqueStrings([...promotionEvidenceRefs, asNonEmptyString(artifacts.routed_step_result_file), asNonEmptyString(artifacts.post_run_verify_summary_file), asNonEmptyString(artifacts.review_report_file), ...asStringArray(artifacts.review_repair_decision_files)]),
+  };
+}
 /**
  * @param {Record<string, unknown>} artifacts
  * @param {string} diagnosticFailureMode
@@ -5054,7 +5072,6 @@ function executeFullJourneyFlowImplementation(options) {
       );
       throw new Error(asNonEmptyString(browserCachePreflight.report.summary) || "Browser cache preflight failed.");
     }
-
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
       const publicArgs = normalizePublicCommandArgs(args);
@@ -5180,7 +5197,6 @@ function executeFullJourneyFlowImplementation(options) {
             )
           : null;
       if (cachedPostRunDiagnosticVerify) return cachedPostRunDiagnosticVerify;
-
       const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
         "project",
         "verify",
@@ -5244,7 +5260,6 @@ function executeFullJourneyFlowImplementation(options) {
       }
       return postRunDiagnosticVerify;
     };
-
     if (guidedJourneyEnabled) {
       const guidedDoctor = runCommand("guided-doctor", [
         "doctor",
@@ -5255,7 +5270,6 @@ function executeFullJourneyFlowImplementation(options) {
         "--json",
       ]);
       artifacts.guided_doctor_transcript_file = guidedDoctor.transcriptFile;
-
       const guidedOnboard = runCommand("guided-onboard", [
         "onboard",
         ".",
@@ -5267,7 +5281,6 @@ function executeFullJourneyFlowImplementation(options) {
       ]);
       artifacts.onboarding_report_file = getStringField(guidedOnboard.payload, "onboarding_report_file");
       artifacts.guided_onboard_transcript_file = guidedOnboard.transcriptFile;
-
       const guidedApp = runCommand("guided-app", [
         "app",
         "--project-ref",
@@ -5281,7 +5294,6 @@ function executeFullJourneyFlowImplementation(options) {
         "--json",
       ]);
       artifacts.guided_app_transcript_file = guidedApp.transcriptFile;
-
       const guidedNextBeforeMission = runCommand("guided-next-before-mission", [
         "next",
         "--project-ref",
@@ -5293,7 +5305,6 @@ function executeFullJourneyFlowImplementation(options) {
       artifacts.next_action_report_file = getStringField(guidedNextBeforeMission.payload, "next_action_report_file");
       artifacts.guided_next_before_mission_transcript_file = guidedNextBeforeMission.transcriptFile;
     }
-
     const hostAssets = materializeHostLiveE2eAssets({
       examplesRoot: options.examplesRoot,
       generatedAssetsRoot: path.join(options.layout.stateRoot, "live-e2e-assets", normalizeId(options.runId)),
@@ -5304,7 +5315,6 @@ function executeFullJourneyFlowImplementation(options) {
     artifacts.host_live_e2e_assets_root = hostAssets.assetsRoot;
     artifacts.live_e2e_adapter_defaults = hostAssets.liveE2eAdapterDefaults;
     artifacts.live_e2e_runtime_selection = hostAssets.runtimeSelection;
-
     const providerRoutes = hostAssets.providerRoutes;
     artifacts.provider_route_override_files = providerRoutes.routeFiles;
     artifacts.provider_route_overrides = providerRoutes.routeOverrides;
@@ -5995,25 +6005,19 @@ function executeFullJourneyFlowImplementation(options) {
     ]);
 
     const implementationLoopPolicy = resolveImplementationLoopPolicy(options.profile);
-    artifacts.implementation_loop = {
-      enabled: implementationLoopPolicy.enabled,
-      max_iterations: implementationLoopPolicy.maxIterations,
-      review_repair_actions: implementationLoopPolicy.reviewRepairActions,
-      cycle_steps: implementationLoopPolicy.cycleSteps,
-      repair_sources: implementationLoopPolicy.repairSources,
-      proof_expectations: implementationLoopPolicy.proofExpectations,
-      acceptance_repair_drill: implementationLoopPolicy.acceptanceRepairDrill,
-      iterations: [],
-    };
+    const implementationResume = prepareImplementationLoopResume({
+      artifacts, policy: implementationLoopPolicy, stepController: options.stepController, promotionEvidenceRefs,
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot, runId: options.runId,
+    });
     let reviewReport = {};
     let reviewOverallStatus = "fail";
     let qaOverallStatus = "skipped";
     let featureSizeFitStatus = "fail";
-    let latestPromotionEvidenceRefs = [...promotionEvidenceRefs];
-    let latestImplementationRunId = deriveRuntimeRunId(options.runId);
-    let latestExecutionRoot = targetCheckout.targetCheckoutRoot;
+    let latestPromotionEvidenceRefs = implementationResume.latestPromotionEvidenceRefs;
+    let latestImplementationRunId = implementationResume.latestImplementationRunId;
+    let latestExecutionRoot = implementationResume.latestExecutionRoot;
     const evalSuites = getEvalSuites(options.profile);
-    for (let iteration = 1; iteration <= implementationLoopPolicy.maxIterations; iteration += 1) {
+    for (let iteration = implementationResume.firstIteration; iteration <= implementationLoopPolicy.maxIterations; iteration += 1) {
       const iterationRunId = deriveRuntimeRunId(options.runId, iteration);
       latestImplementationRunId = iterationRunId;
       artifacts.latest_implementation_run_id = iterationRunId;
