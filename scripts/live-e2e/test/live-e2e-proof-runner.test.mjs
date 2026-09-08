@@ -61,11 +61,13 @@ import {
   resolveGuidedWarnDiagnosticTimeoutMs,
   sourceInstallCacheMatches,
   shouldDeferGuidedWarnDiagnostic,
+  toProjectRuntimeEvidenceRef,
 } from "../lib/flows.mjs";
 import { deriveBrowserCacheKey, prepareBrowserCachePreflight } from "../lib/browser-cache.mjs";
 import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
 import { materializeBrowserEvidenceIndex } from "../lib/installed-browser-proof.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
+import { resolveEvidenceReference } from "../../../shared/evidence-reference.mjs";
 import {
   REQUIRED_GUIDED_COMMAND_LABELS,
   buildGuidedJourneyProof,
@@ -3247,6 +3249,43 @@ test("guided flow identity accepts opaque public packet ids", () => {
       projectId: "workspace-123",
       missionId: "header-regression-follow-up",
     });
+  });
+});
+
+test("guided follow-up evidence refs resolve from the follow-up project runtime root", () => {
+  withTempRoot((tempRoot) => {
+    const hostProjectRuntimeRoot = path.join(tempRoot, "runtime", "projects", "aor-core");
+    const followUpProjectRuntimeRoot = path.join(
+      hostProjectRuntimeRoot,
+      "sessions",
+      "run-123",
+      "aor-home",
+      "projects",
+      "workspace-123",
+    );
+    const packetFile = path.join(followUpProjectRuntimeRoot, "artifacts", "follow-up.json");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(path.dirname(packetFile), { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+    fs.writeFileSync(packetFile, "{}\n", "utf8");
+
+    const reference = toProjectRuntimeEvidenceRef(followUpProjectRuntimeRoot, packetFile);
+
+    assert.equal(reference, "evidence://projects/workspace-123/artifacts/follow-up.json");
+    assert.equal(
+      resolveEvidenceReference({
+        projectRoot: targetCheckoutRoot,
+        projectRuntimeRoot: followUpProjectRuntimeRoot,
+        workspaceProjectId: "workspace-123",
+        reference,
+      }).filePath,
+      fs.realpathSync.native(packetFile),
+    );
+    assert.notEqual(
+      toProjectRuntimeEvidenceRef(hostProjectRuntimeRoot, packetFile),
+      reference,
+      "the host project runtime root must not leak into the workspace evidence URI",
+    );
   });
 });
 

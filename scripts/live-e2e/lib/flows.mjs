@@ -471,7 +471,7 @@ function toProjectEvidenceRef(projectRoot, filePath) {
  * @param {string | null | undefined} filePath
  * @returns {string | null}
  */
-function toProjectRuntimeEvidenceRef(projectRuntimeRoot, filePath) {
+export function toProjectRuntimeEvidenceRef(projectRuntimeRoot, filePath) {
   const concreteFilePath = asNonEmptyString(filePath);
   if (!concreteFilePath) return null;
   const relative = path.relative(
@@ -7255,6 +7255,9 @@ function executeFullJourneyFlowImplementation(options) {
       if (!asNonEmptyString(artifacts.second_flow_id)) {
         throw new Error("Guided follow-up mission did not materialize a second flow id.");
       }
+      // Follow-up commands run in a newly allocated AOR Home project, so its
+      // packet path is the source of truth for the workspace evidence URI.
+      const followUpProjectRuntimeRoot = path.dirname(path.dirname(artifacts.new_flow_mission_artifact_packet_file));
 
       const guidedNextAfterFollowUp = runCommand("guided-next-after-follow-up", [
         "next",
@@ -7294,12 +7297,12 @@ function executeFullJourneyFlowImplementation(options) {
         asNonEmptyString(artifacts.second_flow_id),
         "--target-ref",
         toProjectRuntimeEvidenceRef(
-          options.layout.projectRuntimeRoot,
+          followUpProjectRuntimeRoot,
           artifacts.new_flow_mission_artifact_packet_file,
         ),
         "--target-ref",
         toProjectRuntimeEvidenceRef(
-          options.layout.projectRuntimeRoot,
+          followUpProjectRuntimeRoot,
           artifacts.new_flow_next_action_report_file,
         ),
         "--delivery-mode",
