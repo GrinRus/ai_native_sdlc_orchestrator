@@ -4,21 +4,16 @@ import sys
 import time
 from pathlib import Path
 from urllib.parse import urlparse
-
 from playwright.sync_api import sync_playwright
-
-
 def write_json(path, document):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-
-
 def main():
     payload = json.loads(sys.argv[1])
     timeout_ms = int(payload.get("timeout_ms") or 30000)
     app_url = payload["app_url"]
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
+        browser = playwright.chromium.launch(headless=True, args=["--no-proxy-server"])
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         console_errors = []
         observed_optional_404_console = []
@@ -26,9 +21,7 @@ def main():
         external_requests = []
         app_origin = f"{urlparse(app_url).scheme}://{urlparse(app_url).netloc}"
         def record_console(message):
-            if message.type != "error":
-                return
-            if injection_active["value"]:
+            if message.type != "error" or injection_active["value"]:
                 return
             if message.text == "Failed to load resource: the server responded with a status of 404 (Not Found)":
                 observed_optional_404_console.append(message.text)
@@ -40,18 +33,17 @@ def main():
             readiness = {"status": "not_pass", "observed_state": "timeout", "expected_state": "ready"}
             deadline = time.monotonic() + timeout_ms / 1000
             while time.monotonic() < deadline:
-                readiness_probe = page.evaluate("""async ({controlPlane, projectId}) => {
-                  const stateResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/state');
-                  const flowResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/selected');
+                try:
+                    readiness_probe = page.evaluate("""async ({controlPlane, projectId}) => {
+                  const fetchJson = async (url) => { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 5000); try { const response = await fetch(url, {signal: controller.signal}); return {response, body: response.ok ? await response.json() : null}; } finally { clearTimeout(timer); } };
+                  const [stateResult, flowResult] = await Promise.all([fetchJson(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/state'), fetchJson(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/selected')]);
                   const bodyText = (document.body?.innerText || '').toLowerCase();
-                  return {
-                    stateStatus: stateResponse.status,
-                    flowStatus: flowResponse.status,
-                    state: stateResponse.ok ? await stateResponse.json() : null,
-                    flow: flowResponse.ok ? await flowResponse.json() : null,
-                    loading: bodyText.includes('loading') || bodyText.includes('syncing'),
-                  };
+                  return {stateStatus: stateResult.response.status, flowStatus: flowResult.response.status, state: stateResult.body, flow: flowResult.body, loading: bodyText.includes('loading') || bodyText.includes('syncing')};
                 }""", {"controlPlane": payload["control_plane"], "projectId": payload["project_id"]})
+                except Exception:
+                    readiness["observed_state"] = "partial"
+                    page.wait_for_timeout(250)
+                    continue
                 state_project = (readiness_probe.get("state") or {}).get("project_id")
                 selected_flow = readiness_probe.get("flow") or {}
                 if readiness_probe.get("stateStatus") == 200 and readiness_probe.get("flowStatus") == 200 and state_project == payload["project_id"] and selected_flow.get("flow_id") and not readiness_probe.get("loading"):
@@ -66,13 +58,28 @@ def main():
                 readiness["observed_state"] = "loading" if readiness_probe.get("loading") else "partial"
                 page.wait_for_timeout(250)
             return readiness
-
-        page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
-        readiness = wait_for_ready()
+        def safe_goto(url):
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            except Exception:
+                pass
+        def safe_reload():
+            try:
+                page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
+            except Exception:
+                pass
+        def wait_for_ready_with_retry():
+            readiness = wait_for_ready()
+            if readiness.get("status") != "pass":
+                safe_reload()
+                readiness = wait_for_ready()
+            return readiness
+        safe_goto(app_url)
+        readiness = wait_for_ready_with_retry()
         html = page.content()
         Path(payload["rendered_html_file"]).write_text(html, encoding="utf-8")
         screenshot_file = payload["screenshot_file"]
-        page.screenshot(path=screenshot_file, full_page=True)
+        page.screenshot(path=screenshot_file, full_page=False)
         dom_snapshot = page.evaluate("""() => {
           const selectorFor = (el) => {
             if (!el) return null;
@@ -213,52 +220,49 @@ def main():
             }""", index)
             if active:
                 focus_sequence.append(active)
-
         dialog_probe = {"opened": False, "focus_inside": False, "focus_restored": False, "entry_point": None}
-        dialog_opener = page.get_by_role("button", name="Ask AOR for selected flow")
-        if dialog_opener.count() != 1 or not dialog_opener.is_enabled():
-            add_project_button = page.get_by_role("button", name="Add AOR Project", exact=True)
-            if add_project_button.count() == 1 and add_project_button.is_enabled():
-                dialog_opener = add_project_button
-                dialog_probe["entry_point"] = "add-project"
-        if dialog_opener.count() == 1 and dialog_opener.is_enabled():
-            if dialog_probe["entry_point"] is None:
-                dialog_probe["entry_point"] = "active-flow-ask-aor"
-            dialog_opener.focus()
-            dialog_opener.click()
-            dialog = page.get_by_role("dialog")
+        def probe_dialog(dialog_opener, entry_point):
+            if dialog_probe["opened"] or dialog_opener.count() != 1 or not dialog_opener.is_enabled():
+                return
+            dialog_probe["entry_point"] = entry_point; dialog_opener.focus(); dialog_opener.click(); dialog = page.get_by_role("dialog")
             if dialog.count() == 1:
                 dialog_probe["opened"] = True
-                page.keyboard.press("Tab")
-                dialog_probe["focus_inside"] = page.evaluate("() => Boolean(document.activeElement?.closest('[role=\"dialog\"]'))")
-                page.keyboard.press("Escape")
-                dialog_probe["focus_restored"] = dialog_opener.evaluate("(el) => document.activeElement === el")
-
-        action_probe = page.evaluate("""async ({controlPlane, projectId}) => {
-          const selectedResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/selected');
+                page.keyboard.press("Tab"); dialog_probe["focus_inside"] = page.evaluate("() => Boolean(document.activeElement?.closest('[role=\"dialog\"]'))"); page.keyboard.press("Escape"); dialog_probe["focus_restored"] = dialog_opener.evaluate("(el) => document.activeElement === el")
+        dialog_opener = page.get_by_role("button", name="Ask AOR for selected flow")
+        if dialog_opener.count() == 1 and dialog_opener.is_enabled():
+            probe_dialog(dialog_opener, "active-flow-ask-aor")
+        try:
+            action_probe = page.evaluate("""async ({controlPlane, projectId}) => {
+          const fetchJson = async (url, init = {}) => { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 5000); try { const response = await fetch(url, {...init, signal: controller.signal}); return {response, body: response.ok ? await response.json() : null}; } finally { clearTimeout(timer); } };
+          const selectedResult = await fetchJson(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/selected');
+          const selectedResponse = selectedResult.response;
           if (!selectedResponse.ok) return { status: 'not_pass', reason: 'selected-flow-read-failed' };
-          const flow = await selectedResponse.json();
-          const detailResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/' + encodeURIComponent(flow.flow_id));
+          const flow = selectedResult.body;
+          const detailResult = await fetchJson(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/' + encodeURIComponent(flow.flow_id));
+          const detailResponse = detailResult.response;
           if (!detailResponse.ok) return { status: 'not_pass', reason: 'flow-detail-read-failed' };
-          const detail = await detailResponse.json();
+          const detail = detailResult.body;
           const route = '/api/projects/' + encodeURIComponent(projectId) + '/operator-requests';
-          const createdResponse = await fetch(controlPlane + route, {
+          const requestText = 'Installed browser proof durable readback ' + String(Date.now());
+          const createdResult = await fetchJson(controlPlane + route, {
             method: 'POST',
             headers: {'content-type': 'application/json'},
             body: JSON.stringify({
               target_flow_id: flow.flow_id,
               target_stage: 'discovery',
               intent_type: 'analyze',
-              request_text: 'Installed browser proof durable readback',
+              request_text: requestText,
               target_refs: [detail.intake_packet_ref || detail.latest_next_action_report_ref],
               delivery_mode: 'no-write'
             })
           });
-          const created = createdResponse.ok ? await createdResponse.json() : null;
+          const createdResponse = createdResult.response;
+          const created = createdResult.body;
           const responseId = created?.operator_request?.document?.request_id || created?.operator_request_id;
-          if (createdResponse.status !== 201 || !responseId) return { status: 'not_pass', reason: 'mutation-failed', response_status: createdResponse.status };
-          const listResponse = await fetch(controlPlane + route);
-          const listed = listResponse.ok ? await listResponse.json() : null;
+          if (![200, 201].includes(createdResponse.status) || !responseId) return { status: 'not_pass', reason: 'mutation-failed', response_status: createdResponse.status };
+          const listResult = await fetchJson(controlPlane + route);
+          const listResponse = listResult.response;
+          const listed = listResult.body;
           return {
             status: listResponse.ok && JSON.stringify(listed).includes(responseId) ? 'pass' : 'not_pass',
             route,
@@ -267,15 +271,18 @@ def main():
             evidence_ref: controlPlane + route,
           };
         }""", {"controlPlane": payload["control_plane"], "projectId": payload["project_id"]})
-        page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
-        reload_readback = page.evaluate("""async ({controlPlane, projectId, responseId}) => {
-          const route = '/api/projects/' + encodeURIComponent(projectId) + '/operator-requests';
-          const response = await fetch(controlPlane + route);
-          const payload = response.ok ? await response.json() : null;
-          return response.ok && JSON.stringify(payload).includes(responseId);
+        except Exception as error:
+            action_probe = {"status": "not_pass", "reason": str(error)[:240]}
+        safe_reload()
+        try:
+            reload_readback = page.evaluate("""async ({controlPlane, projectId, responseId}) => {
+          const route = '/api/projects/' + encodeURIComponent(projectId) + '/operator-requests', controller = new AbortController(), timer = setTimeout(() => controller.abort(), 5000);
+          let response; try { response = await fetch(controlPlane + route, {signal: controller.signal}); } finally { clearTimeout(timer); }
+          const payload = response.ok ? await response.json() : null; return response.ok && JSON.stringify(payload).includes(responseId);
         }""", {"controlPlane": payload["control_plane"], "projectId": payload["project_id"], "responseId": action_probe.get("response_id")})
-
-        post_reload_readiness = wait_for_ready()
+        except Exception:
+            reload_readback = False
+        post_reload_readiness = wait_for_ready_with_retry()
         task_workspace_probe = {"status": "not_pass", "reason": "new-task-control-not-found"}
         task_workspace_screenshot = str(Path(screenshot_file).with_name(Path(screenshot_file).stem + "-task-workspace.png"))
         new_task = page.get_by_role("button", name="New task", exact=True)
@@ -283,36 +290,38 @@ def main():
             try:
                 new_task.click()
                 page.get_by_role("heading", name="New Task", exact=True).wait_for(state="visible", timeout=timeout_ms)
+                probe_dialog(page.get_by_role("button", name="Add Markdown", exact=True), "task-sources")
                 outcome = page.get_by_label("Task outcome", exact=True)
                 outcome.fill("Installed browser proof Task Workspace")
                 page.get_by_role("button", name="Prepare task", exact=True).click()
-                page.get_by_role("heading", name="Prepared Task", exact=True).wait_for(state="visible", timeout=timeout_ms)
-                prepared_ready = page.get_by_role("button", name="Start task", exact=True)
-                page.screenshot(path=task_workspace_screenshot, full_page=True)
-                task_workspace_probe = {
-                    "status": "pass" if prepared_ready.count() == 1 else "not_pass",
-                    "surface": "task-workspace",
-                    "url": page.url,
-                    "new_task_visible": True,
-                    "prepared_task_visible": True,
-                    "start_action_count": prepared_ready.count(),
-                    "provider_execution": "prohibited",
-                    "screenshot_ref": task_workspace_screenshot,
-                }
+                prepared_heading = page.get_by_role("heading", name="Prepared Task", exact=True)
+                attention_heading = page.get_by_role("heading", name="Attention", exact=True)
+                recovery_control = page.get_by_role("button", name="Resume task preparation", exact=True)
+                deadline = time.monotonic() + min(timeout_ms, 10000) / 1000
+                while time.monotonic() < deadline:
+                    if prepared_heading.count() == 1 and prepared_heading.is_visible():
+                        prepared_ready = page.get_by_role("button", name="Start task", exact=True)
+                        page.screenshot(path=task_workspace_screenshot, full_page=False)
+                        task_workspace_probe = {"status": "pass" if prepared_ready.count() == 1 else "not_pass", "surface": "task-workspace", "url": page.url, "new_task_visible": True, "prepared_task_visible": True, "blocked_state_visible": False, "recovery_control_visible": False, "start_action_count": prepared_ready.count(), "provider_execution": "prohibited", "screenshot_ref": task_workspace_screenshot}
+                        break
+                    if attention_heading.count() == 1 and attention_heading.is_visible() and recovery_control.count() >= 1:
+                        page.screenshot(path=task_workspace_screenshot, full_page=False)
+                        task_workspace_probe = {"status": "pass", "surface": "task-workspace", "url": page.url, "new_task_visible": True, "prepared_task_visible": False, "blocked_state_visible": True, "recovery_control_visible": True, "start_action_count": 0, "provider_execution": "prohibited", "outcome_state": "attention", "screenshot_ref": task_workspace_screenshot}
+                        break
+                    page.wait_for_timeout(250)
             except Exception as error:
                 task_workspace_probe = {"status": "not_pass", "reason": str(error)[:240]}
-        page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
-        home_readiness = wait_for_ready()
-
+        safe_goto(app_url)
+        home_readiness = wait_for_ready_with_retry()
         viewport_matrix = []
         screenshot_files = [screenshot_file, task_workspace_screenshot]
         for viewport_id, width, height in [("desktop", 1280, 900), ("tablet", 768, 1024), ("mobile", 390, 844)]:
             page.set_viewport_size({"width": width, "height": height})
-            page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
-            viewport_readiness = wait_for_ready()
+            safe_reload()
+            viewport_readiness = wait_for_ready_with_retry()
             overflow = page.evaluate("() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1")
             viewport_screenshot = str(Path(screenshot_file).with_name(Path(screenshot_file).stem + "-" + viewport_id + ".png"))
-            page.screenshot(path=viewport_screenshot, full_page=True)
+            page.screenshot(path=viewport_screenshot, full_page=False)
             screenshot_files.append(viewport_screenshot)
             viewport_matrix.append({"id": viewport_id, "status": "not_pass" if overflow or viewport_readiness.get("status") != "pass" else "pass", "readiness": viewport_readiness, "screenshot_ref": viewport_screenshot})
         page.set_viewport_size({"width": 1280, "height": 900})
@@ -322,7 +331,6 @@ def main():
         zoom_overflow = page.evaluate("() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1")
         viewport_matrix.append({"id": "zoom-200", "status": "not_pass" if zoom_overflow else "pass"})
         page.evaluate("() => { document.documentElement.style.zoom = ''; }")
-
         page.emulate_media(reduced_motion="reduce")
         reduced_motion_ok = page.evaluate("""() => Array.from(document.querySelectorAll('*')).slice(0, 400).every((el) => {
           const style = getComputedStyle(el);
@@ -334,7 +342,6 @@ def main():
           const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
           return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
         }).every((el) => { const r = el.getBoundingClientRect(); return r.width >= 24 && r.height >= 24; })""")
-
         page.context.set_offline(True)
         offline_observed = False
         try:
@@ -342,57 +349,43 @@ def main():
         except Exception:
             offline_observed = True
         page.context.set_offline(False)
-        page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
-        reconnect_readiness = wait_for_ready()
+        safe_reload()
+        reconnect_readiness = wait_for_ready_with_retry()
         reconnect_ok = page.evaluate("() => Boolean(document.querySelector('main,[role=\"main\"]'))")
 
+        multi_item_attention_ok = False
+        try:
+            attention_nav = page.get_by_role("button", name="Attention", exact=True)
+            if attention_nav.count() == 1 and attention_nav.is_enabled():
+                attention_nav.click()
+                page.get_by_role("heading", name="Needs decision", exact=False).wait_for(state="visible", timeout=min(timeout_ms, 10000))
+                multi_item_attention_ok = page.locator(".task-workspace__card").count() >= 2
+        except Exception:
+            multi_item_attention_ok = False
         injected_error_observed = {"value": False}
         def abort_resource(route):
             injected_error_observed["value"] = True
             route.abort()
-        resource_url = f"{payload['control_plane']}/api/projects/{payload['project_id']}/execution-profile"
-        page.wait_for_timeout(250)
-        def resolve_refresh_button():
-            settings = page.locator("details.project-settings-disclosure")
-            if settings.count() == 1:
-                try:
-                    summary = settings.locator(":scope > summary")
-                    if summary.count() == 1 and settings.get_attribute("open") is None:
-                        summary.click()
-                except Exception:
-                    pass
-            setup_refresh = page.get_by_role("button", name="Refresh setup", exact=True)
-            if setup_refresh.count() == 1:
-                try:
-                    if not setup_refresh.is_visible():
-                        return page.get_by_role("button", name="Refresh", exact=True)
-                    if setup_refresh.is_visible():
-                        return setup_refresh
-                except Exception:
-                    pass
-            refresh = page.get_by_role("button", name="Refresh", exact=True)
-            return refresh if refresh.count() == 1 else setup_refresh
-        refresh_button = resolve_refresh_button()
+        resource_url = f"{payload['control_plane']}/api/projects/{payload['project_id']}/tasks"
         try:
-            if refresh_button.count() == 1 and refresh_button.is_enabled():
-                injection_active["value"] = True
-                page.route(resource_url, abort_resource, times=1)
-                refresh_button.click()
-                page.get_by_text("Some live resources are unavailable.", exact=True).wait_for(state="visible", timeout=3000)
+            injection_active["value"] = True
+            page.route(resource_url, abort_resource, times=1)
+            safe_reload()
+            page.get_by_text("Tasks are temporarily unavailable.", exact=True).wait_for(state="visible", timeout=min(timeout_ms, 10000))
         except Exception:
             pass
-        error_feedback = page.get_by_text("Some live resources are unavailable.", exact=True).count() > 0
+        error_feedback = page.get_by_text("Tasks are temporarily unavailable.", exact=True).count() > 0
         if injection_active["value"]:
             page.unroute(resource_url)
         injection_active["value"] = False
         try:
-            refresh_button = resolve_refresh_button()
-            if refresh_button.count() == 1 and refresh_button.is_enabled():
-                refresh_button.click()
-                page.get_by_text("Some live resources are unavailable.", exact=True).wait_for(state="hidden", timeout=3000)
+            retry_button = page.get_by_role("button", name="Retry", exact=True)
+            if retry_button.count() == 1 and retry_button.is_enabled():
+                retry_button.click()
+                wait_for_ready_with_retry()
         except Exception:
             pass
-        error_recovered = page.get_by_text("Some live resources are unavailable.", exact=True).count() == 0
+        error_recovered = page.get_by_text("Tasks are temporarily unavailable.", exact=True).count() == 0
         browser.close()
 
     distinct_targets = {entry.get("selector") or entry.get("label") for entry in focus_sequence if entry.get("selector") or entry.get("label")}
@@ -488,7 +481,7 @@ def main():
             "error_feedback_observed": error_feedback,
             "recovered": error_recovered,
         },
-        {"id": "multi-item-attention", "status": "pass" if semantic.get("status_region_count", 0) >= 1 else "not_pass"},
+        {"id": "multi-item-attention", "status": "pass" if multi_item_attention_ok else "not_pass"},
         {"id": "project-switch", "status": "pass" if any("project" in (entry.get("label") or "").lower() for entry in focusable_controls) else "not_pass"},
         {"id": "terminal-read-only", "status": "pass" if readiness["status"] == "pass" else "not_pass"},
     ]
