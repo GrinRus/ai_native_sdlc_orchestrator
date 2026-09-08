@@ -680,12 +680,8 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
   }
 
   function sourcePreview() {
-    if (sourceMode === "upload") return sanitizeMarkdown(markdown) || "Choose a Markdown file to preview.";
-    if (sourceMode === "repository") {
-      const source = sourceItems.find((item) => item.kind === "repository-markdown");
-      return sanitizeMarkdown(source?.preview?.sanitized_markdown || "") || "Pinned repository Markdown is read-only until the source is confirmed.";
-    }
-    return sanitizeMarkdown(markdown);
+    const repositorySource = sourceItems.find((item) => item.kind === "repository-markdown");
+    return { upload: sanitizeMarkdown(markdown) || "Choose a Markdown file to preview.", repository: sanitizeMarkdown(repositorySource?.preview?.sanitized_markdown || "") || "Pinned repository Markdown is read-only until the source is confirmed.", inline: sanitizeMarkdown(markdown) }[sourceMode];
   }
 
   const listSelectedTask = visibleTasks.some((task) => task.task_id === selectedTask?.task_id) ? selectedTask : null;
