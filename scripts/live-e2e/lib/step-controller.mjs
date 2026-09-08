@@ -1282,11 +1282,10 @@ export function createLiveE2eStepController(options) {
         const action = asNonEmptyString(asRecord(entry.decision).action);
         const isLatestRetry =
           action === "retry_public_step" && latestPersistedEntryForStep(step)?.step_instance_id === stepInstanceId;
-        if (isLatestRetry) {
-          // A public retry is a new observation, not a replay of the failed
-          // decision. Move to a fresh step instance so a passing rerun can
-          // close the step and downstream terminal evidence can become
-          // complete.
+        const manualQualityRetry = Boolean(action === "retry_public_step" && { manual: { review: true, qa: true } }[mode]?.[step]);
+        if ([isLatestRetry, !manualQualityRetry].every(Boolean)) {
+          // A public retry is a new observation, not a replay of the failed decision. Move to a fresh step instance so a passing rerun can
+          // close the step and downstream terminal evidence can become complete.
           iteration = nextPersistedIterationForStep(step);
           stepInstanceId = buildStepInstanceId(step, iteration);
           persistedEntry = null;
@@ -1696,8 +1695,9 @@ export function createLiveE2eStepController(options) {
     writeJson(stateFile, state);
 
     const action = asNonEmptyString(asRecord(entry.decision).action) || "continue";
-    const actionContinuesController = action === "continue" || (mode === "auto" && action === "retry_public_step");
-    const terminalManualContinue = mode === "manual" && actionContinuesController && state.current_step === null;
+    const manualQualityRetry = Boolean(action === "retry_public_step" && { manual: { review: true, qa: true } }[mode]?.[step]);
+    const actionContinuesController = ["continue", { auto: "retry_public_step" }[mode]].includes(action) || manualQualityRetry;
+    const terminalManualContinue = mode === "manual" && actionContinuesController && { true: null, false: state.current_step }[manualQualityRetry] === null;
     if (
       (mode === "manual" && !terminalManualContinue) ||
       (mode === "evaluator" && !actionContinuesController) ||

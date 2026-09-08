@@ -2109,6 +2109,60 @@ test("live E2E step controller preserves repeated execution and review iteration
   });
 });
 
+test("live E2E manual quality retry resumes without a synthetic review iteration", () => {
+  withTempRoot((reportsRoot) => {
+    const reviewTranscript = path.join(reportsRoot, "01-review-run.json");
+    fs.writeFileSync(reviewTranscript, "{}\n", "utf8");
+    const runId = "controller-manual-quality-retry";
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const observeInput = {
+      stage: "review",
+      iteration: 1,
+      stageResult: { stage: "review", status: "warn", evidence_refs: [reviewTranscript], summary: "repair" },
+      commandResults: [
+        {
+          label: "review-run",
+          command_surface: "aor review run",
+          status: "warn",
+          transcript_file: reviewTranscript,
+          artifact_refs: [reviewTranscript],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+      decisionOverride: {
+        action: "retry_public_step",
+        reason: "repair iteration requested",
+        next_step: "execution",
+      },
+    };
+    const first = createLiveE2eStepController({ reportsRoot, runId, profile, mode: "manual" });
+    first.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 1 });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "review", {
+      action: "retry_public_step",
+      semanticStatus: "warn",
+      nextStep: "execution",
+      inspectedEvidenceRefs: [reviewTranscript],
+    });
+
+    const firstResult = first.observeStage(observeInput);
+    assert.equal(firstResult.action, "retry_public_step");
+    assert.deepEqual(first.getStepJournal().map((entry) => entry.step_instance_id), ["review"]);
+
+    const resumed = createLiveE2eStepController({ reportsRoot, runId, profile, mode: "manual" });
+    const resumedResult = resumed.observeStage(observeInput);
+    assert.equal(resumedResult.action, "continue");
+    assert.deepEqual(resumed.getStepJournal().map((entry) => entry.step_instance_id), ["review"]);
+  });
+});
+
 test("live E2E auto resume reuses cached setup commands after persisted progress", () => {
   withTempRoot((reportsRoot) => {
     const setupTranscript = path.join(reportsRoot, "01-guided-doctor.json");
