@@ -59,6 +59,7 @@ import {
   resolveAuditHoldOverrideArgs,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
   resolveGuidedWarnDiagnosticTimeoutMs,
+  resolveImplementationResume,
   sourceInstallCacheMatches,
   shouldDeferGuidedWarnDiagnostic,
   toProjectRuntimeEvidenceRef,
@@ -118,6 +119,25 @@ test("live E2E assessment refs include only typed evidence fields and known evid
   ]);
   assert.equal(refs.some((ref) => ref.includes("npx ava")), false);
   assert.equal(refs.some((ref) => ref.includes("context_doc_id")), false);
+});
+
+test("implementation quality resume advances past an accepted repair retry", () => {
+  const executionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-resume-execution-"));
+  const stepResultFile = path.join(executionRoot, "step-result-routed-test.json");
+  fs.writeFileSync(stepResultFile, JSON.stringify({ mission_semantics: { git_status_root: executionRoot } }));
+  const resume = resolveImplementationResume({
+    getStepJournal: () => [
+      { step_id: "execution", iteration: 2, sequence: 1, artifact_refs: [stepResultFile], decision: { action: "continue" } },
+      { step_id: "review", iteration: 2, sequence: 2, decision: { action: "retry_public_step" } },
+    ],
+  });
+  assert.deepEqual(resume, { nextIteration: 3, executionRoot });
+  assert.equal(
+    resolveImplementationResume({
+      getStepJournal: () => [{ step_id: "execution", iteration: 2, sequence: 1, artifact_refs: [stepResultFile], decision: { action: "continue" } }],
+    }).nextIteration,
+    2,
+  );
 });
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
 const fullJourneyFlowScript = path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs");
