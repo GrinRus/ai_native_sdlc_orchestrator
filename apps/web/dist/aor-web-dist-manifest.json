@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "d958a7a2b189c060a22f2b7d49b5acfdf072da9554d3a791fbfa3365d5f46ca5",
+  "source_hash": "f0aed0ade6c749075e4d04e47dd6f90613ea4ea7612a53ef5a1863175e6338e5",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -18,13 +18,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-CvURoeLL.css",
-    "apps/web/dist/assets/index-k9rgAFaZ.js",
+    "apps/web/dist/assets/index-Bu3HKW6H.css",
+    "apps/web/dist/assets/index-D71YqxlY.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-CvURoeLL.css": "a93d50f4f0682135e0a05a8c697b60679a5ff2eba14ce10029fac026da95c5b7",
-    "apps/web/dist/assets/index-k9rgAFaZ.js": "74f75f640e24b02dc6b8aaac31782ae44b6e0e7a74eee08fc532f950d37d7be8",
-    "apps/web/dist/index.html": "1b7809017718762ecf0e23fc093d13aef4af4b01bb8dd0450ce73677518ef9fc"
+    "apps/web/dist/assets/index-Bu3HKW6H.css": "0cb249120f18e227fe799b605bf5072330693e063071dc9bfdd8aa92b0ad596b",
+    "apps/web/dist/assets/index-D71YqxlY.js": "a2234c2f16ad0f3265644567483731a284654c4d1307b0e7caf7374a5745dfc9",
+    "apps/web/dist/index.html": "76c2c23c95163eb3063bf8e4f0fa168c7bcad976cc25ac6a66292d91848e8471"
   }
 }
