@@ -1889,7 +1889,7 @@ export function createLiveE2eStepController(options) {
       const normalizedIteration = Number(iteration) || 1;
       const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
       if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) {
-        return canReuseCachedCommand(label, normalizedIteration);
+        return [canReuseCachedCommand(label, normalizedIteration), false][Number(new Set(["review:retry_public_step", "qa:retry_public_step"]).has(`${step}:${asNonEmptyString(asRecord(asRecord(entryByStep[stepInstanceId]).decision).action)}`))];
       }
       if (mode === "evaluator" && observedStepInstances().includes(stepInstanceId)) {
         return canReuseCachedCommand(label, normalizedIteration);
