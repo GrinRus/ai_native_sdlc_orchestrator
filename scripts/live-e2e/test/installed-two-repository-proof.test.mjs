@@ -11,6 +11,8 @@ function passingReport() {
     upstream_writes: false,
     credentialed_provider_calls: false,
     target_repository_unchanged: true,
+    workspace_project_id: "project-proof",
+    runtime_evidence_ref: "evidence://projects/project-proof/reports/installed-two-repository-closure.json",
     scenarios: {
       provision: "pass",
       conflict_serialization: "pass",

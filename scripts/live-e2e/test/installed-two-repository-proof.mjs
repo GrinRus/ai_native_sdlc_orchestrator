@@ -30,6 +30,8 @@ export function validateInstalledTwoRepositoryClosure(report) {
   if (report?.upstream_writes !== false) issues.push("upstream writes were not explicitly false");
   if (report?.credentialed_provider_calls !== false) issues.push("credentialed provider calls were not explicitly false");
   if (report?.target_repository_unchanged !== true) issues.push("target repository stability was not proven");
+  if (typeof report?.workspace_project_id !== "string" || !report.workspace_project_id) issues.push("workspace project identity is missing");
+  if (typeof report?.runtime_evidence_ref !== "string" || !report.runtime_evidence_ref.startsWith("evidence://projects/")) issues.push("runtime evidence reference is missing");
   if (!Array.isArray(report?.commands) || report.commands.length < 8) issues.push("public command journal is incomplete");
   if (!Array.isArray(report?.source_snapshots) || report.source_snapshots.length !== 2) issues.push("two source repository snapshots are missing");
   return { ok: issues.length === 0, issues };
@@ -293,6 +295,8 @@ function main() {
     project_root: targetRoot,
     aor_home: aorHome,
     evidence_root: evidenceRoot,
+    workspace_project_id: null,
+    runtime_evidence_ref: null,
     upstream_writes: false,
     credentialed_provider_calls: false,
     target_repository_unchanged: false,
@@ -348,6 +352,8 @@ function main() {
 
     const workspaceProjectId = /^evidence:\/\/projects\/([^/]+)\//u.exec(provision.workspace_set_ref)?.[1];
     if (!workspaceProjectId) throw new Error(`Could not resolve workspace project id from '${provision.workspace_set_ref}'.`);
+    report.workspace_project_id = workspaceProjectId;
+    report.runtime_evidence_ref = `evidence://projects/${workspaceProjectId}/reports/installed-two-repository-closure.json`;
     const parentRunId = "run-s14-installed-two-repository";
     const parentFile = path.join(runtimePath(intake, "stateRoot", "state_root"), "parent-runs", `parent-run-${parentRunId}.json`);
     const planRef = `evidence://projects/${workspaceProjectId}/artifacts/${path.basename(approved.execution_plan_file)}`;
@@ -416,7 +422,9 @@ function main() {
     report.commands = context.journal;
     const validation = validateInstalledTwoRepositoryClosure(report);
     if (!validation.ok) throw new Error(`Installed two-repository closure report failed validation: ${validation.issues.join("; ")}`);
-    fs.writeFileSync(resolvedOutputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+    const reportBytes = Buffer.from(`${JSON.stringify(report, null, 2)}\n`, "utf8");
+    fs.writeFileSync(resolvedOutputPath, reportBytes);
+    fs.writeFileSync(path.join(aorHome, "projects", workspaceProjectId, "reports", "installed-two-repository-closure.json"), reportBytes);
     process.stdout.write(`${JSON.stringify({ status: report.status, report: resolvedOutputPath, evidence_root: evidenceRoot, scenarios: report.scenarios })}\n`);
   } catch (error) {
     report.status = "fail";
