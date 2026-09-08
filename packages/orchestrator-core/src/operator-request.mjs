@@ -9,6 +9,7 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import { resolveNextAction } from "./next-action.mjs";
 import { assertFlowMutationAllowed } from "./control-plane/flow-projections.mjs";
 import { resolveEvidenceReference } from "./aor-home.mjs";
+import { boundedDerivedId } from "./shared/bounded-derived-id.mjs";
 import {
   operatorRequestInputsMatch,
   resolveOperatorRequestIdempotencyKey,
@@ -566,7 +567,7 @@ export function createOperatorRequest(options) {
     }
     const timestamp = new Date().toISOString();
     const suffix = normalizeForId(idempotencyKey) || "request";
-    const requestId = `operator-request.${init.projectId}.${suffix}`;
+    const requestId = boundedDerivedId("operator-request", `operator-request.${init.projectId}.${suffix}`);
     const filePath = path.join(init.runtimeLayout.reportsRoot, `operator-request-${normalizeForId(requestId)}.json`);
     const operatorRequestRef = toOperatorRequestPacketRef(init.projectRoot, filePath);
     const document = {
@@ -605,7 +606,6 @@ export function createOperatorRequest(options) {
     };
   }));
 }
-
 /**
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
