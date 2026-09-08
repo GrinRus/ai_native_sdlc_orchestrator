@@ -28,7 +28,7 @@ const MAX_READINESS_PROBE_ATTEMPTS = 2;
 const DEFAULT_PREFLIGHT_REQUEST_ARTIFACT_MESSAGE = [
   "Run only the AOR live-adapter preflight described in the provider work packet at {provider_work_packet_path}.",
   "Read that JSON once and follow request.objective exactly.",
-  "Do not invoke provider CLIs or nested agents such as codex, claude, opencode, or qwen from inside this preflight; this provider invocation is already the auth/runtime probe.",
+  "Do not invoke provider CLIs or nested agents such as codex, claude, opencode, or qwen, and do not use MCP tools, apps, browser, web search, or subagents from inside this preflight; this provider invocation is already the auth/runtime probe.",
   "If the packet has no request.edit_probe or request.permission_probe, run no shell commands and immediately return a concise final preflight report with status, commands-run: [], changed-files: [], verification, and risks.",
   "If a probe path is present, only read/write the explicitly named probe files and then return the same concise final report.",
   "Do not write upstream and do not summarize the packet instead of completing the requested preflight.",
