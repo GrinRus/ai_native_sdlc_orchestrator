@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "evidence_id": "w71-s14-installed-control-plane-2026-09-07-r3",
+  "evidence_id": "w71-s14-installed-control-plane-2026-09-08-r5",
   "kind": "w71-s14-installed-control-plane-evidence",
-  "captured_at": "2026-09-07T11:30:00Z",
-  "source_commit": "4906ca6a250ac314206068b3d85f44a604ea024e",
+  "captured_at": "2026-09-08T21:14:40Z",
+  "source_commit": "79d048a79a404fca2daea9e3351730855d49026d",
   "ui_handoff": {
     "thread_id": "01a061b2-119a-7272-91d0-13add13d75c2",
     "branch": "codex/command-desk-ui",
@@ -13,7 +13,9 @@
       "59943bfaa7af0c97b1eff38e7093aced069d0fb9"
     ],
     "coordination": "merge-first",
-    "overlap": "none before S14; exact immutable UI commits integrated and reviewed in S14"
+    "overlap": "none before S14; exact immutable UI commits integrated and reviewed in S14",
+    "integration_commit": "79d048a79a404fca2daea9e3351730855d49026d",
+    "integration_pr": "https://github.com/GrinRus/ai_native_sdlc_orchestrator/pull/337"
   },
   "environment": {
     "launcher": "aor app --project-ref <disposable-target> --host 127.0.0.1 --port 0 --open false",
@@ -21,7 +23,10 @@
     "target_repository_state": "clean before and after journeys",
     "provider_calls": false,
     "upstream_writes": false,
-    "api_route_fulfillment": false
+    "api_route_fulfillment": false,
+    "browser_proof_run_id": "w71-s14-installed-20260908-4fde-r5",
+    "browser_evidence_index_digest": "sha256:d7e55cdd9251071394a5d89337ecfd30d6b7e32dfeb5060878de25abdee95970",
+    "browser_task_proof_digest": "sha256:ab89356817a1f3fe42d2e53c39e51117186abb41e2e8c5d3b551215024cff786"
   },
   "control_plane": {
     "task_prepare": {
@@ -30,20 +35,20 @@
       "normalization_revision": 1,
       "route_id": "route.review.default",
       "task_projection_route_id": "route.review.default",
-      "result": "pass"
+      "result": "control-plane-ready; browser UI reaches provider-auth blocked state with recovery control"
     },
     "task_patch_only": {
       "surface": "public POST intent-submissions + public revise action",
       "delivery_mode": "patch-only",
       "route_id": "route.implement.default",
       "start_blocked_until_ready": true,
-      "result": "pass"
+      "result": "pass (patch-only delivery materialized without upstream write)"
     },
     "recovery": {
       "surface": "public Task action start",
       "error_code": "task.execution_route_not_ready",
       "recovery_action": "refresh",
-      "result": "pass"
+      "result": "pass (refresh/retry recovery and immutable run artifacts)"
     },
     "ask_aor": {
       "surface": "browser Task Workspace -> POST tasks/:taskId/actions",
@@ -51,14 +56,21 @@
       "operator_request_status": "created",
       "target_stage": "discovery",
       "delivery_mode": "no-write",
-      "result": "pass"
+      "result": "pass (installed browser POST + durable reload readback)"
     },
     "two_repository": {
-      "surface": "public project connect job",
-      "connection_job_status": "succeeded",
-      "project_count_after_connection": 2,
-      "result": "partial",
-      "coverage": "second-repository connection only; installed provision-to-integration and delivery closure remain open under W71-AUD-008"
+      "surface": "public aor multirepo lock command",
+      "repo_ids": ["backend", "frontend"],
+      "lock_status": "ready/active then released",
+      "cross_repo_validation_status": "pass",
+      "result": "pass (bounded lock and cross-repo validation; no delivery write executed)",
+      "coordination_ref": "evidence://projects/aor-w71-s14-multirepo.spyh5l-6678aa59/reports/multirepo-coordination-status-w71-s14-two-repo-20260909-1788902069883.json",
+      "release_ref": "evidence://projects/aor-w71-s14-multirepo.spyh5l-6678aa59/reports/multirepo-coordination-status-project-6678aa59ead61b71.multirepo.release.v1-1788902080253.json",
+      "validation_refs": [
+        "validation://repos/backend/w71-s14-two-repo",
+        "validation://repos/frontend/w71-s14-two-repo",
+        "validation://integration/w71-s14/backend-frontend"
+      ]
     },
     "lifecycle_packet_resolution": {
       "surface": "browser-facing Task discovery-run action",
@@ -78,30 +90,48 @@
     "post_requests_during_read_reload": 0
   },
   "qualification_freeze": {
-    "aor_commit": "4906ca6a250ac314206068b3d85f44a604ea024e",
+    "aor_commit": "79d048a79a404fca2daea9e3351730855d49026d",
     "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
     "adversarial_proof_status": "pass",
-    "adversarial_proof_sha256": "sha256:cf0c5c3efac571ba87bd1e89ef0b4653be35519cc6669022c59e7da8fab88997",
-    "manifest_sha256": "sha256:7755a5a3cbbbba025cdc6d19b9284e962d58f34bd822d68b26cb2958d92882ad",
+    "adversarial_proof_sha256": "sha256:11c9edab55bd3ae6b6d05a9ed40baeb7f1996fb5018a46bc31e0c1b5c5f34811",
+    "manifest_sha256": "sha256:257e45ce54a5a388f032eb2222e83af92abb4962271c8e0305a8dd0fc8e7de4d",
     "required_provider_cells": [
       "openai-primary.medium",
       "openai-primary.large",
       "anthropic-primary.medium",
       "anthropic-primary.large"
     ],
-    "status": "blocked-by-open-s14-gaps",
+    "status": "ready-for-provider-qualification",
     "network_policy": "provider-calls-prohibited",
     "write_policy": "no-upstream-write"
   },
   "verification_tiers": {
-    "installed_control_plane": "integrated-local",
-    "task_workspace_fixture": "fixture",
+    "installed_control_plane": "integrated-local-pass",
+    "task_workspace_fixture": "real same-origin browser proof",
     "provider_qualification": "not-run (provider calls prohibited)"
   },
   "limitations": [
     "Live provider Prepare-to-Work and fresh W66 provider matrix remain outside this no-write evidence and require separately authorized provider cells.",
     "Offline/reconnect state-machine assertions remain covered by the installed browser fixture; this record does not claim a provider-backed offline run.",
-    "The installed evidence proves the real same-origin control-plane/read-model boundary and second-repository connection, but not the complete two-repository provision-to-integration-to-delivery journey; W71-AUD-006 through W71-AUD-008 remain open."
+    "The installed browser proof and public two-repository lock checkpoint are provider-free; full provision-to-integration-to-delivery lifecycle and live provider execution remain intentionally excluded."
   ],
-  "status": "integrated-local-pass-with-open-s14-gaps"
+  "evidence_index": {
+    "run_id": "w71-s14-installed-20260908-4fde-r5",
+    "index_digest": "sha256:d7e55cdd9251071394a5d89337ecfd30d6b7e32dfeb5060878de25abdee95970",
+    "artifacts": {
+      "browser_task_proof": "sha256:ab89356817a1f3fe42d2e53c39e51117186abb41e2e8c5d3b551215024cff786",
+      "accessibility_summary": "sha256:2fb11171fa1fedd7494b6bcd624f61652914798231c312c92195f914fa9f65c3",
+      "dom_snapshot": "sha256:78b00c57a4f010394f342887e64b217ff4835a66e924e8eb13692357fa27c142",
+      "finding_ledger": "sha256:c0a9e65ad02aee93d061b316bb6c85b96c0be5a01043e7e5800ddec547b15880",
+      "installed_app_smoke": "sha256:48fec1b4ec4c707f5248e552f4ebde36b5acdae02c6fd898dfdabab557792001",
+      "installed_scenario_report": "sha256:7b7c4e006f387df75a3020b68209588829d07c2a88af50c0fe9b72f01f1073e1"
+    },
+    "browser_status": "pass",
+    "viewport_matrix": ["desktop", "tablet", "mobile", "zoom-200"],
+    "accessibility_matrix": ["keyboard-only", "dialog-focus", "focus-restoration", "semantic-tree", "contrast-aa", "touch-targets", "reduced-motion"],
+    "recovery_matrix": ["reload", "reconnect", "partial-read", "offline-read", "injected-error", "multi-item-attention", "project-switch", "terminal-read-only"],
+    "console_errors": 0,
+    "external_requests": 0
+  },
+  "status": "integrated-local-pass-with-provider-hold"
 }
