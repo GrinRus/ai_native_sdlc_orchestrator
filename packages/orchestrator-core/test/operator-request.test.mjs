@@ -283,6 +283,24 @@ test("operator request creation is idempotent and a stale running request resume
   });
 });
 
+test("operator request ids stay within the public-id limit for long idempotency keys", async () => {
+  await withTempRepo((repoRoot) => {
+    const created = createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      targetStage: "discovery",
+      intentType: "analyze",
+      requestText: "Analyze the selected flow without changing the checkout.",
+      targetRefs: ["README.md"],
+      idempotencyKey: `task-workspace-${"x".repeat(220)}`,
+    });
+
+    assert.ok(created.requestId.length <= 128);
+    assert.match(created.requestId, /^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$/u);
+    assert.equal(JSON.parse(fs.readFileSync(created.operatorRequestFile, "utf8")).request_id, created.requestId);
+  });
+});
+
 test("operator request idempotency keys reject a materially different replay", async () => {
   await withTempRepo((repoRoot) => {
     createOperatorRequest({
