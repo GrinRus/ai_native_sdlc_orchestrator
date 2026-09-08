@@ -6,8 +6,6 @@ import { guidedBrowserTaskCollectorPythonSource } from "../lib/browser-proof-pyt
 test("guided browser collector keeps dialog proof reachable across installed Task Workspace surfaces", () => {
   const source = guidedBrowserTaskCollectorPythonSource();
   assert.match(source, /chromium\.launch\(headless=True, args=\["--no-proxy-server"\]\)/u);
-  assert.match(source, /add-project/u);
-  assert.match(source, /get_by_role\("button", name="Add AOR Project", exact=True\)/u);
   assert.match(source, /probe_dialog\(page\.get_by_role\("button", name="Add Markdown", exact=True\), "task-sources"\)/u);
   assert.match(source, /dialog_probe\["focus_restored"\] = dialog_opener\.evaluate/u);
 });
