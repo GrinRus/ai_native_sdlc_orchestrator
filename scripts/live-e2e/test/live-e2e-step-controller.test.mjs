@@ -2157,6 +2157,7 @@ test("live E2E manual quality retry resumes without a synthetic review iteration
     assert.deepEqual(first.getStepJournal().map((entry) => entry.step_instance_id), ["review"]);
 
     const resumed = createLiveE2eStepController({ reportsRoot, runId, profile, mode: "manual" });
+    assert.equal(resumed.shouldUseCachedCommand("review-run", 1), false);
     const resumedResult = resumed.observeStage(observeInput);
     assert.equal(resumedResult.action, "continue");
     assert.deepEqual(resumed.getStepJournal().map((entry) => entry.step_instance_id), ["review"]);

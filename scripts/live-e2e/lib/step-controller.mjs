@@ -1889,6 +1889,14 @@ export function createLiveE2eStepController(options) {
       const normalizedIteration = Number(iteration) || 1;
       const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
       if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) {
+        const persistedAction = asNonEmptyString(asRecord(asRecord(entryByStep[stepInstanceId]).decision).action);
+        if (persistedAction === "retry_public_step" && ["review", "qa"].includes(step)) {
+          // A manual quality retry keeps the same review/QA step instance, but
+          // its command must be rerun after the repair execution. Replaying
+          // the cached warning would prevent the controller from inspecting
+          // the repaired workspace and leave the run parked at review.
+          return false;
+        }
         return canReuseCachedCommand(label, normalizedIteration);
       }
       if (mode === "evaluator" && observedStepInstances().includes(stepInstanceId)) {
