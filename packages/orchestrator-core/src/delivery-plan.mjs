@@ -46,7 +46,7 @@ function verifyIntegrationMaterialization(integrationReport, options) {
     const resolved = resolveEvidenceReference({
       projectRoot: options.projectRoot ?? options.runtimeLayout.projectRuntimeRoot,
       projectRuntimeRoot: options.runtimeLayout.projectRuntimeRoot,
-      workspaceProjectId: options.projectId,
+      workspaceProjectId: options.workspaceProjectId ?? options.projectId,
       reference: reportFile,
     });
     const reportBytes = resolved.bytes;
@@ -91,14 +91,14 @@ function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
 }
 
-function lockEvidenceRefs(refs, executionRoot, runtimeLayout, projectId) {
+function lockEvidenceRefs(refs, executionRoot, runtimeLayout, projectId, workspaceProjectId = projectId) {
   if (!executionRoot) return [];
   return uniqueStrings(refs).map((ref) => {
     try {
       const resolved = resolveEvidenceReference({
         projectRoot: executionRoot,
         projectRuntimeRoot: runtimeLayout?.projectRuntimeRoot,
-        workspaceProjectId: projectId,
+        workspaceProjectId,
         reference: ref,
       });
       return { ref, resolved_path: resolved.filePath, status: "locked", sha256: resolved.sha256 };
@@ -209,6 +209,7 @@ function resolveGovernanceSource(policyResolution) {
  *   evidenceLocks?: Array<{ ref: string, status: string, sha256: string | null }>,
  *   deliveryAuthorizationPhase?: boolean,
  *   projectId: string,
+ *   workspaceProjectId?: string,
  *   runId: string,
  *   stepClass: string,
  *   policyResolution: Record<string, unknown>,
@@ -392,7 +393,13 @@ function executeDeliveryPlanTransaction(options) {
   if (writebackAuthorizationRequired && diffAuthorization === null) {
     blockingReasons.push("exact-diff-authorization-required");
   }
-  const evidenceLocks = options.evidenceLocks ?? lockEvidenceRefs(evidenceRefs, options.executionRoot, options.runtimeLayout, options.projectId);
+  const evidenceLocks = options.evidenceLocks ?? lockEvidenceRefs(
+    evidenceRefs,
+    options.executionRoot,
+    options.runtimeLayout,
+    options.projectId,
+    options.workspaceProjectId,
+  );
   if (writebackAuthorizationRequired && (evidenceLocks.length !== evidenceRefs.length ||
       evidenceLocks.some((lock) => lock.status !== "locked" || !lock.sha256))) {
     blockingReasons.push("delivery-evidence-lock-required");

@@ -358,6 +358,7 @@ export function handleDeliveryCommand(context) {
       runtimeLayout: init.runtimeLayout,
       executionRoot: deliveryExecutionRoot,
       projectId: init.projectId,
+      workspaceProjectId: init.workspaceProjectId,
       runId,
       stepClass,
       policyResolution: resolvedPolicy,

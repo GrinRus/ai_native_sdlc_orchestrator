@@ -442,7 +442,7 @@ export function prepareIntentSubmission({ registry, projectId, submissionId, nor
           stepId: "intent.normalize",
           requireDiscoveryCompleteness: false,
           routeOverrides: { discovery: selectedRouteId },
-          promptBundleOverrides: { discovery: "intake-normalize" },
+          promptBundleOverrides: { discovery: "prompt-bundle://intake-normalize@v1" },
           forceReadOnly: true,
           runtimeEvidenceRefs: [file, ...submission.attachments.map((entry) => path.join(init.runtimeLayout.projectRuntimeRoot, entry.storage_ref))],
         });

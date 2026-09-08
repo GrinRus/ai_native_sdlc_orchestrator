@@ -72,14 +72,14 @@ export function handleIntentCommand({ command, flags, cwd, outputState }) {
       attachments,
       autoPrepare: false,
     });
-    outputState.intent_submission = result.submission;
-    outputState.status_ref = `intent-submission://${result.submission.submission_id}`;
+    outputState.intentSubmission = result.submission;
+    outputState.statusRef = `intent-submission://${result.submission.submission_id}`;
     try {
       const prepared = prepareIntentSubmission({ registry: workspace, projectId, submissionId: result.submission.submission_id });
-      outputState.intent_submission = prepared.submission;
-      outputState.intent_normalization = prepared.report;
+      outputState.intentSubmission = prepared.submission;
+      outputState.intentNormalization = prepared.report;
     } catch (error) {
-      outputState.prepare_blocker = { code: error?.code ?? "intent_prepare.failed", message: error instanceof Error ? error.message : String(error) };
+      outputState.prepareBlocker = { code: error?.code ?? "intent_prepare.failed", message: error instanceof Error ? error.message : String(error) };
     }
     return true;
   }
@@ -91,7 +91,7 @@ export function handleIntentCommand({ command, flags, cwd, outputState }) {
     if (expectedRevision !== undefined && (!Number.isInteger(expectedRevision) || expectedRevision < 0)) {
       throw new CliUsageError("Flag '--expected-revision' must be a non-negative integer.");
     }
-    outputState.task_start = confirmAndStartIntent({ registry: workspace, projectId, submissionId, expectedRevision });
+    outputState.taskStart = confirmAndStartIntent({ registry: workspace, projectId, submissionId, expectedRevision });
     return true;
   }
   const flowId = resolveOptionalStringFlag("flow-id", flags["flow-id"]);
