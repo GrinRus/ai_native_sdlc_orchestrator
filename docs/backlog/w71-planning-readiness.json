@@ -5,13 +5,12 @@
   "slice_count": 15,
   "status_counts": {
     "ready": 0,
-    "active": 1,
+    "active": 0,
     "blocked": 0,
-    "done": 14
+    "done": 15
   },
   "release_blockers": [
-    "W66-S09",
-    "W71-S14"
+    "W66-S09"
   ],
   "historical_snapshot_labels": [
     "W34-S06",

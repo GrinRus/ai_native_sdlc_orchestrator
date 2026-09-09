@@ -10,13 +10,13 @@
     { "id": "live-provider", "order": 6 }
   ],
   "protected_story_ids": {
-    "PBO-10": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
-    "OPS-11": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
-    "OPS-12": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
-    "EMP-03": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
-    "RMO-04": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
-    "RMO-05": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
-    "RMO-06": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
-    "DTX-08": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" }
+    "PBO-10": { "allowed_statuses": ["partial"], "owner_slice": "W66-S09" },
+    "OPS-11": { "allowed_statuses": ["partial"], "owner_slice": "W66-S09" },
+    "OPS-12": { "allowed_statuses": ["partial"], "owner_slice": "W66-S09" },
+    "EMP-03": { "allowed_statuses": ["proof-covered"], "requires_s14": false },
+    "RMO-04": { "allowed_statuses": ["proof-covered"], "requires_s14": false },
+    "RMO-05": { "allowed_statuses": ["proof-covered"], "requires_s14": false },
+    "RMO-06": { "allowed_statuses": ["proof-covered"], "requires_s14": false },
+    "DTX-08": { "allowed_statuses": ["proof-covered"], "requires_s14": false }
   }
 }

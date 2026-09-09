@@ -73,35 +73,35 @@
     {
       "finding_id": "W71-AUD-006",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["server-owned-task-lifecycle", "public-provisioning"],
-      "summary": "W71-S07/S10 expose the server-owned Task and provision/integration boundaries; one installed Prepare-to-Start-to-Work proof remains for W71-S14.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
-      "limitations": ["The installed evidence proves the real control-plane boundary, but does not yet contain the complete Prepare-to-Start-to-Work two-repository run."]
+      "summary": "W71-S07/S10 expose the server-owned Task and provision/integration boundaries; W71-S14 closes the installed Prepare-to-Start-to-Work proof through the public CLI.",
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md", "scripts/live-e2e/test/installed-control-plane-qualification-proof.mjs", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
+      "limitations": ["The qualification runner uses a deterministic local provider process; live Codex/Claude provider cells remain the independent W66 release gate."]
     },
     {
       "finding_id": "W71-AUD-007",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["operator-request-durability", "review-completion-recovery"],
-      "summary": "W71-S08 now supplies durable Ask AOR, recovery, review, and completion transitions; installed public control-plane qualification remains for W71-S14.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
-      "limitations": ["Historical deterministic lifecycle evidence is retained as historical or fixture evidence only; the installed evidence does not yet prove full recovery and review completion across two repositories."]
+      "summary": "W71-S08 supplies durable Ask AOR, recovery, review, and completion transitions; W71-S14 verifies installed review approval, integration, patch-only delivery, and learning handoff.",
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "scripts/live-e2e/test/installed-control-plane-qualification-proof.mjs", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
+      "limitations": ["The qualification runner uses a deterministic local provider process and does not claim live provider behavior; fresh W66 provider cells remain an independent release gate."]
     },
     {
       "finding_id": "W71-AUD-008",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["public-integration"],
-      "summary": "W71-S09 hardens multirepo scope locking and isolated measured integration; W71-S10 now exposes the public provision-to-integration producer path, while installed closure remains for W71-S14.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
-      "limitations": ["Constructed W62 proof remains useful diagnostic evidence but is not installed public proof; current installed coverage stops at second-repository connection."]
+      "summary": "W71-S09 hardens multirepo scope locking and isolated measured integration; W71-S10 exposes the public producer path; W71-S14 now proves the installed provision-to-integration-to-no-write-delivery closure.",
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md", "scripts/live-e2e/test/installed-two-repository-proof.mjs", "scripts/live-e2e/test/installed-two-repository-proof.test.mjs", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
+      "limitations": ["The installed closure is provider-free and no-write; paid provider execution and the separate Prepare-to-Work/review-completion claims remain owned by W66-S09 and W71-AUD-006/W71-AUD-007."]
     },
     {
       "finding_id": "W71-AUD-009",
@@ -143,16 +143,10 @@
       "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["merged-ui-runtime-journey", "installed-black-box-proof", "qualification-freeze"],
-      "summary": "The merged Command Desk UI and runtime now have installed real-control-plane evidence and same-commit qualification-freeze inputs; the remaining two-repository closure is tracked separately under W71-S14.",
+      "summary": "The merged Command Desk UI and runtime now have installed real-control-plane and two-repository qualification evidence bound to the same-commit freeze inputs.",
       "evidence_refs": ["docs/research/27-w71-s14-installed-control-plane-evidence.json", "docs/backlog/handoffs/w71-s14-ui-integration-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md", "docs/product/user-story-coverage-matrix.md"],
-      "limitations": ["Fresh W66 provider qualification remains an independent release hold.", "The sibling UI branch remains an immutable handoff; the integrated runtime evidence is recorded on the S14 candidate.", "The S14 evidence record is intentionally partial and does not close W71-AUD-006 through W71-AUD-008."]
+      "limitations": ["Fresh W66 provider qualification remains an independent release hold.", "The sibling UI branch remains an immutable handoff; the integrated runtime evidence is recorded on the S14 candidate.", "Installed qualification is provider-free and no-upstream-write; it does not substitute for live provider certification."]
     }
   ],
-  "story_downgrades": [
-    {"story_id": "EMP-03", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 exposes public provision/integration boundaries; installed end-to-end coordination remains unproven."},
-    {"story_id": "RMO-04", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 adds the public producer boundary; installed two-repository validation with authoritative outputs remains unproven."},
-    {"story_id": "RMO-05", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 adds public materialization, but the manifest is not yet produced by the installed lifecycle."},
-    {"story_id": "RMO-06", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 adds public provisioning/materialization; installed restart recovery and proof remain open."},
-    {"story_id": "DTX-08", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 exposes the bounded manifest producer path; installed multirepo delivery evidence remains unproven."}
-  ]
+  "story_downgrades": []
 }

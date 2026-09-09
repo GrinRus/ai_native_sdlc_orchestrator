@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "evidence_id": "w71-s14-installed-control-plane-2026-09-08-r5",
+  "evidence_id": "w71-s14-installed-control-plane-2026-09-09-r6",
   "kind": "w71-s14-installed-control-plane-evidence",
-  "captured_at": "2026-09-08T21:14:40Z",
-  "source_commit": "79d048a79a404fca2daea9e3351730855d49026d",
+  "captured_at": "2026-09-09T22:49:46Z",
+  "source_commit": "7850998d8931498cc970c88f36533ef7db575e67",
   "ui_handoff": {
     "thread_id": "01a061b2-119a-7272-91d0-13add13d75c2",
     "branch": "codex/command-desk-ui",
@@ -59,17 +59,42 @@
       "result": "pass (installed browser POST + durable reload readback)"
     },
     "two_repository": {
-      "surface": "public aor multirepo lock command",
+      "surface": "installed @grinrus/aor public CLI via scripts/live-e2e/test/installed-two-repository-proof.mjs",
       "repo_ids": ["backend", "frontend"],
-      "lock_status": "ready/active then released",
+      "package_version": "0.1.0-alpha.21",
+      "source_commit": "d3c1bb89f226579b8d2193778034aefcf9e67e84",
+      "lock_status": "ready/active, deterministic conflict, then released",
       "cross_repo_validation_status": "pass",
-      "result": "pass (bounded lock and cross-repo validation; no delivery write executed)",
-      "coordination_ref": "evidence://projects/aor-w71-s14-multirepo.spyh5l-6678aa59/reports/multirepo-coordination-status-w71-s14-two-repo-20260909-1788902069883.json",
-      "release_ref": "evidence://projects/aor-w71-s14-multirepo.spyh5l-6678aa59/reports/multirepo-coordination-status-project-6678aa59ead61b71.multirepo.release.v1-1788902080253.json",
+      "result": "pass (installed provision → lock conflict/serialization → retry → integration → no-write delivery → cleanup)",
+      "scenario_report_ref": "evidence://projects/target-965fb496/reports/installed-two-repository-closure.json",
+      "scenario_report_sha256": "sha256:a6f3e388a4320e76a96dd11d92db70a8b2ba0e92cd347ddfceedcdd2cb70c40f",
+      "command_journal_count": 10,
+      "coordination_ref": "evidence://projects/target-965fb496/reports/multirepo-coordination-status-run-s14-installed-two-repository-1788907776797.json",
+      "release_ref": "evidence://projects/target-965fb496/reports/multirepo-coordination-status-run-s14-installed-two-repository-1788907786246.json",
       "validation_refs": [
-        "validation://repos/backend/w71-s14-two-repo",
-        "validation://repos/frontend/w71-s14-two-repo",
-        "validation://integration/w71-s14/backend-frontend"
+        "validation://repos/backend/w71-s14-installed",
+        "validation://repos/frontend/w71-s14-installed",
+        "validation://integration/w71-s14/installed-two-repository"
+      ]
+    },
+    "installed_control_plane_qualification": {
+      "surface": "installed @grinrus/aor public CLI via scripts/live-e2e/test/installed-control-plane-qualification-proof.mjs",
+      "repo_ids": ["backend", "frontend"],
+      "package_version": "0.1.0-alpha.21",
+      "source_commit": "7850998d8931498cc970c88f36533ef7db575e67",
+      "result": "pass (Prepare → Start → Work → review → approve → workspace provision → multirepo lock → integration → patch-only delivery → learning handoff)",
+      "scenario_report_file": "/tmp/aor-installed-control-plane-qualification-s14-final5.json",
+      "scenario_report_sha256": "sha256:b9f50e84ae9d3f76cc488f1135eeaf453845e05fff2a50c917ee7f4a76e525b9",
+      "evidence_root": "/tmp/aor-installed-control-plane-qualification-s14-final5-UZKNFb",
+      "workspace_project_id": "target-c2f1dd82",
+      "command_journal_count": 19,
+      "upstream_writes": false,
+      "credentialed_provider_calls": false,
+      "target_repository_unchanged": true,
+      "validation_refs": [
+        "validation://repos/backend/w71-s14-installed",
+        "validation://repos/frontend/w71-s14-installed",
+        "validation://integration/w71-s14/installed-control-plane"
       ]
     },
     "lifecycle_packet_resolution": {
@@ -90,11 +115,11 @@
     "post_requests_during_read_reload": 0
   },
   "qualification_freeze": {
-    "aor_commit": "79d048a79a404fca2daea9e3351730855d49026d",
+    "aor_commit": "7850998d8931498cc970c88f36533ef7db575e67",
     "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
     "adversarial_proof_status": "pass",
-    "adversarial_proof_sha256": "sha256:11c9edab55bd3ae6b6d05a9ed40baeb7f1996fb5018a46bc31e0c1b5c5f34811",
-    "manifest_sha256": "sha256:257e45ce54a5a388f032eb2222e83af92abb4962271c8e0305a8dd0fc8e7de4d",
+    "adversarial_proof_sha256": "sha256:f4b5206fb6217e57f11f28b5dc6cd5918018d4080faef1bd8dc41171c115fbec",
+    "manifest_sha256": "sha256:3a4fca3c0845e934dea00123efe9ae411e9a9fcfb738d986c3add859d8e3d15d",
     "required_provider_cells": [
       "openai-primary.medium",
       "openai-primary.large",
@@ -107,13 +132,14 @@
   },
   "verification_tiers": {
     "installed_control_plane": "integrated-local-pass",
+    "installed_control_plane_qualification": "integrated-local-pass",
     "task_workspace_fixture": "real same-origin browser proof",
     "provider_qualification": "not-run (provider calls prohibited)"
   },
   "limitations": [
     "Live provider Prepare-to-Work and fresh W66 provider matrix remain outside this no-write evidence and require separately authorized provider cells.",
     "Offline/reconnect state-machine assertions remain covered by the installed browser fixture; this record does not claim a provider-backed offline run.",
-    "The installed browser proof and public two-repository lock checkpoint are provider-free; full provision-to-integration-to-delivery lifecycle and live provider execution remain intentionally excluded."
+    "The installed browser proof, two-repository closure, and full control-plane qualification are provider-free; live provider execution remains intentionally excluded."
   ],
   "evidence_index": {
     "run_id": "w71-s14-installed-20260908-4fde-r5",

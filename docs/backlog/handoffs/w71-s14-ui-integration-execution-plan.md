@@ -14,9 +14,8 @@
 - Acceptance: the merged product preserves server-owned Task truth; no-write,
   patch/recovery/Ask AOR, and the installed control-plane boundary are proven
   through public surfaces; UI accessibility/responsive/keyboard/offline checks
-  pass; evidence resolves to immutable bytes; and any missing two-repository
-  provision-to-delivery coverage is recorded as an explicit S14 blocker rather
-  than promoted to a pass.
+  pass; evidence resolves to immutable bytes; and the installed two-repository
+  provision-to-delivery journey is closed without upstream writes.
 
 ## Neighbor UI coordination
 
@@ -68,20 +67,32 @@
   patch-only preparation, revision-aware route readback, route persistence
   across reload, readiness recovery, durable Ask AOR, a successful second
   repository connection, and the Task `discovery-run` lifecycle action. The
-  second-repository evidence stops at connection/provisioning; a complete
-  two-repository provision → conflict/retry → integration → delivery/cleanup
-  run is not yet proven.
+  installed public two-repository closure is now reproducible through
+  `scripts/live-e2e/test/installed-two-repository-proof.mjs`: it invokes the
+  packaged `@grinrus/aor@0.1.0-alpha.21` binary only as external subprocesses,
+  retains a digest-addressed command journal under the selected evidence root,
+  and passes provision, deterministic lock conflict/serialization, retry,
+  integration, review approval, patch-only delivery, learning handoff, and lock
+  cleanup while both source Git checkouts remain unchanged. A second installed
+  qualification runner now proves Prepare-to-Start-to-Work and review/recovery
+  completion through 19 public CLI commands with a deterministic local provider.
 - Browser checks used the running app without API route fulfilment: desktop
   keyboard focus, 390x844 mobile overflow, 200% zoom overflow, reduced-motion
   emulation, zero console errors, and zero POSTs during read/reload checks.
 - The immutable record is
   `docs/research/27-w71-s14-installed-control-plane-evidence.json`.
+- The installed closure report is retained by the runner under its
+  `runtime_evidence_ref` and records ten successful public CLI commands plus
+  the blocked overlapping-lock attempt. The installed control-plane
+  qualification report is `/tmp/aor-installed-control-plane-qualification-s14-final5.json`
+  (`sha256:b9f50e84ae9d3f76cc488f1135eeaf453845e05fff2a50c917ee7f4a76e525b9`)
+  with 19 public commands and both required scenarios passing.
 - The runtime/control-plane candidate commit represented by the freeze is
-  `4906ca6a250ac314206068b3d85f44a604ea024e`; its fresh 16-case adversarial
+  `7850998d8931498cc970c88f36533ef7db575e67`; its fresh 16-case adversarial
   proof is
-  `sha256:cf0c5c3efac571ba87bd1e89ef0b4653be35519cc6669022c59e7da8fab88997`,
+  `sha256:f4b5206fb6217e57f11f28b5dc6cd5918018d4080faef1bd8dc41171c115fbec`,
   and its same-commit qualification manifest is
-  `sha256:7755a5a3cbbbba025cdc6d19b9284e962d58f34bd822d68b26cb2958d92882ad`.
+  `sha256:3a4fca3c0845e934dea00123efe9ae411e9a9fcfb738d986c3add859d8e3d15`.
   The durable review decision and learning handoff passed. The historical
   run-health record still contains the earlier missing-review-decision failure
   and diagnostic warning; it was not rewritten or used as fresh provider proof.
@@ -93,9 +104,8 @@
 
 S14 may be marked done only after the merged installed proof and immutable
 freeze manifest are present **and** the public two-repository
-provision-to-integration-to-delivery journey is closed. The current
-integrated-local evidence is valid for the no-write/control-plane boundary and
-is intentionally partial; W71-AUD-006 through W71-AUD-008 remain open. The
-slice is also release-blocked until the separately authorized W66-S09 provider
-matrix is available. Readiness must identify both the open S14 coverage and
-the external provider hold without stale UI or W71 source-of-truth claims.
+provision-to-integration-to-delivery journey is closed. The integrated-local
+evidence now closes the public multirepo journey and W71-AUD-006/W71-AUD-007.
+The slice is still release-blocked until the separately authorized W66-S09
+provider matrix is available. Readiness must identify only that external hold
+without stale UI or W71 source-of-truth claims.
