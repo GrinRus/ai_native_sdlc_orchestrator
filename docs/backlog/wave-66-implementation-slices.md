@@ -14,8 +14,8 @@ project profiles use canonical repository identities. Public runtime behavior is
 validated independently of the private proof harness. Qualification joins
 terminal lifecycle, run health, deterministic diagnostics, final outcome
 quality, exact changed paths, and no-upstream-write evidence. Fresh medium and
-large Codex and Claude cells run only after deterministic runtime, delivery, and
-installed-console gates are trustworthy.
+large Codex and Kimi-backed Claude adapter cells run only after deterministic
+runtime, delivery, and installed-console gates are trustworthy.
 
 ## Entry conditions
 
@@ -24,8 +24,9 @@ installed-console gates are trustworthy.
   controller, runtime atomicity, integration, delivery, and browser-proof gaps.
 - Product runtime and private live E2E remain separate: public operations cross
   the boundary only through the installed CLI and versioned public JSON.
-- Codex and Claude host authentication may be used only by the terminal live
-  qualification slice; upstream writes remain disabled throughout the wave.
+- Codex and the Kimi-backed Claude adapter host authentication may be used only
+  by the terminal live qualification slice; upstream writes remain disabled
+  throughout the wave.
 
 ## Wave exit criteria
 
@@ -49,8 +50,9 @@ installed-console gates are trustworthy.
 - Installed browser proof exercises durable action outcomes across responsive,
   keyboard, accessibility, reload, reconnect, partial, and offline scenarios.
 - All deterministic gates pass before any paid provider call.
-- Four fresh Codex/Claude medium/large cells are recorded against one AOR commit
-  and one pinned target commit, with no primary-checkout or upstream mutation.
+- Four fresh Codex/Kimi-backed-Claude medium/large cells are recorded against
+  one AOR commit and one pinned target commit, with no primary-checkout or
+  upstream mutation.
 
 ## Delivery order
 
@@ -250,7 +252,7 @@ installed-console gates are trustworthy.
    - Validation: Classification fixtures produce one stable owner/phase/class and
      never project a positive observation as a gap.
 5. **Explicit four-cell matrix**
-   - Purpose: Assess the requested Codex/Claude cells without unrelated global counts.
+   - Purpose: Assess the requested Codex/Kimi-backed-Claude cells without unrelated global counts.
    - Changes: Define exact medium/large cell identities and required evidence;
      preserve profile differences as qualification metadata rather than benchmark parity.
    - Validation: Matrix closure fails until all four required cells pass on one commit set.
@@ -1892,23 +1894,21 @@ it does not reopen them inside adapter implementation.
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** One clean merged AOR commit completes the requested medium/large
-  Codex and Claude matrix against one pinned target commit, with validated final
-  quality and no primary-checkout or upstream mutation.
+  Codex and Kimi-backed Claude adapter matrix against one pinned target commit,
+  with validated final quality and no primary-checkout or upstream mutation.
 - **Delivery priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
 - **Hard dependencies:** W66-S25
-- **External blocker:** The W71-S14 qualification freeze is present, but the required Anthropic runner quota is unavailable.
-
-  The freeze identity must be revalidated before W66-S09 starts. W71-S14 has
-  merged or consumed the immutable `Улучшить UI и UX` handoff, passed the
-  installed real-control-plane journeys, and frozen current qualification
-  identities. Separately, the current Kimi-backed host failed claude-code
-  adapter preflight with HTTP 403 before provider execution; restored quota is
-  the remaining external prerequisite.
+- **Qualification configuration:** The `anthropic-primary` matrix cells use the
+  `claude-code` adapter with the host's default Kimi backend (currently observed
+  as `kimi-k2.7-code`). W66-S09 must not add a model override or require an
+  Anthropic-specific quota. Each cell records the actual provider, adapter,
+  requested/effective model, and reasoning effort from public preflight and run
+  evidence.
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
@@ -1934,9 +1934,9 @@ does not grant release clearance.
 2. **Sequential four-cell execution**
    - Purpose: Produce comparable provider qualification evidence without concurrent contamination.
    - Changes: Consume the exact W71-S14 qualification-freeze manifest and run
-     medium Codex, medium Claude, large Codex, and large Claude in fresh isolated
-     workspaces without changing any frozen source, target, package, UI handoff,
-     profile, or proof identity.
+     medium Codex, medium Kimi-backed Claude adapter, large Codex, and large
+     Kimi-backed Claude adapter in fresh isolated workspaces without changing
+     any frozen source, target, package, UI handoff, profile, or proof identity.
    - Validation: Every cell matches all freeze digests and records actual
      provider/adapter/model/reasoning, terminal controller state, diagnostics,
      changed paths, delivery, and health.

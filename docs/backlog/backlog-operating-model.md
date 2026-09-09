@@ -2,10 +2,9 @@
 
 The latest defined wave is W71. It converts the post-W70 codebase audit into a
 release-blocking remediation lane and preserves the single-active-slice rule.
-The W66 S20-S25 deterministic chain is closed, but W66-S09 remains explicitly
-blocked by the required Anthropic provider cells' external runner quota
-failure. W67-S01 entered through its explicit release-only qualification gate,
-and W68-W70 development slices were accepted through deterministic code,
+The W66 S20-S25 deterministic chain is closed, and W66-S09 is now ready for
+the required medium/large Codex and Kimi-backed Claude adapter cells. W67-S01
+entered through its explicit release-only qualification gate, and W68-W70 development slices were accepted through deterministic code,
 contracts, and local browser proof. W70-S10 remains closed for its accepted
 visual-fidelity and review-read scope; the newly demonstrated filesystem,
 Task-flow, state, multirepo, contract, gate, and evidence gaps are independent
@@ -242,7 +241,8 @@ parent/integration/delivery correctness, and installed browser-proof integrity.
 Its S20-S25 successor chain now closes weak-runner output contracts, adapter
 normalization, executable post-validation, bounded output repair, explicit
 quality-repair retry, structured artifact/evaluator consumers, and adversarial
-proof before the final same-commit medium/large Codex and Claude matrix.
+proof before the final same-commit medium/large Codex and Kimi-backed Claude
+adapter matrix.
 Backlog state does not replace the ledger-derived production readiness decision.
 
 W67 is the blocked successor planning lane for the breaking central AOR Home,

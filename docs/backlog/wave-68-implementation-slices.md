@@ -25,9 +25,9 @@ W68-S01 through W68-S05 are complete on the current source baseline through
 deterministic materialization and a reversible code-only hold; Claude, Qwen,
 and Codex live or paid runs remain intentionally deferred. Deterministic
 provider-format, malformed-output, capability, and no-spawn fixtures remain
-part of the contract and adapter gates. W66-S09 stays blocked and production
-readiness remains `audit-hold` until the fresh four-cell W66 matrix is rerun
-after the Anthropic quota blocker is removed.
+part of the contract and adapter gates. W66-S09 remains a release-only hold and
+production readiness remains `audit-hold` until the fresh four-cell W66 matrix
+is rerun with the configured Kimi-backed Claude adapter.
 
 The deterministic W68-S04 implementation also emits a query-safe selection
 readback for each generated asset set. It records the selected model/effort,

@@ -76,7 +76,7 @@ The authoritative planning model for implementation lives in:
 | W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, a reusable visual system, and browser-operable safe lifecycle parity. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
 | W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
-| W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, bounded provider-session convergence, and same-commit Codex/Claude closure. | 25 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
+| W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, bounded provider-session convergence, and same-commit Codex/Kimi-backed Claude adapter closure. | 25 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
 | W67 | Move mutable state to central AOR Home and make code plus plain-language intent the primary onboarding path. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-67-implementation-slices.md` |
 | W68 | Reconcile, complete, and certify provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
 | W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
@@ -328,7 +328,7 @@ The current roadmap contains **399 slices across 72 waves**.
 | W66-S23 | explicit quality-repair retry and attempt lineage target: DEV-05, RQA-02, RQA-05, RQA-06, OPS-01, OPS-04, OPS-10 |
 | W66-S24 | structured artifact and evaluator hardening target: EMP-01, EMP-02, DEV-01, DEV-05, RQA-05, OPS-06 |
 | W66-S25 | weak-runner adversarial proof and qualification reset target: DEV-01, DEV-04, DEV-05, AIP-12, RQA-05, OPS-06, OPS-07 |
-| W66-S09 | same-commit Codex/Claude qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
+| W66-S09 | same-commit Codex/Kimi-backed Claude adapter qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
 | W71-S01 | audit disposition, evidence-tier truth, and parallel UI ownership baseline: PBO-10, EMP-03, DEV-05, OPS-06, OPS-10, OPS-11, OPS-12, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, FIN-03 |
 | W71-S02 | canonical filesystem containment and durable cleanup target: PBO-05, SEC-04, DTX-05, FIN-03 |
 | W71-S03 | deterministic repository gate and dependency/process safety target: OPS-06, OPS-07, SEC-04, FIN-03 |
@@ -1438,7 +1438,7 @@ console benchmarks.
 canonical catalog/bootstrap identity, enforcing the product/private boundary,
 making qualification verdicts evidence-complete, repairing deterministic
 runtime and coordinated-delivery behavior, and proving the installed console
-before same-commit Codex/Claude runs.
+before same-commit Codex/Kimi-backed Claude adapter runs.
 
 **Exit criteria:**
 - generated repository IDs satisfy the public contract without changing catalog
@@ -1462,8 +1462,9 @@ before same-commit Codex/Claude runs.
   per-repository delivery pass deterministic stress and recovery fixtures;
 - installed browser acceptance proves durable actions across responsive,
   accessibility, reload, reconnect, partial, and offline scenarios;
-- medium/large Codex and Claude cells pass from isolated installs against one
-  AOR commit and one pinned target commit with no upstream writes.
+- medium/large Codex and Kimi-backed Claude adapter cells pass from isolated
+  installs against one AOR commit and one pinned target commit with no upstream
+  writes.
 
 **Current entry reset:** W66-S20 through W66-S25 are the deterministic
 remediation chain before W66-S09. Earlier guided and provider results remain
@@ -1479,10 +1480,9 @@ folder or Git URL, and prepare free-form text/file intent before any
 write-capable execution.
 
 **Entry condition:** W66-S09 normally closes before the breaking storage and
-onboarding cutover. While the Anthropic runner quota is externally blocked,
-W67-S01 entered through an explicit release-only qualification gate for
-deterministic contract work; this did not change the W66 audit hold or permit
-live qualification.
+onboarding cutover. W67-S01 entered through an explicit release-only
+qualification gate for deterministic contract work while the final live matrix
+was pending; this did not grant live qualification or release clearance.
 
 **Exit criteria:**
 
@@ -1534,7 +1534,7 @@ W66 evidence or the independent live qualification hold.
 - Cockpit shows Flow context and one server-owned next action across supported
   responsive/accessibility states;
 - docs, contracts, examples, browser proof, and Codex qualification evidence
-  agree without changing the Anthropic/W66 hold.
+  agree without changing the independent W66 live-qualification hold.
 
 **Detailed slices:** `docs/backlog/wave-69-implementation-slices.md`
 
@@ -1576,8 +1576,8 @@ execution, concurrent-state integrity, bounded multirepo integration, and
 independently verifiable evidence before the next live qualification attempt.
 
 **Entry condition:** W66-S25 and W70-S10 are complete. W66-S09 remains an
-independent release-only blocker, so its external Anthropic quota does not block
-deterministic W71 work and W71 does not grant release clearance.
+independent release-only blocker until its Kimi-backed Claude adapter and Codex
+cells pass, and W71 does not grant release clearance.
 
 **Parallel UI boundary:** The separate Command Desk UI-refactor task owns all
 `apps/web/src/**`, `apps/web/browser/**`, `apps/web/test/**`, generated

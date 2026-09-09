@@ -1649,12 +1649,12 @@ qualification_gate:
     - W66-S09
 ```
 
-The gate is valid only while `W66-S09` is `blocked` with its recorded external
-Anthropic runner-quota blocker. It permits deterministic W67 entry and
-completion; it never marks `W66-S09` done, clears production `audit-hold`, or
-creates provider qualification evidence. W68-W71 development closure uses
-deterministic and local-browser acceptance; release qualification remains
-external.
+The gate records the historical deterministic W67 entry while `W66-S09` was
+blocked by an incorrect Anthropic-quota assumption. It never marks `W66-S09`
+done, clears production `audit-hold`, or creates provider qualification
+evidence. W66-S09 now uses the host's Kimi backend through the `claude-code`
+adapter alongside Codex; W68-W71 development closure uses deterministic and
+local-browser acceptance, while release qualification remains external.
 
 ## Topological order
 1. W0-S01
