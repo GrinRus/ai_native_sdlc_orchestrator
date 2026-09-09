@@ -2,7 +2,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import path from "node:path";
 
-import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs"; import { resolveMissionSpecificPlannerCandidate, revisionAdviceForValidationIssue } from "./planner-decomposition.mjs";
 import { toLogicalEvidenceRef } from "./aor-home.mjs";
@@ -784,7 +784,7 @@ export function prepareHandoffArtifacts(options = {}) {
     `validation-report-${sanitizeFileSegment(planId)}.v${planVersion}.json`,
   );
   const planValidationReport = {
-    report_id: `${planId}.validation.v${planVersion}`,
+    report_id: derivePublicId([planId, "validation", `v${planVersion}`], "validation-report"),
     subject_ref: planRef,
     validators: waveTicketValidation.ok
       ? [{
