@@ -6,9 +6,9 @@ adversarial proof for the final integrated commit. The current entry conditions
 are defined in `docs/backlog/wave-71-implementation-slices.md` and
 `docs/backlog/wave-66-implementation-slices.md`.
 
-W66-S25 remains historical prerequisite evidence. Neither its old proof nor
-restored provider quota bypasses W71-S14. Freezing inputs makes no provider call
-and does not grant release clearance.
+W66-S25 remains historical prerequisite evidence. Neither its old proof nor a
+provider-specific workaround bypasses W71-S14. Freezing inputs makes no
+provider call and does not grant release clearance.
 
 Once that entry gate is satisfied, pin the exact `ky` target commit and create
 the qualification manifest:
@@ -28,7 +28,7 @@ profile, any cell other than the four W66 cells, or any premature cell result.
 The manifest records SHA-256 digests for:
 
 - OpenAI medium and large profiles;
-- Anthropic medium and large profiles.
+- Kimi-backed Claude adapter medium and large profiles.
 
 Supply `--proof-file` to bind the passing final-commit adversarial proof digest
 to the frozen AOR commit. W71-S14 also owns the accepted package, UI handoff,
