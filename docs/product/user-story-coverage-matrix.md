@@ -14,7 +14,7 @@ the ordered tiers `unit`, `contract`, `fixture`, `mocked-browser`,
 `integrated-local`, and `live-provider`; W71-S13 keeps audited stories at their
 current status and assigns W71-S14 as the owner of any integrated-proof upgrade.
 
-Current planning status counts: `baseline-covered=102`, `proof-covered=9`, `partial=3`, `blocked=2`. The 114-story W34-S06 result and later W57-W65 closure records remain immutable historical evidence at their demonstrated scope. The post-W70 audit reclassifies W70 route-fulfilled browser state as partial rather than current integrated proof; W71-S14 restores the installed multirepo coordination and delivery claims from a public CLI journal. W71 still owns executable Ask AOR, route/safety truth, and the canonical installed UI Task lifecycle. W66 keeps release clearance on `audit-hold` until the fresh same-commit Codex/Claude matrix closes; OpenCode certification outcomes remain blocked.
+Current planning status counts: `baseline-covered=102`, `proof-covered=9`, `partial=3`, `blocked=2`. The 114-story W34-S06 result and later W57-W65 closure records remain immutable historical evidence at their demonstrated scope. The post-W70 audit reclassifies W70 route-fulfilled browser state as partial rather than current integrated proof; W71-S14 restores the installed multirepo coordination and delivery claims from a public CLI journal. W71 still owns executable Ask AOR, route/safety truth, and the canonical installed UI Task lifecycle. W66 keeps release clearance on `audit-hold` until the fresh same-commit Codex/Kimi-backed Claude adapter matrix closes; OpenCode certification outcomes remain blocked.
 
 | Story ID | Role cluster | Tier | Outcome | Coverage status | Evidence | Gap slice |
 |---|---|---|---|---|---|---|
