@@ -976,7 +976,7 @@ were changed; the sibling UI handoff remains `59943bfa` for W71-S14 integration.
 
 ## W71-S14 — UI-refactor integration, installed black-box closure, and freeze
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7
 - **Hard dependencies:** W71-S13
 - **UI handoff:** explicit immutable commit `59943bfa` from `Улучшить UI и UX` is
@@ -1013,11 +1013,11 @@ installed local scenarios, and freeze all source/target/profile/proof identities
    - Validation: Actual diff/check/request/attempt/delivery artifacts resolve after reload; duplicate actions remain idempotent; commit/push do not occur.
 4. **Run public two-repository closure.**
    - Purpose: Restore the multirepo proof claims against production surfaces.
-   - Changes: Execute provision, children, conflict serialization, retry, integration, aggregate checks, delivery evidence, and cleanup using installed public commands/API.
-   - Validation: Source repos remain unchanged and every Task/unit/attempt/repo/diff/digest reference resolves.
+   - Changes: Execute the installed black-box runners through public `aor` subprocesses for Prepare-to-Start-to-Work, review/recovery completion, provision, children, conflict serialization, retry, integration, aggregate checks, patch-only/no-write delivery evidence, and lock/workspace cleanup.
+   - Validation: The runners retain digest-addressed command journals and runtime evidence refs; source repos remain unchanged and every Task/unit/attempt/repo/diff/digest reference resolves.
 5. **Restore evidence-backed story claims.**
    - Purpose: Promote only outcomes exercised by the merged installed product.
-   - Changes: Re-evaluate OPS-11, OPS-12, PBO-10, and affected W62 multirepo stories against the immutable S14 journals; keep every incomplete outcome `partial` with an owning gap or `baseline-covered` without a proof claim.
+   - Changes: Re-evaluate OPS-11, OPS-12, PBO-10, and affected W62 multirepo stories against the immutable S14 journals; restore only the installed multirepo coordination and delivery claims, while retaining UI/Ask AOR gaps at `partial`.
    - Validation: Each promoted row resolves to the current source/package identity, real action journal, durable artifact bytes, before/after safety snapshot, and declared runner mode.
 6. **Regenerate final-commit adversarial proof.**
    - Purpose: Prevent S11 evidence from being reused after quality, hotspot, documentation, or UI integration commits change source identity.
@@ -1032,7 +1032,7 @@ installed local scenarios, and freeze all source/target/profile/proof identities
 
 1. The merged Command Desk UI renders only server-owned lifecycle, runner, safety, review, and completion truth.
 2. Prepared UI outcome, acceptance, scope, route, readiness, write-back mode, and revision match the Task GET projection and the confirmed Start input, and the selected route remains identical after reload.
-3. No-write, patch-only/recovery/Ask AOR, and two-repository installed scenarios pass without AOR API fulfillment mocks or upstream writes.
+3. No-write, patch-only/recovery/Ask AOR, and two-repository installed scenarios pass without AOR API fulfillment mocks or upstream writes; the installed control-plane qualification proves Prepare-to-Start-to-Work and review/recovery completion through the public CLI.
 4. Desktop, mobile, 200% zoom, keyboard-only, reduced-motion, focus, offline/reconnect, overflow, and console-error checks pass on the merged UI.
 5. Every evidence reference resolves after reload and matches immutable bytes, digest, owner identity, and the frozen commit.
 6. Story claims are restored only to the strongest tier justified by the current installed journals.
@@ -1043,6 +1043,7 @@ installed local scenarios, and freeze all source/target/profile/proof identities
 
 - sibling UI task/PR handoff and merge-base record
 - installed no-write, patch/recovery/Ask AOR, and two-repository action journals
+- installed public two-repository closure and control-plane qualification reports with digest-addressed command journals
 - desktop/mobile/accessibility/browser evidence against the real control plane
 - package/install/smoke reports and target before/after Git snapshots
 - final-commit `pnpm w66:proof` output and current evidence digests

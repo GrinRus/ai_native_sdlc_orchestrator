@@ -1901,14 +1901,14 @@ it does not reopen them inside adapter implementation.
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
 - **Hard dependencies:** W66-S25
-- **External blocker:** W71-S14 qualification freeze is absent and the required Anthropic runner quota is unavailable.
+- **External blocker:** The W71-S14 qualification freeze is present, but the required Anthropic runner quota is unavailable.
 
-  Both conditions must be explicitly re-evaluated before W66-S09 starts.
-  W71-S14 must merge or consume the immutable `Улучшить UI и UX` handoff, pass
-  the installed real-control-plane journeys, and freeze current qualification
+  The freeze identity must be revalidated before W66-S09 starts. W71-S14 has
+  merged or consumed the immutable `Улучшить UI и UX` handoff, passed the
+  installed real-control-plane journeys, and frozen current qualification
   identities. Separately, the current Kimi-backed host failed claude-code
-  adapter preflight with HTTP 403 before provider execution. Restored quota
-  alone does not remove the W71-S14 prerequisite.
+  adapter preflight with HTTP 403 before provider execution; restored quota is
+  the remaining external prerequisite.
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
