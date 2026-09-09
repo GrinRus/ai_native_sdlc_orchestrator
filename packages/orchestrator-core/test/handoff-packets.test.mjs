@@ -44,6 +44,35 @@ function materializeSmallIntake(repoRoot) {
   });
 }
 
+test("prepareHandoffArtifacts bounds validation report ids for long project ids", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, ".aor", "project.yaml");
+    fs.unlinkSync(profilePath);
+    const longProjectId = "github-sandbox.run.live-e2e.full-journey.regress.ky.medium.anthropic.run-909043955465";
+    const profile = fs.readFileSync(path.join(repoRoot, "examples", "project.aor.yaml"), "utf8");
+    fs.writeFileSync(profilePath, profile.replace("project_id: aor-core", `project_id: ${longProjectId}`), "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const requestFile = path.join(repoRoot, "long-project-planning.request.json");
+    fs.writeFileSync(requestFile, `${JSON.stringify({ feature_size: "small" }, null, 2)}\n`, "utf8");
+    materializeIntakeArtifactPacket({
+      projectId: init.projectId,
+      projectRoot: init.projectRoot,
+      projectProfileRef: init.projectProfileRef,
+      runtimeLayout: init.runtimeLayout,
+      command: "aor intake create",
+      missionId: "ky-fetch-options-regression",
+      requestFile,
+    });
+
+    const result = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
+    assert.equal(result.waveTicket.project_id, longProjectId);
+    assert.equal(result.planValidationReport.status, "pass");
+    assert.ok(result.planValidationReport.report_id.length <= 128);
+    assert.match(result.planValidationReport.report_id, /^validation-report-[0-9a-f]{32}$/);
+  });
+});
+
 test("prepareHandoffArtifacts materializes wave-ticket and pending handoff packet", () => {
   withTempRepo((repoRoot) => {
     materializeSmallIntake(repoRoot);
