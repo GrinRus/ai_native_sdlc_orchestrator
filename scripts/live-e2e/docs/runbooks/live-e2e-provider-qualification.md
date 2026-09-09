@@ -25,6 +25,14 @@ Each cell keeps public lifecycle, run health, diagnostic verification, final
 assessment, changed paths, checkout integrity, and delivery safety as separate
 dimensions. A missing or non-all-pass final assessment always blocks the cell.
 
+For the current host configuration, the two `anthropic-primary` cells are
+executed through the `claude-code` adapter using the host's default Kimi backend
+(currently observed as `kimi-k2.7-code`). The matrix keeps
+`anthropic-primary` as the adapter-path identity for contract compatibility; it
+does not require an Anthropic-specific quota or a `--model` override. Public
+preflight and run evidence must record the actual provider, adapter,
+requested/effective model, and reasoning effort.
+
 Installed browser evidence used by the baseline or a provider cell must satisfy
 `installed-browser-proof.v2`. The content-addressed evidence index binds
 artifact kind, digest, byte length, run/scenario ownership, and freshness.

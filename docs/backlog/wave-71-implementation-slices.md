@@ -58,10 +58,11 @@ W71-S15, W71-S13, and W71-S14. Investigation may run in parallel on disjoint
 surfaces, but review, merge, state transition, and final validation remain
 sequential.
 
-W66-S09 stays blocked by the external Anthropic quota and remains the final
-release-qualification action. No paid provider cells should run before
-W71-S14 freezes the current source, target, profile, and evidence identities.
-W71 development acceptance never grants release clearance by itself.
+W66-S09 remains the final release-qualification action. Its Claude cells use
+the host's configured Kimi backend through the `claude-code` adapter; no model
+override or Anthropic-specific quota is required. No paid provider cells should
+run before W71-S14 freezes the current source, target, profile, and evidence
+identities. W71 development acceptance never grants release clearance by itself.
 
 Effort labels include contracts, implementation, focused tests, source-of-truth
 updates, and slice-gate evidence: `S` is roughly 1-2 engineering days, `M` is
@@ -1058,7 +1059,7 @@ installed local scenarios, and freeze all source/target/profile/proof identities
 ### Out of scope
 
 - Additional Command Desk redesign after the accepted sibling UI handoff.
-- Paid Codex/Claude execution, owned by W66-S09.
+- Paid Codex/Kimi-backed Claude adapter execution, owned by W66-S09.
 - General production clearance before all four required provider cells pass.
 
 ## Wave exit criteria
@@ -1074,4 +1075,5 @@ W71 is development-complete only when:
 5. One immutable qualification freeze exists for W66-S09.
 
 W71 completion does not itself close W66-S09. Release clearance still requires
-all four required Codex/Claude cells to pass on the W71-S14 freeze.
+all four required Codex/Kimi-backed Claude adapter cells to pass on the W71-S14
+freeze.
