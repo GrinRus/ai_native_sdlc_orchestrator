@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { scoreEvaluationSuite } from "../../harness/src/scorer-interface.mjs";
 
 import { createProjectContext, resolveProjectContextReference } from "./control-plane/project-context.mjs";
@@ -214,7 +214,7 @@ export function runEvaluationSuite(options) {
   });
   const scorecard = scoreEvaluationSuite({ suite: documents.suite, dataset: documents.dataset, resolvedCases, subjectSnapshot, subjectRef, subjectType, scorerRegistry: options.scorerRegistry, judge: options.judge });
   const generatedAt = new Date().toISOString();
-  const reportId = `${init.projectId}.evaluation.${sanitizeForFileName(suiteRef)}.${Date.now()}`;
+  const reportId = derivePublicId([init.projectId, "evaluation", sanitizeForFileName(suiteRef), String(Date.now())], "evaluation-report");
   const caseResolution = resolvedCases.map((entry) => ({ case_id: entry.testCase.case_id, status: entry.status, reason: entry.reason ?? null, input_ref: entry.testCase.input_ref ?? null, expected_ref: entry.testCase.expected_ref ?? null, input_version: entry.input?.version ?? null, expected_version: entry.expected?.version ?? null, input_digest: entry.input_digest, expected_digest: entry.expected_digest }));
   const report = {
     report_id: reportId,

@@ -59,6 +59,27 @@ test("runEvaluationSuite executes suite and writes durable evaluation report", (
   });
 });
 
+test("runEvaluationSuite bounds generated report IDs for long project IDs", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, ".aor/project.yaml");
+    fs.unlinkSync(profilePath);
+    const profile = parseYaml(fs.readFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "utf8"));
+    profile.project_id = `project-${"x".repeat(100)}`;
+    fs.writeFileSync(profilePath, stringifyYaml(profile), "utf8");
+
+    writeRunSubject(repoRoot, "candidate-long-project-id");
+    const result = runEvaluationSuite({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      suiteRef: "suite.release.core@v1",
+      subjectRef: "run://candidate-long-project-id",
+    });
+
+    assert.ok(result.evaluationReport.report_id.length <= 128);
+    assert.match(result.evaluationReport.report_id, /^evaluation-report-[a-f0-9]{32}$/u);
+  });
+});
+
 test("runEvaluationSuite finds run-owned evidence after unrelated runtime documents", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
