@@ -1939,6 +1939,7 @@ test("audit hold override is explicit, fail-closed, and constrained to no-write 
 test("every frozen W66 baseline and qualification profile explicitly enables the reviewed hold override", () => {
   for (const profileRef of [
     "scripts/live-e2e/profiles/installed-user-guided-journey.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-small-codex.yaml",
     "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
     "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
     "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
