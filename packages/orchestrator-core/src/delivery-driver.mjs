@@ -699,7 +699,7 @@ function executeDeliveryDriverTransaction(options = {}) {
   };
   fs.writeFileSync(transcriptFile, `${JSON.stringify(transcript, null, 2)}\n`, "utf8");
 
-  const ticketId = asString(options.ticketId) ?? `${init.projectId}.wave.${normalizeForId(runId)}`;
+  const ticketId = asString(options.ticketId) ?? boundedDerivedId("wave-ticket", `${init.projectId}.wave.${normalizeForId(runId)}`);
   const deliveryPlanEvidenceRefs = uniqueStrings(asStringArray(deliveryPlan.evidence_refs));
   const planRef =
     deliveryPlanPath.startsWith("runtime://") || !path.isAbsolute(deliveryPlanPath)
