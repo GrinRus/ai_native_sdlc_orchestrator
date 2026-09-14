@@ -7,6 +7,22 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.22] - 2026-09-14
+
+- Hardened the installed Task-first control plane with server-owned task
+  actions, atomic lifecycle state, bounded workspace ownership, and durable
+  review, QA, completion, and delivery evidence.
+- Added installed black-box proof for the integrated Command Desk and
+  two-repository control-plane journeys while preserving no-upstream-write
+  defaults and immutable evidence lineage.
+- Strengthened repository gates, source-of-truth checks, quality ratchets,
+  evidence freshness, and provider-output validation so false-green lifecycle
+  results fail closed.
+- Improved provider qualification setup by bounding small Ky Codex workspace
+  installation and explicitly applying the reviewed audit-hold policy.
+- Kept W66 release clearance on audit hold pending the fresh medium/large
+  Codex and Kimi-backed Claude qualification matrix.
+
 ## [0.1.0-alpha.21] - 2026-09-01
 
 - Prevented Task Workspace live-event subscriptions from reconnecting after
