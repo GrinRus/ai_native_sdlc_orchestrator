@@ -4322,6 +4322,7 @@ test("guided browser-task collector materializes proof through configured Python
         "const proof = {",
         "  status: 'pass',",
         "  proof_source: 'fake-python-guided-browser-task-collector',",
+        "  readiness_timeout_ms: payload.timeout_ms,",
         "  env_playwright_browsers_path: process.env.PLAYWRIGHT_BROWSERS_PATH || null,",
         "  browser_task_proof_request_file: payload.browser_task_proof_request_file,",
         "  rendered_html_file: payload.rendered_html_file,",
@@ -4374,6 +4375,7 @@ test("guided browser-task collector materializes proof through configured Python
     assert.equal(fs.existsSync(result.screenshot_file), true);
     const proof = JSON.parse(fs.readFileSync(result.proof_file, "utf8"));
     assert.equal(proof.task_outcome.status, "pass");
+    assert.equal(proof.readiness_timeout_ms, 30000);
     assert.equal(proof.env_playwright_browsers_path, null);
     assert.deepEqual(
       proof.accessibility_checks.map((entry) => entry.check_id),
@@ -5762,6 +5764,21 @@ test("full journey requests repair only for actionable review or QA findings bef
   assert.ok(
     flowsSource.indexOf('runCommand("review-run"') < flowsSource.indexOf("const previousRepairContexts = readRepairDecisionContexts"),
     "expected fresh review evidence before repeated repair context comparison",
+  );
+});
+
+test("full journey materializes review approval for non-guided learning closure", () => {
+  const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
+
+  assert.match(
+    flowsSource,
+    /if \(guidedJourneyEnabled\) \{[\s\S]*?guided_next_after_review_transcript_file = guidedNextAfterReview\.transcriptFile;\n    \}\n\n    const reviewDecision = runCommand\("review-decide-approve"/u,
+    "guided next-action evidence may be conditional, but public review approval must run for every full-journey profile",
+  );
+  assert.match(
+    flowsSource,
+    /"--require-review-decision",\s*\],\s*\{ allowNonZeroWithPayload: true \}\)/u,
+    "delivery must enforce the same approved review decision that learning handoff requires",
   );
 });
 

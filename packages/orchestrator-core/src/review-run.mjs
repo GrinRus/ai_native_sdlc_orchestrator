@@ -486,7 +486,7 @@ function loadPacketArtifacts(projectRoot, artifactsRoot) {
       if (path.basename(filePath).includes(".handoff.")) {
         return loadContractDocument(projectRoot, filePath, "handoff-packet");
       }
-      if (path.basename(filePath).includes(".artifact.")) {
+      if (path.basename(filePath).includes(".artifact.") || path.basename(filePath).startsWith("packet-")) {
         return loadContractDocument(projectRoot, filePath, "artifact-packet");
       }
       if (path.basename(filePath).startsWith("delivery-manifest-")) {

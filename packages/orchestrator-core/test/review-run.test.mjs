@@ -95,7 +95,7 @@ function writeReviewRuntimeFixture(init, runId, options = {}) {
     },
     evidence_roots: {},
   });
-  writeJson(path.join(init.runtimeLayout.artifactsRoot, `${init.projectId}.artifact.intake-request.v1.json`), {
+  writeJson(path.join(init.runtimeLayout.artifactsRoot, "packet-generated-intake-request.json"), {
     packet_id: `${init.projectId}.intake-request.v1`,
     project_id: init.projectId,
     packet_type: "intake-request",

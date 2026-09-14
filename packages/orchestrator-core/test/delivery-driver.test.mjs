@@ -339,7 +339,7 @@ test("runDeliveryDriver emits patch artifact and transcript for patch-only mode"
 
 test("runDeliveryDriver bounds its derived coordination transaction ID for long canonical run IDs", () => {
   withTempRepo((repoRoot) => {
-    const runId = "run.w66-guided-ui-anthropic-20260721t080742z-fe259a5.delivery-qualification-retry-after-provider-boundary";
+    const runId = "run.w66-guided-ui-anthropic-20260721t080742z-fe259a5.delivery-qualification-retry-after-provider-boundary-long-ticket-identity";
     fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# bounded transaction identity\n", "utf8");
 
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
@@ -353,6 +353,8 @@ test("runDeliveryDriver bounds its derived coordination transaction ID for long 
     });
 
     assert.equal(result.status, "success");
+    assert.match(result.deliveryManifest.ticket_id, /^wave-ticket-[a-f0-9]{32}$/u);
+    assert.ok(result.deliveryManifest.ticket_id.length <= 128);
     assert.match(result.deliveryManifest.coordination_transaction.transaction_id, /^delivery-transaction-[a-f0-9]{32}$/u);
     assert.ok(result.deliveryManifest.coordination_transaction.transaction_id.length <= 128);
     assert.match(result.learningLoopScorecard.scorecard_id, /^learning-loop-scorecard-[a-f0-9]{32}$/u);
