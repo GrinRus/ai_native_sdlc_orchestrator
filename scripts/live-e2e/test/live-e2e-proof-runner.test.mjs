@@ -1578,7 +1578,7 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
     assert.equal(loaded.document.repos[0].repo_id, "ky");
     assert.equal(loaded.document.repos[0].name, "sindresorhus/ky");
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "ephemeral");
-    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
+    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 300);
     assert.deepEqual(loaded.document.repos[0].lint_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
@@ -1939,6 +1939,7 @@ test("audit hold override is explicit, fail-closed, and constrained to no-write 
 test("every frozen W66 baseline and qualification profile explicitly enables the reviewed hold override", () => {
   for (const profileRef of [
     "scripts/live-e2e/profiles/installed-user-guided-journey.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-small-codex.yaml",
     "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
     "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
     "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
