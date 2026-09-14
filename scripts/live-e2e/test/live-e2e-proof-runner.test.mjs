@@ -4322,6 +4322,7 @@ test("guided browser-task collector materializes proof through configured Python
         "const proof = {",
         "  status: 'pass',",
         "  proof_source: 'fake-python-guided-browser-task-collector',",
+        "  readiness_timeout_ms: payload.timeout_ms,",
         "  env_playwright_browsers_path: process.env.PLAYWRIGHT_BROWSERS_PATH || null,",
         "  browser_task_proof_request_file: payload.browser_task_proof_request_file,",
         "  rendered_html_file: payload.rendered_html_file,",
@@ -4374,6 +4375,7 @@ test("guided browser-task collector materializes proof through configured Python
     assert.equal(fs.existsSync(result.screenshot_file), true);
     const proof = JSON.parse(fs.readFileSync(result.proof_file, "utf8"));
     assert.equal(proof.task_outcome.status, "pass");
+    assert.equal(proof.readiness_timeout_ms, 30000);
     assert.equal(proof.env_playwright_browsers_path, null);
     assert.deepEqual(
       proof.accessibility_checks.map((entry) => entry.check_id),
