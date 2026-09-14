@@ -6836,30 +6836,30 @@ function executeFullJourneyFlowImplementation(options) {
       ]);
       artifacts.next_action_report_file = getStringField(guidedNextAfterReview.payload, "next_action_report_file");
       artifacts.guided_next_after_review_transcript_file = guidedNextAfterReview.transcriptFile;
-
-      const reviewDecision = runCommand("review-decide-approve", [
-        "review",
-        "decide",
-        "--project-ref",
-        ".",
-        "--project-profile",
-        generatedProfile.generatedProjectProfileFile,
-        "--runtime-root",
-        ".aor",
-        "--run-id",
-        latestImplementationRunId,
-        "--execution-root",
-        latestExecutionRoot,
-        "--decision",
-        "approve",
-        "--decider-ref",
-        "operator://installed-user-guided-proof",
-        "--reason",
-        "Approved by installed-user guided proof after review evidence materialized.",
-      ]);
-      artifacts.review_decision_file = getStringField(reviewDecision.payload, "review_decision_file");
-      artifacts.guided_review_decision_transcript_file = reviewDecision.transcriptFile;
     }
+
+    const reviewDecision = runCommand("review-decide-approve", [
+      "review",
+      "decide",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      generatedProfile.generatedProjectProfileFile,
+      "--runtime-root",
+      ".aor",
+      "--run-id",
+      latestImplementationRunId,
+      "--execution-root",
+      latestExecutionRoot,
+      "--decision",
+      "approve",
+      "--decider-ref",
+      "operator://installed-user-guided-proof",
+      "--reason",
+      "Approved by installed-user guided proof after review evidence materialized.",
+    ]);
+    artifacts.review_decision_file = getStringField(reviewDecision.payload, "review_decision_file");
+    artifacts.guided_review_decision_transcript_file = reviewDecision.transcriptFile;
 
     const harnessCertification = getHarnessCertification(options.profile);
     /** @type {string[]} */
@@ -6919,7 +6919,7 @@ function executeFullJourneyFlowImplementation(options) {
           ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
           : []),
         ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
-        ...(guidedJourneyEnabled ? ["--require-review-decision"] : []),
+        "--require-review-decision",
       ], { allowNonZeroWithPayload: true });
     } catch (error) {
       const summary = error instanceof Error ? error.message : String(error);

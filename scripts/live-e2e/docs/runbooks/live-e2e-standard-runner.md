@@ -614,7 +614,7 @@ Full-journey layer:
   explicitly overrides target verification mode, so broad target lint/test
   commands do not scan AOR runtime JSON under `.aor/`.
 - gates continuation after every observed public step by the online live E2E controller decision and, for medium+ product-change missions, an accepted step-quality assessment report.
-- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, execute profile-declared terminal stages as ordinary observed steps. Governance profiles that declare `learning` must reach learning closure even when release is not required.
+- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, execute profile-declared terminal stages as ordinary observed steps. Governance profiles that declare `learning` must reach learning closure even when release is not required. Before delivery and learning closure, every full-journey profile materializes an approved public review decision; guided profiles additionally record the guided next-action evidence.
 - requires post-run diagnostic evidence to be `pass` under the strict quality-assessment `all-pass` policy. Non-blocking diagnostic warnings remain valid factual run evidence, but they must be fixed, scoped out, or explicitly kept outside all-pass closure.
 - passes an explicit output-quality policy to external runtime agents in the
   provider work packet. The agent runs only ordered mission-primary

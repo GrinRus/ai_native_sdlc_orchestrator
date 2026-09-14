@@ -5765,6 +5765,21 @@ test("full journey requests repair only for actionable review or QA findings bef
   );
 });
 
+test("full journey materializes review approval for non-guided learning closure", () => {
+  const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
+
+  assert.match(
+    flowsSource,
+    /if \(guidedJourneyEnabled\) \{[\s\S]*?guided_next_after_review_transcript_file = guidedNextAfterReview\.transcriptFile;\n    \}\n\n    const reviewDecision = runCommand\("review-decide-approve"/u,
+    "guided next-action evidence may be conditional, but public review approval must run for every full-journey profile",
+  );
+  assert.match(
+    flowsSource,
+    /"--require-review-decision",\s*\],\s*\{ allowNonZeroWithPayload: true \}\)/u,
+    "delivery must enforce the same approved review decision that learning handoff requires",
+  );
+});
+
 test("repair context keeps verification failure details structured", () => {
   const [detail] = collectReviewFindingDetails({
     findings: [
