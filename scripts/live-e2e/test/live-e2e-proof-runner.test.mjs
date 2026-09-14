@@ -1578,7 +1578,7 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
     assert.equal(loaded.document.repos[0].repo_id, "ky");
     assert.equal(loaded.document.repos[0].name, "sindresorhus/ky");
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "ephemeral");
-    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
+    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 300);
     assert.deepEqual(loaded.document.repos[0].lint_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
