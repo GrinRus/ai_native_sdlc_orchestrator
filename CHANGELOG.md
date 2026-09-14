@@ -20,6 +20,8 @@ versioned AOR snapshots.
   results fail closed.
 - Improved provider qualification setup by bounding small Ky Codex workspace
   installation and explicitly applying the reviewed audit-hold policy.
+- Made run cancellation idempotent across concurrent worker updates so the
+  control-plane cancel action remains retryable instead of surfacing a 500.
 - Kept W66 release clearance on audit hold pending the fresh medium/large
   Codex and Kimi-backed Claude qualification matrix.
 

@@ -234,12 +234,11 @@ export function startRunJob(options) {
 }
 
 export function requestRunJobCancel(options) {
-  const init = initializeProjectRuntime(options);
-  const jobId = derivePublicId([options.runId, "job"], "job");
-  const file = jobPath(init.runtimeLayout, jobId);
-  const current = readRunJobFile(file);
-  if (!current || TERMINAL_STATUSES.has(current.status)) return current;
-  return updateRunJobFile(file, { status: "canceling" }, current.revision);
+  const file = jobPath(initializeProjectRuntime(options).runtimeLayout, derivePublicId([options.runId, "job"], "job"));
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const current = readRunJobFile(file); if (!current || TERMINAL_STATUSES.has(current.status) || current.status === "canceling") return current;
+    try { return updateRunJobFile(file, { status: "canceling" }, current.revision); } catch (error) { if (error?.code !== "run-job-revision-conflict" || attempt === 3) throw error; }
+  }
 }
 
 export function resumeRunJobAfterInput(options) {
