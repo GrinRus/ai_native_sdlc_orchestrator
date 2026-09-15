@@ -6,7 +6,9 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 
 import {
+  acquireFileLock,
   readJsonState,
+  releaseFileLock,
   updateJsonState,
   writeJsonAtomic,
 } from "../src/index.mjs";
@@ -54,6 +56,46 @@ test("corrupt state is quarantined and never treated as an empty object", () => 
     assert.throws(() => readJsonState(file), (error) => error.code === "state-corrupt" && error.state_file === file && typeof error.recovery_ref === "string");
     assert.equal(fs.existsSync(file), false);
     assert.equal(fs.readdirSync(root).filter((entry) => entry.includes(".corrupt-")).length, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("lock timeout reports the owner and elapsed wait", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-lock-diagnostic-"));
+  const lockDirectory = path.join(root, "held.lock");
+  try {
+    fs.mkdirSync(lockDirectory);
+    fs.writeFileSync(path.join(lockDirectory, "owner.json"), `${JSON.stringify({
+      pid: process.pid,
+      hostname: os.hostname(),
+      acquired_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    })}\n`, "utf8");
+    assert.throws(
+      () => acquireFileLock(lockDirectory, { timeoutMs: 20, retryMs: 1 }),
+      (error) => error.code === "file-lock-timeout" && /after 20ms.*pid=/u.test(error.message),
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("dead same-host lock owners are reclaimed before the stale deadline", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-lock-recovery-"));
+  const lockDirectory = path.join(root, "held.lock");
+  try {
+    fs.mkdirSync(lockDirectory);
+    fs.writeFileSync(path.join(lockDirectory, "owner.json"), `${JSON.stringify({
+      lock_id: "dead-owner",
+      pid: Number.MAX_SAFE_INTEGER,
+      hostname: os.hostname(),
+      acquired_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    })}\n`, "utf8");
+    const lock = acquireFileLock(lockDirectory, { timeoutMs: 100, retryMs: 1 });
+    assert.equal(lock.owner.pid, process.pid);
+    releaseFileLock(lock);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -11,8 +11,8 @@
   },
   "debt_metrics": {
     "file_count": 323,
-    "total_lines": 115711,
-    "complexity_units": 24406,
+    "total_lines": 115811,
+    "complexity_units": 24446,
     "max_complexity": 1401,
     "long_function_count": 139,
     "max_function_lines": 2651,
