@@ -7,6 +7,16 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.23] - 2026-09-15
+
+- Expanded the certified installed CLI matrix to Node.js 22.x and 26.x with
+  pinned repository and release gates for both runtimes.
+- Added one shared runtime check for package metadata, CLI startup, guided
+  readiness, and release smoke so unsupported Node versions fail with an
+  actionable message instead of a misleading ready state.
+- Documented the npm `EBADENGINE` warning and the supported runtime matrix for
+  installed-user troubleshooting.
+
 ## [0.1.0-alpha.22] - 2026-09-14
 
 - Hardened the installed Task-first control plane with server-owned task

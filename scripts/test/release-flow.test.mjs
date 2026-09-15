@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   RELEASE_LABEL,
+  RELEASE_COMPATIBILITY_NODE_VERSION,
   validatePackedFiles,
   validatePublishEvent,
   RELEASE_PUBLISH_NODE_VERSION,
@@ -199,6 +200,29 @@ test("release verifier rejects an untested open-ended Node runtime range", () =>
     });
     assert.equal(result.ok, false);
     assert.match(result.findings.join("\n"), />=22 <23/u);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("release verifier requires the pinned Node 26 compatibility gate", () => {
+  const tempRoot = copyFixtureRepo();
+  try {
+    for (const workflowPath of [".github/workflows/release-candidate.yml", ".github/workflows/release-publish.yml"]) {
+      const absolutePath = path.join(tempRoot, workflowPath);
+      fs.writeFileSync(
+        absolutePath,
+        fs.readFileSync(absolutePath, "utf8").replaceAll(RELEASE_COMPATIBILITY_NODE_VERSION, "26.0.0"),
+        "utf8",
+      );
+    }
+    const result = validateReleaseState({
+      rootDir: tempRoot,
+      releaseBranch: RELEASE_BRANCH,
+      strictReleaseBranch: true,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), new RegExp(`node-version: ${RELEASE_COMPATIBILITY_NODE_VERSION.replaceAll(".", "\\.")}`, "u"));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

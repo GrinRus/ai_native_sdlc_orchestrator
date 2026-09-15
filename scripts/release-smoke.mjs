@@ -5,11 +5,13 @@ import path from "node:path";
 import process from "node:process";
 
 import { assertProcessSuccess, runCheckedProcess } from "./process-runner.mjs";
-import { SUPPORTED_NODE_ENGINE } from "./release-lib.mjs";
+import {
+  isSupportedNodeVersion,
+  unsupportedNodeVersionMessage,
+} from "../packages/orchestrator-core/src/node-runtime.mjs";
 
-const supportedNode = /^22\./u.test(process.versions.node);
-if (!supportedNode) {
-  throw new Error(`release smoke requires Node.js ${SUPPORTED_NODE_ENGINE}; got ${process.version}.`);
+if (!isSupportedNodeVersion()) {
+  throw new Error(`release smoke blocked: ${unsupportedNodeVersionMessage()}`);
 }
 
 function runChecked(command, args, options = {}) {

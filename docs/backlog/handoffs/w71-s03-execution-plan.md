@@ -21,9 +21,10 @@
    timeouts to test, typecheck, lint, build, pack, smoke, and audit owners.
    The single CLI test module is executed in four disjoint name partitions so
    one expensive or leaked fixture cannot consume the whole test-group budget.
-3. Make Node 22.x (`>=22 <23`) the only advertised runtime until an equivalent
-   installed-CLI matrix is proven. Pin CI and dependency-audit jobs to the
-   validated 22.14.0 baseline and make release verification enforce it.
+3. Keep the advertised runtime explicit and evidence-backed. The current
+   release candidate advertises Node 22.x or 26.x
+   (`>=22 <23 || >=26 <27`) only after the installed-CLI gate runs on pinned
+   22.14.0 and 26.8.2. Node 23.x–25.x remain unsupported.
 4. Publish `gate-coverage.json` from the repository test manifest. It must list
    every source/test/browser file, the checks that own it, and any generated
    exclusion with owner, reason, and expiry.
@@ -37,7 +38,8 @@
 - `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`,
   `pnpm quality:ratchet`, and `pnpm release:verify` pass; the execution and
   coverage reports contain exact file accounting.
-- The final `pnpm check` is repeated three times when the runner is available;
+- The final `pnpm check` is repeated on every advertised Node version when the
+  runner is available;
   any environment timeout is recorded as a residual risk rather than silently
   treated as success.
 

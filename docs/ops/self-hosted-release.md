@@ -3,7 +3,7 @@
 ## Supported mode
 
 AOR retains the W57-W59 **bounded self-hosted release clearance** as historical
-prerequisite evidence for the declared Node 22 CLI/API, loopback local app, and
+prerequisite evidence for the declared Node 22 or Node 26 CLI/API, loopback local app, and
 no-upstream-write defaults. W66 has placed current release disposition on
 `audit-hold` until deterministic remediation and fresh same-commit Codex and
 Claude qualification close. Post-W70 remediation blockers are tracked

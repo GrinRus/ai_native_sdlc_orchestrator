@@ -1,6 +1,16 @@
 #!/usr/bin/env node
 import process from "node:process";
 
+import {
+  isSupportedNodeVersion,
+  unsupportedNodeVersionMessage,
+} from "../../../packages/orchestrator-core/src/node-runtime.mjs";
+
+if (!isSupportedNodeVersion()) {
+  process.stderr.write(`${unsupportedNodeVersionMessage()}\n`);
+  process.exit(1);
+}
+
 // A follow-mode child can receive SIGINT while the CLI's static module graph
 // is still loading. Install a temporary guard before the dynamic import so
 // the signal is handed to the follow lifecycle instead of terminating the

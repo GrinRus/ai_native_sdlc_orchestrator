@@ -13,11 +13,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish npm CLI alpha
+  node-compatibility:
+    name: Release compatibility gate (Node 26)
     permissions:
-      contents: write
-      id-token: write
+      contents: read
       pull-requests: read
     if: >-
       github.event.pull_request.merged == true &&
@@ -25,6 +24,51 @@ jobs:
       startsWith(github.event.pull_request.head.ref, 'release/v') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'release:publish')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AOR_RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
+      AOR_RELEASE_STRICT_BRANCH: "true"
+
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+
+      - name: Setup Node.js 26
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 26.8.2
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for compatibility acceptance
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Node 26 release gate
+        run: pnpm release:gate
+
+  publish:
+    name: Publish npm CLI alpha
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: read
+    if: >-
+      needs.node-compatibility.result == 'success' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      startsWith(github.event.pull_request.head.ref, 'release/v') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'release:publish')
+    needs: node-compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

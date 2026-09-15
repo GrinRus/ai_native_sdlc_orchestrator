@@ -226,7 +226,7 @@ commands, and expose actual lint/type/test coverage.
    - Validation: Fake compiler and command fixtures cover missing binary, signal, silent non-zero exit, timeout, and prompt suppression.
 3. **Stabilize repository tests.**
    - Purpose: Remove load-dependent correctness failures and whole-group timeout ambiguity.
-   - Changes: Split the CLI mega-group where needed and move wall-clock performance assertions to isolated repeatable measurements. Normalize the initial public runtime contract to Node 22.x (`>=22 <23`) across package metadata, README, CI, and release smoke unless the same slice adds and passes equivalent installed-CLI gates for each newer version before expanding the range.
+   - Changes: Split the CLI mega-group where needed and move wall-clock performance assertions to isolated repeatable measurements. Keep the public runtime contract explicit across package metadata, README, CI, and release smoke; the current supported matrix is Node 22.x or 26.x (`>=22 <23 || >=26 <27`) with pinned installed-CLI gates for both versions.
    - Validation: Three consecutive clean gates pass with diagnostic time reserve on every advertised Node version; package engines, docs, CI, and release verification reject any untested version consistently.
 4. **Expose gate coverage.**
    - Purpose: Make a passing gate say which source and test files actually ran.
@@ -237,7 +237,9 @@ commands, and expose actual lint/type/test coverage.
 
 1. Frozen dependency installation and both audit modes pass without high-severity findings.
 2. Any failed, signaled, missing, or timed-out child process fails the owning command with typed evidence.
-3. `pnpm check` passes three consecutive clean runs on every version allowed by package engines, with Node 22.x as the required initial baseline and no untested open-ended range.
+3. `pnpm check` passes on every version allowed by package engines, with Node
+   22.x and Node 26.x as the required pinned baselines and no untested
+   open-ended range.
 4. Gate reports identify the exact source and test coverage rather than source markers.
 
 ### Done evidence

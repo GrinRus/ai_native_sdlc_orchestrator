@@ -3,6 +3,10 @@
 Use this matrix to choose the bounded alpha operating mode before starting a
 local AOR run.
 
+The installed alpha runtime is supported on Node.js 22.x or 26.x
+(`>=22 <23 || >=26 <27`). Node.js 23.x–25.x are intentionally outside the
+certified matrix.
+
 ## Modes
 
 | Mode | Primary surface | Required credentials | Required commands | Evidence and safety boundary |

@@ -2,13 +2,17 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { SUPPORTED_NODE_ENGINE } from "../packages/orchestrator-core/src/node-runtime.mjs";
+
+export { SUPPORTED_NODE_ENGINE };
+
 export const RELEASE_PACKAGE_NAME = "@grinrus/aor";
 export const RELEASE_LABEL = "release:publish";
 export const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+-alpha\.\d+$/u;
 export const RELEASE_BRANCH_PATTERN = /^release\/v(\d+\.\d+\.\d+-alpha\.\d+)$/u;
 export const RELEASE_VALIDATE_NODE_VERSION = "22.14.0";
+export const RELEASE_COMPATIBILITY_NODE_VERSION = "26.8.2";
 export const RELEASE_PUBLISH_NODE_VERSION = "24.20.0";
-export const SUPPORTED_NODE_ENGINE = ">=22 <23";
 
 const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "apps/cli/bin",
@@ -160,6 +164,12 @@ function ensureIncludes(findings, content, needle, file) {
   }
 }
 
+function ensureWorkflowNodeVersion(findings, content, version, file) {
+  if (!content.includes(`node-version: ${version}`) && !content.includes(`- ${version}`)) {
+    findings.push(`${file} must mention 'node-version: ${version}'.`);
+  }
+}
+
 export function validateReleaseState(options = {}) {
   const rootDir = options.rootDir ?? process.cwd();
   const releaseBranch =
@@ -188,7 +198,7 @@ export function validateReleaseState(options = {}) {
     findings.push("package.json bin.aor must point to apps/cli/bin/aor.mjs.");
   }
   if (packageJson.engines?.node !== SUPPORTED_NODE_ENGINE) {
-    findings.push(`package.json engines.node must remain ${SUPPORTED_NODE_ENGINE} (the tested Node 22.x range).`);
+    findings.push(`package.json engines.node must remain ${SUPPORTED_NODE_ENGINE} (the tested Node 22.x or 26.x range).`);
   }
   if (packageJson.dependencies?.yaml !== "^2.8.1") {
     findings.push("package.json must declare runtime dependency yaml@^2.8.1.");
@@ -273,13 +283,14 @@ export function validateReleaseState(options = {}) {
       continue;
     }
     const workflow = readText(rootDir, workflowPath);
-    ensureIncludes(findings, workflow, `node-version: ${RELEASE_VALIDATE_NODE_VERSION}`, workflowPath);
+    ensureWorkflowNodeVersion(findings, workflow, RELEASE_VALIDATE_NODE_VERSION, workflowPath);
+    ensureWorkflowNodeVersion(findings, workflow, RELEASE_COMPATIBILITY_NODE_VERSION, workflowPath);
     ensureIncludes(findings, workflow, "pnpm exec playwright install --with-deps chromium", workflowPath);
     if (/npm install -g npm@/u.test(workflow)) {
       findings.push(`${workflowPath} must not install npm globally; use the pinned Node.js runtime.`);
     }
     if (workflowPath.endsWith("release-publish.yml")) {
-      ensureIncludes(findings, workflow, `node-version: ${RELEASE_PUBLISH_NODE_VERSION}`, workflowPath);
+      ensureWorkflowNodeVersion(findings, workflow, RELEASE_PUBLISH_NODE_VERSION, workflowPath);
       ensureIncludes(findings, workflow, "id-token: write", workflowPath);
       ensureIncludes(findings, workflow, "release-publish-transaction.mjs", workflowPath);
       ensureIncludes(findings, workflow, "RELEASE_COMMIT_SHA", workflowPath);
