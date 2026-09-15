@@ -16,15 +16,17 @@ concurrency:
 
 jobs:
   repo-integrity:
-    name: Repo integrity (Node ${{ matrix.node-version }})
+    name: Repo integrity (Node ${{ matrix.node-label }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        node-version:
-          - 22.14.0
-          - 26.8.2
+        include:
+          - node-version: 22.14.0
+            node-label: "22"
+          - node-version: 26.8.2
+            node-label: "26.8.2"
 
     steps:
       - name: Checkout repository

@@ -19,16 +19,18 @@ concurrency:
 
 jobs:
   release-candidate:
-    name: Release candidate gate (Node ${{ matrix.node-version }})
+    name: Release candidate gate (Node ${{ matrix.node-label }})
     if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        node-version:
-          - 22.14.0
-          - 26.8.2
+        include:
+          - node-version: 22.14.0
+            node-label: "22"
+          - node-version: 26.8.2
+            node-label: "26.8.2"
     env:
       AOR_RELEASE_BRANCH: ${{ github.event.pull_request.head.ref || inputs.release_branch }}
       AOR_RELEASE_STRICT_BRANCH: "true"
