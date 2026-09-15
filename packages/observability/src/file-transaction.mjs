@@ -15,6 +15,16 @@ function readOwner(lockDirectory) {
   }
 }
 
+function ownerProcessAlive(owner) {
+  if (owner?.hostname !== os.hostname() || !Number.isInteger(owner?.pid) || owner.pid <= 0) return null;
+  try {
+    process.kill(owner.pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
 export function acquireFileLock(lockDirectory, options = {}) {
   const timeoutMs = options.timeoutMs ?? 10_000;
   const staleAfterMs = options.staleAfterMs ?? 60_000;
@@ -36,6 +46,7 @@ export function acquireFileLock(lockDirectory, options = {}) {
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
       const currentOwner = readOwner(lockDirectory);
+      const processAlive = ownerProcessAlive(currentOwner);
       let expiresAt = Date.parse(currentOwner?.expires_at ?? "");
       if (!Number.isFinite(expiresAt)) {
         try {
@@ -45,7 +56,7 @@ export function acquireFileLock(lockDirectory, options = {}) {
           throw statError;
         }
       }
-      if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+      if (processAlive === false || (Number.isFinite(expiresAt) && expiresAt < Date.now())) {
         try {
           const staleDirectory = `${lockDirectory}.stale-${crypto.randomUUID()}`;
           fs.renameSync(lockDirectory, staleDirectory);
@@ -56,7 +67,10 @@ export function acquireFileLock(lockDirectory, options = {}) {
         }
       }
       if (Date.now() - startedAt >= timeoutMs) {
-        const conflict = new Error(`Timed out acquiring lock '${lockDirectory}'.`);
+        const ownerDetails = currentOwner
+          ? ` Owner pid=${currentOwner.pid ?? "unknown"}, host=${currentOwner.hostname ?? "unknown"}, acquired_at=${currentOwner.acquired_at ?? "unknown"}, expires_at=${currentOwner.expires_at ?? "unknown"}.`
+          : " Owner metadata is unavailable.";
+        const conflict = new Error(`Timed out acquiring lock '${lockDirectory}' after ${timeoutMs}ms.${ownerDetails}`);
         conflict.code = "file-lock-timeout";
         conflict.lock_owner = currentOwner;
         throw conflict;
