@@ -91,7 +91,17 @@ test("adapter invocation executes one compatible fallback and records argv/model
       projectRoot: root,
       executionRoot: root,
     });
-    assert.equal(result.status, "passed");
+    assert.equal(
+      result.status,
+      "passed",
+      JSON.stringify({
+        summary: result.summary,
+        blocked_next_step: result.blockedNextStep,
+        adapter_status: result.adapterResponse?.status,
+        adapter_summary: result.adapterResponse?.summary,
+        adapter_output: result.adapterResponse?.output,
+      }, null, 2),
+    );
     assert.equal(result.adapterResponse.output.route_attempts.length, 2);
     assert.equal(result.adapterResponse.output.fallback_transitions.length, 1);
     assert.equal(result.adapterResponse.output.effective_model, "model-b");
