@@ -6,7 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { createControlPlaneHttpServer } from "../apps/api/src/index.mjs";
-import { requestRunJobCancel, startRunJob } from "../packages/orchestrator-core/src/run-job.mjs";
+import { startRunJob } from "../packages/orchestrator-core/src/run-job.mjs";
 import { withTempRepo } from "./test/helpers/temp-repo.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -151,13 +151,15 @@ const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: roo
     };
     const jobFile = startedJob.file;
     await waitForJob(jobFile, ["running"]);
-    requestRunJobCancel({ cwd: projectRoot, projectRef: projectRoot, runtimeRoot, runId });
     const cancelResponse = await postJson(
       `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
       { action: "cancel", run_id: runId, approval_ref: "approval://w58-runtime-quality-proof", reason: "deterministic cancellation proof" },
       transport.baseUrl,
     );
-    if (cancelResponse.status !== 200) throw new Error(`W58 cancel failed with HTTP ${cancelResponse.status}.`);
+    if (cancelResponse.status !== 200) {
+      const cancelBody = await cancelResponse.text();
+      throw new Error(`W58 cancel failed with HTTP ${cancelResponse.status}: ${cancelBody.slice(0, 500)}`);
+    }
     const cancelPayload = await cancelResponse.json();
     const publicCancellationStatus = cancelPayload.run_control?.state?.status;
     if (publicCancellationStatus !== "canceled") {
