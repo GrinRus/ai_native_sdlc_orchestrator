@@ -78,15 +78,25 @@ async function readOneSseEvent(url) {
   const response = await proofFetch("SSE replay", url, { signal: controller.signal });
   if (response.status !== 200 || !response.body) throw new Error(`SSE proof failed with HTTP ${response.status}.`);
   const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  const deadline = Date.now() + 3000;
   try {
-    const result = await Promise.race([
-      reader.read(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out waiting for W58 SSE replay.")), 3000)),
-    ]);
-    const text = new TextDecoder().decode(result.value);
-    const dataLine = text.split(/\r?\n/u).find((line) => line.startsWith("data:"));
-    if (!dataLine) throw new Error("W58 SSE replay did not contain a data record.");
-    return JSON.parse(dataLine.slice(5).trim());
+    while (Date.now() < deadline) {
+      const remainingMs = deadline - Date.now();
+      let timer;
+      const result = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Timed out waiting for W58 SSE replay.")), remainingMs);
+        }),
+      ]).finally(() => clearTimeout(timer));
+      if (result.done) break;
+      buffered += decoder.decode(result.value, { stream: true });
+      const dataLine = buffered.split(/\r?\n/u).find((line) => line.startsWith("data:"));
+      if (dataLine) return JSON.parse(dataLine.slice(5).trim());
+    }
+    throw new Error("W58 SSE replay did not contain a data record before the 3s deadline.");
   } finally {
     controller.abort();
     await reader.cancel().catch(() => {});
