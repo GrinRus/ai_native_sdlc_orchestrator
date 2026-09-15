@@ -8,6 +8,11 @@ without it, and the browser never owns lifecycle state or execution policy.
 
 ## Install and launch
 
+The installed alpha supports Node.js 22.x or 26.x
+(`>=22 <23 || >=26 <27`). npm may print a generic `EBADENGINE` warning before
+the package's own check runs; an unsupported runtime then fails with an
+actionable AOR message. Install a supported Node.js version before retrying.
+
 ```sh
 AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"
 npm install -g "@grinrus/aor@$AOR_VERSION"

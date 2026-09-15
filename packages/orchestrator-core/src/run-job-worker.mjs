@@ -14,6 +14,28 @@ let job = readRunJobFile(jobFile);
 if (!job || !claimToken || job.worker?.claim_token !== claimToken) process.exit(2);
 const fencingToken = job.worker.fencing_token;
 const leaseMs = 10_000;
+let child = null;
+let killTimer = null;
+let cancellationRequested = false;
+const signalGroup = (signal) => {
+  if (!child) return;
+  if (!signalProcessGroup(child.pid, signal)) {
+    try { child.kill(signal); } catch {}
+  }
+};
+const cancelChild = () => {
+  cancellationRequested = true;
+  if (!child) return;
+  signalGroup("SIGTERM");
+  if (!killTimer) {
+    killTimer = setTimeout(() => signalGroup("SIGKILL"), 1000);
+    killTimer.unref?.();
+  }
+};
+// The accepting process sends SIGUSR2 after durably recording canceling. This
+// avoids waiting for a polling tick and prevents a stale heartbeat from
+// racing the cancellation transition. Polling remains the recovery fallback.
+if (process.platform !== "win32") process.on("SIGUSR2", cancelChild);
 
 function recordWorkerFailure(error) {
   try {
@@ -55,7 +77,7 @@ job = updateRunJobFile(jobFile, {
 
 const request = job.worker_request;
 const cliBin = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../apps/cli/bin/aor.mjs");
-const child = spawn(process.execPath, [cliBin, ...request.args], {
+child = spawn(process.execPath, [cliBin, ...request.args], {
   cwd: request.cwd,
   detached: true,
   stdio: ["ignore", "pipe", "pipe"],
@@ -69,13 +91,8 @@ child.on("error", (error) => {
   process.exit(1);
 });
 
+if (cancellationRequested) cancelChild();
 let stopped = false;
-let killTimer = null;
-const signalGroup = (signal) => {
-  if (!signalProcessGroup(child.pid, signal)) {
-    try { child.kill(signal); } catch {}
-  }
-};
 const monitor = setInterval(() => {
   const current = readRunJobFile(jobFile);
   if (!current) return;
@@ -87,11 +104,7 @@ const monitor = setInterval(() => {
       runId: current.run_id,
     });
     if (current.status === "canceling" || control?.state?.status === "canceled") {
-      signalGroup("SIGTERM");
-      if (!killTimer) {
-        killTimer = setTimeout(() => signalGroup("SIGKILL"), 1000);
-        killTimer.unref?.();
-      }
+      cancelChild();
     } else if (control?.state?.status === "paused" && !stopped && process.platform !== "win32") {
       signalGroup("SIGSTOP");
       stopped = true;

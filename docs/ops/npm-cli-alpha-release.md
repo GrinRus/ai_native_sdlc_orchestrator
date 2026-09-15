@@ -160,11 +160,12 @@ publish reasons. Do not advance `latest` from automation until a stable channel
 exists; release automation must update only the `alpha` dist-tag.
 
 The workflow uses npm Trusted Publishing through GitHub OIDC. Do not add npm
-tokens or token fallback behavior. Release validation runs on pinned Node.js
-`22.14.0`; after the gate passes, the publish workflow switches to pinned Node.js
-`24.20.0`, whose bundled npm version satisfies the Trusted Publishing runtime
-requirement. This keeps the publish toolchain reproducible without an
-unpinned global npm installation.
+tokens or token fallback behavior. Release validation runs the full gate on
+pinned Node.js `22.14.0` and `26.8.2`; the merge-triggered publish workflow
+repeats the Node 26 compatibility gate before publishing. After those gates
+pass, it switches to pinned Node.js `24.20.0`, whose bundled npm version
+satisfies the Trusted Publishing runtime requirement. This keeps the publish
+toolchain reproducible without an unpinned global npm installation.
 
 ## External prerequisites
 

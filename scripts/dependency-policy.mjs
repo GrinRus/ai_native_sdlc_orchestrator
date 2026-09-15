@@ -4,6 +4,8 @@ import path from "node:path";
 import process from "node:process";
 import YAML from "yaml";
 
+import { SUPPORTED_NODE_ENGINE } from "../packages/orchestrator-core/src/node-runtime.mjs";
+
 const root = process.cwd();
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const lockfile = YAML.parse(fs.readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"));
@@ -19,8 +21,8 @@ for (const dependency of Object.keys(direct)) {
 if (Object.keys(packageJson.dependencies ?? {}).some((name) => name !== "yaml")) {
   findings.push("The root runtime dependency allowlist permits only yaml during W59.");
 }
-if (packageJson.engines?.node !== ">=22 <23") {
-  findings.push("package.json engines.node must remain the tested Node 22.x range >=22 <23.");
+if (packageJson.engines?.node !== SUPPORTED_NODE_ENGINE) {
+  findings.push(`package.json engines.node must remain the tested Node 22.x or 26.x range ${SUPPORTED_NODE_ENGINE}.`);
 }
 for (const scriptName of ["audit:all", "audit:prod:bulk"]) {
   if (typeof packageJson.scripts?.[scriptName] !== "string") findings.push(`package.json scripts.${scriptName} is required for dependency policy.`);

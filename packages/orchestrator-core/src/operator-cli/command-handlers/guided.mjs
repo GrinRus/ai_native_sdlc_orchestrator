@@ -2,6 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  isSupportedNodeVersion,
+  supportedNodeFamiliesLabel,
+  SUPPORTED_NODE_ENGINE,
+} from "../../node-runtime.mjs";
+
+import {
   initializeProjectRuntime,
   materializeIntakeArtifactPacket,
   normalizeDeliveryMode,
@@ -96,21 +102,21 @@ function resolveKpiFlags(value) {
  * @param {string} runtimeRoot
  * @returns {{ status: "ready" | "blocked", checks: Array<Record<string, unknown>>, blockers: Array<Record<string, string>> }}
  */
-function inspectReadiness(projectRoot, runtimeRoot) {
+export function inspectReadiness(projectRoot, runtimeRoot, nodeVersion = process.versions.node) {
   const checks = [];
   const blockers = [];
 
-  const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
+  const nodeSupported = isSupportedNodeVersion(nodeVersion);
   checks.push({
     check_id: "node-version",
-    status: nodeMajor >= 22 ? "pass" : "fail",
-    detail: `Node.js ${process.versions.node}`,
+    status: nodeSupported ? "pass" : "fail",
+    detail: `Node.js ${nodeVersion} (${nodeSupported ? "supported" : `unsupported; expected ${SUPPORTED_NODE_ENGINE}`})`,
   });
-  if (nodeMajor < 22) {
+  if (!nodeSupported) {
     blockers.push({
-      code: "node-version-too-old",
-      summary: "AOR requires Node.js 22 or newer.",
-      next_command: "Install Node.js 22+ and rerun aor doctor.",
+      code: "node-version-unsupported",
+      summary: `AOR requires Node.js ${supportedNodeFamiliesLabel()} (${SUPPORTED_NODE_ENGINE}).`,
+      next_command: "Install Node.js 22.x or 26.x and rerun aor doctor.",
     });
   }
 

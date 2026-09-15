@@ -235,9 +235,25 @@ export function startRunJob(options) {
 
 export function requestRunJobCancel(options) {
   const file = jobPath(initializeProjectRuntime(options).runtimeLayout, derivePublicId([options.runId, "job"], "job"));
+  const wakeWorker = (job) => {
+    const pid = Number(job?.worker?.pid);
+    if (process.platform === "win32" || !Number.isInteger(pid) || pid <= 0 || pid === process.pid) return;
+    try { process.kill(pid, "SIGUSR2"); } catch { /* polling remains the recovery path */ }
+  };
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const current = readRunJobFile(file); if (!current || TERMINAL_STATUSES.has(current.status) || current.status === "canceling") return current;
-    try { return updateRunJobFile(file, { status: "canceling" }, current.revision); } catch (error) { if (error?.code !== "run-job-revision-conflict" || attempt === 3) throw error; }
+    const current = readRunJobFile(file);
+    if (!current || TERMINAL_STATUSES.has(current.status)) return current;
+    if (current.status === "canceling") {
+      wakeWorker(current);
+      return current;
+    }
+    try {
+      const next = updateRunJobFile(file, { status: "canceling" }, current.revision);
+      wakeWorker(next);
+      return next;
+    } catch (error) {
+      if (error?.code !== "run-job-revision-conflict" || attempt === 3) throw error;
+    }
   }
 }
 

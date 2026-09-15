@@ -10,14 +10,14 @@
     "ratchet": "non-increasing"
   },
   "debt_metrics": {
-    "file_count": 321,
-    "total_lines": 115547,
-    "complexity_units": 24362,
-    "max_complexity": 1421,
+    "file_count": 323,
+    "total_lines": 115699,
+    "complexity_units": 24404,
+    "max_complexity": 1401,
     "long_function_count": 139,
-    "max_function_lines": 2667,
+    "max_function_lines": 2651,
     "max_nesting": 11,
-    "clone_windows": 1001,
+    "clone_windows": 1002,
     "dead_code_candidates": 0
   },
   "facade_functions": [

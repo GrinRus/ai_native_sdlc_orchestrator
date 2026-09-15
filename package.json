@@ -1,7 +1,7 @@
 {
   "name": "@grinrus/aor",
   "private": false,
-  "version": "0.1.0-alpha.22",
+  "version": "0.1.0-alpha.23",
   "description": "AI-native SDLC orchestrator CLI for bounded packets, evidence, reviews, and delivery decisions.",
   "keywords": [
     "ai",
@@ -66,9 +66,10 @@
   "homepage": "https://github.com/GrinRus/ai_native_sdlc_orchestrator#readme",
   "packageManager": "pnpm@10.12.4",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=22 <23 || >=26 <27"
   },
   "scripts": {
+    "preinstall": "node ./apps/cli/bin/check-node-runtime.mjs",
     "build": "node ./scripts/build.mjs",
     "web:build": "vite build --config apps/web/vite.config.mjs && node ./scripts/web-dist-freshness.mjs write",
     "test:web:browser": "playwright test --config apps/web/playwright.config.mjs",

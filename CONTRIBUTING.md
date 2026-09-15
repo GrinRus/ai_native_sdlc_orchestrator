@@ -56,9 +56,9 @@ remain under `docs/ops/`.
 
 ## Validation by change type
 
-Use Node.js 22.x (`>=22 <23`) and the pnpm version pinned in `package.json` when reproducing CI.
-The installed CLI's minimum Node requirement is not certification of every
-newer Node version for contributor tests.
+Use Node.js 22.x or 26.x (`>=22 <23 || >=26 <27`) and the pnpm version pinned
+in `package.json` when reproducing CI. Node.js 23.x–25.x are not certified
+runtime targets.
 
 Use the rows that match the changed surfaces. Start with deterministic checks,
 then focused tests, and finish with one `pnpm check` run for a commit-ready

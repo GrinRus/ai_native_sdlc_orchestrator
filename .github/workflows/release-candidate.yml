@@ -19,10 +19,16 @@ concurrency:
 
 jobs:
   release-candidate:
-    name: Release candidate gate
+    name: Release candidate gate (Node ${{ matrix.node-version }})
     if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v')
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 22.14.0
+          - 26.8.2
     env:
       AOR_RELEASE_BRANCH: ${{ github.event.pull_request.head.ref || inputs.release_branch }}
       AOR_RELEASE_STRICT_BRANCH: "true"
@@ -39,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
-          node-version: 22.14.0
+          node-version: ${{ matrix.node-version }}
           cache: pnpm
 
       - name: Install dependencies
