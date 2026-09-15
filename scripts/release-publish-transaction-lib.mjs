@@ -12,6 +12,15 @@ export function normalizeCapturedCommandOutput(result) {
   return output.length > 0 ? output : null;
 }
 
+export function isNpmStagingConflict(output) {
+  return typeof output === "string" && /Cannot publish over previously staged version/u.test(output);
+}
+
+export function npmPublicationPendingMessage({ packageName, version, timeoutMs }) {
+  const timeoutMinutes = Math.max(1, Math.round(timeoutMs / 60_000));
+  return `npm accepted ${packageName}@${version}, but the version is not visible in the public registry after ${timeoutMinutes} minutes. npm publish-time scanning can temporarily keep a version staged; wait for the scan to finish and rerun the same Release publish workflow. Do not bump or republish this immutable version.`;
+}
+
 function present(value) {
   return value !== null && value !== undefined && value !== "";
 }

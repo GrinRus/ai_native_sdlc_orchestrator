@@ -17,7 +17,9 @@ import {
 } from "../release-lib.mjs";
 import {
   classifyAlphaPublishState,
+  isNpmStagingConflict,
   normalizeCapturedCommandOutput,
+  npmPublicationPendingMessage,
   planAlphaPublishReconciliation,
   reconcileAlphaPublication,
 } from "../release-publish-transaction-lib.mjs";
@@ -390,6 +392,15 @@ test("publication inspection treats successful empty command output as an absent
   assert.equal(normalizeCapturedCommandOutput({ status: 0, stdout: "\n" }), null);
   assert.equal(normalizeCapturedCommandOutput({ status: 1, stdout: "unexpected" }), null);
   assert.equal(normalizeCapturedCommandOutput({ status: 0, stdout: "  value\n" }), "value");
+});
+
+test("npm staging diagnostics distinguish a temporary staged conflict from a hard publish failure", () => {
+  assert.equal(isNpmStagingConflict("npm error 409 Conflict - Cannot publish over previously staged version \\\"0.1.0-alpha.23\\\""), true);
+  assert.equal(isNpmStagingConflict("npm error 403 Forbidden"), false);
+  assert.match(
+    npmPublicationPendingMessage({ packageName: "@grinrus/aor", version: "0.1.0-alpha.23", timeoutMs: 900000 }),
+    /temporarily keep a version staged.*Do not bump/u,
+  );
 });
 
 test("alpha publication classifier covers absent, partial, complete, and conflict states", () => {

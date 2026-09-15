@@ -167,6 +167,14 @@ pass, it switches to pinned Node.js `24.20.0`, whose bundled npm version
 satisfies the Trusted Publishing runtime requirement. This keeps the publish
 toolchain reproducible without an unpinned global npm installation.
 
+npm may temporarily stage a newly published version while publish-time malware
+scanning completes. During that window `npm publish` can exit successfully while
+`npm view <package>@<version>` still returns 404; an immediate second publish can
+then return `409 Cannot publish over previously staged version`. The transaction
+waits up to 15 minutes for registry visibility and emits an explicit recovery
+message if the scan has not completed. Do not bump the immutable version or run a
+second publish command manually; wait and rerun the same workflow.
+
 ## External prerequisites
 
 Before the first publish, maintainers must configure:
@@ -195,6 +203,10 @@ classifies the remote state before mutation:
   normal npm authentication, then rerun the workflow;
 - `complete` performs no publication and only removes a retained release branch;
 - `conflict` stops before mutation and retains the branch for investigation.
+
+Do not pass a merge command's automatic branch-delete option. The publish
+transaction owns release-branch cleanup after all four surfaces are verified;
+cleanup is idempotent if a hosting UI has already removed the branch.
 
 Before retrying a conflict, capture the tag target SHA, GitHub Release JSON,
 published npm version, `alpha` dist-tag, merge commit, and failed workflow URL.

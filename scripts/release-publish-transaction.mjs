@@ -3,7 +3,22 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 
 import { RELEASE_PACKAGE_NAME } from "./release-lib.mjs";
-import { normalizeCapturedCommandOutput, reconcileAlphaPublication } from "./release-publish-transaction-lib.mjs";
+import {
+  isNpmStagingConflict,
+  normalizeCapturedCommandOutput,
+  npmPublicationPendingMessage,
+  reconcileAlphaPublication,
+} from "./release-publish-transaction-lib.mjs";
+
+const NPM_VISIBILITY_TIMEOUT_MS = Number.parseInt(process.env.AOR_NPM_VISIBILITY_TIMEOUT_MS ?? "900000", 10);
+const NPM_VISIBILITY_POLL_MS = Number.parseInt(process.env.AOR_NPM_VISIBILITY_POLL_MS ?? "15000", 10);
+
+function boundedPositiveNumber(value, fallback) {
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
+const npmVisibilityTimeoutMs = boundedPositiveNumber(NPM_VISIBILITY_TIMEOUT_MS, 900000);
+const npmVisibilityPollMs = boundedPositiveNumber(NPM_VISIBILITY_POLL_MS, 15000);
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -66,6 +81,56 @@ async function inspect() {
   };
 }
 
+function commandOutput(result) {
+  return [result?.stdout, result?.stderr]
+    .filter((value) => typeof value === "string" && value.length > 0)
+    .join("\n");
+}
+
+function npmVersionLookup() {
+  const result = run("npm", ["view", `${RELEASE_PACKAGE_NAME}@${version}`, "version"], {
+    capture: true,
+    allowFailure: true,
+  });
+  if (result.status === 0) return normalizeCapturedCommandOutput(result) === version;
+  const diagnostics = commandOutput(result);
+  if (/E404|No match found for version/u.test(diagnostics)) return false;
+  throw new Error(`Unable to inspect npm registry for ${RELEASE_PACKAGE_NAME}@${version}.\n${diagnostics.trim()}`);
+}
+
+async function waitForNpmVisibility() {
+  const deadline = Date.now() + npmVisibilityTimeoutMs;
+  while (true) {
+    if (npmVersionLookup()) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, npmVisibilityPollMs));
+  }
+}
+
+async function publishNpm() {
+  const result = run("npm", ["publish", "--access", "public", "--tag", "alpha", "--provenance"], {
+    capture: true,
+    allowFailure: true,
+  });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+
+  const captured = commandOutput(result);
+  const stagedConflict = isNpmStagingConflict(captured);
+  if (result.status !== 0 && !stagedConflict) {
+    throw new Error(`npm publish failed with exit code ${result.status ?? "unknown"}.\n${captured.trim()}`);
+  }
+
+  process.stdout.write(`[AOR] Waiting for ${RELEASE_PACKAGE_NAME}@${version} to become visible in npm registry...\n`);
+  if (await waitForNpmVisibility()) return;
+
+  throw new Error(npmPublicationPendingMessage({
+    packageName: RELEASE_PACKAGE_NAME,
+    version,
+    timeoutMs: npmVisibilityTimeoutMs,
+  }));
+}
+
 async function execute(operation) {
   if (operation === "create-tag") {
     run("git", ["config", "user.name", "github-actions[bot]"]);
@@ -85,7 +150,7 @@ async function execute(operation) {
     return;
   }
   if (operation === "publish-npm") {
-    run("npm", ["publish", "--access", "public", "--tag", "alpha", "--provenance"]);
+    await publishNpm();
     return;
   }
   if (operation === "set-alpha-dist-tag") {
@@ -93,6 +158,18 @@ async function execute(operation) {
     return;
   }
   if (operation === "delete-release-branch") {
+    const branchLookup = run("git", ["ls-remote", "--heads", "origin", `refs/heads/${releaseBranch}`], {
+      capture: true,
+      allowFailure: true,
+    });
+    if (branchLookup.status !== 0) {
+      throw new Error(`Unable to inspect release branch ${releaseBranch} before cleanup.\n${commandOutput(branchLookup).trim()}`);
+    }
+    const remoteBranch = normalizeCapturedCommandOutput(branchLookup);
+    if (!remoteBranch) {
+      process.stdout.write(`[AOR] Release branch ${releaseBranch} is already absent; cleanup is complete.\n`);
+      return;
+    }
     run("git", ["push", "origin", "--delete", releaseBranch]);
     return;
   }
