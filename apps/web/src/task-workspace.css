@@ -260,7 +260,8 @@
 .task-runner-card strong { display: block; margin-bottom: 7px; font-size: 1.06rem; }
 .task-runner-card .task-readiness { margin: 0; justify-self: start; }
 .task-runner-card__check { display: inline-grid; width: 24px; height: 24px; place-items: center; border: 2px solid currentColor; border-radius: 50%; color: var(--aor-task-success-fg); font-weight: 800; }
-.task-change-runner { width: 100%; min-height: 43px; margin-top: 27px; border: 1px solid var(--task-line); border-radius: 5px; background: var(--task-surface); color: var(--task-ink); }
+.task-change-runner { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 43px; margin-top: 27px; padding: 0 12px; border: 1px solid var(--task-line); border-radius: 5px; background: var(--task-surface); color: var(--task-ink); font: inherit; text-align: left; }
+.task-change-runner select { min-width: 0; margin-left: 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: right; }
 .task-runner-details { display: grid; gap: 0; margin: 21px 0 0; }
 .task-runner-details > div { display: flex; justify-content: space-between; gap: 15px; padding: 14px 0; }
 .task-runner-details dt { color: var(--task-ink); }
@@ -308,7 +309,8 @@
 .task-attention-task { display: flex; align-items: center; gap: 10px; margin: 0; }
 .task-warning-callout { margin-top: 24px; padding: 17px 18px; border: 1px solid var(--aor-task-warning-callout-border); border-radius: 6px; background: var(--task-warning-soft); }
 .task-bullet-list, .task-check-list { display: grid; gap: 13px; margin: 0; padding: 0; list-style: none; }
-.task-bullet-list li { display: flex; gap: 12px; align-items: baseline; }
+.task-bullet-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.task-bullet-list li > strong, .task-bullet-list li > code, .task-bullet-list li > span { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
 .task-bullet-list li::before { content: "•"; color: var(--task-teal); font-size: 1.5rem; }
 .task-attention-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
 .task-attention-evidence { display: grid; gap: 8px; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--task-line); color: var(--task-muted); }

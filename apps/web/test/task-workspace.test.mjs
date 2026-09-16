@@ -38,6 +38,10 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /pendingSource/u);
   assert.match(source, /Digest:/u);
   assert.match(source, /aria-modal="true"/u);
+  assert.match(source, /approvedRunnerOptions/u);
+  assert.match(source, /onSelectRunner/u);
+  assert.match(source, /No approved execution route is published/u);
+  assert.match(source, /item\.message \|\| item\.consequence/u);
 });
 
 test("web client reads bounded Task review evidence separately from the Task list", () => {
@@ -47,6 +51,8 @@ test("web client reads bounded Task review evidence separately from the Task lis
   assert.match(source, /loadTaskReview=\{loadTaskReview\}/u);
   assert.match(source, /async function reviewTask/u);
   assert.match(source, /review decide/u);
+  assert.match(source, /execution-profile/u);
+  assert.match(source, /expected_revision: executionProfile\.revision/u);
 });
 
 test("Task Workspace owns the full viewport without legacy project-settings chrome", () => {

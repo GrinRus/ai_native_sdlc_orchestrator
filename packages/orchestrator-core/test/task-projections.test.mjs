@@ -111,6 +111,11 @@ test("intent submissions project into draft, prepared, and attention Task states
         updated_at: "2026-08-13T10:02:00.000Z",
         attachments: [],
         normalization_refs: [],
+        blocker: {
+          code: "intent_provider.not_ready",
+          message: "Configure and authenticate an approved runner before preparing this task.",
+          recovery_action: "Choose an approved route and retry preparation.",
+        },
       },
       normalization: null,
     },
@@ -122,6 +127,11 @@ test("intent submissions project into draft, prepared, and attention Task states
   assert.equal(projection.tasks[1].primary_action.action_id, "start");
   assert.equal(projection.tasks[1].primary_action.operator_control, "Start task");
   assert.equal(projection.tasks[2].runner_selection.readiness, "blocked");
+  assert.equal(projection.tasks[2].attention_items[0].code, "intent_provider.not_ready");
+  assert.equal(projection.tasks[2].attention_items[0].message, "Configure and authenticate an approved runner before preparing this task.");
+  assert.equal(projection.tasks[2].attention_items[0].recovery_action, "Choose an approved route and retry preparation.");
+  assert.equal(projection.tasks[2].primary_action.reason, "Configure and authenticate an approved runner before preparing this task.");
+  assert.equal(projection.tasks[2].runner_selection.unavailable_reason, "Configure and authenticate an approved runner before preparing this task.");
   const repositorySource = projection.tasks[1].source_items.find((source) => source.kind === "repository-markdown");
   assert.equal(repositorySource.stale, true);
 });

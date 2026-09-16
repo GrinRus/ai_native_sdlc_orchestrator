@@ -6,11 +6,12 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../dist");
 const port = Number(process.env.AOR_LIVE_UI_PORT || 4173);
 const projectId = "project-live";
+let selectedRunnerRoute = "route.implement.simulation";
 
 const runner = {
   schema_version: 1,
   source: "project-default",
-  route_id: "route.implement.simulation",
+  route_id: selectedRunnerRoute,
   readiness: "ready",
   requested_model: "gpt-5",
   effective_model: "gpt-5",
@@ -53,6 +54,26 @@ const tasks = [
   { ...taskBase, task_id: "task.live-ui.draft", display_title: "Draft authentication task", status: "draft", status_detail: "Draft", current_step: "prepare", current_step_label: "Prepare" },
   { ...taskBase, task_id: "task.live-ui.completed", display_title: "Update auth timeout docs", status: "completed", status_detail: "Completed", current_step: "complete", current_step_label: "Complete", completed_read_only: true },
 ];
+
+function executionProfile() {
+  return {
+    profile_id: `execution-profile.${projectId}`,
+    project_id: projectId,
+    revision: 3,
+    initialized: true,
+    routes: [{
+      ...runner,
+      route_id: selectedRunnerRoute,
+      step: "implement",
+      approved_routes: [
+        { route_id: "route.implement.default", mode: "live", provider: "openai", requested_model: "coding-primary", requested_reasoning_effort: "high" },
+        { route_id: "route.implement.simulation", mode: "simulation", provider: "none", requested_model: "gpt-5", requested_reasoning_effort: "high" },
+      ],
+    }],
+    latest_readiness_ref: null,
+    read_only: true,
+  };
+}
 
 const review = {
   schema_version: 1,
@@ -111,6 +132,17 @@ const json = (response, status, body) => {
   response.end(JSON.stringify(body));
 };
 
+function collectBody(request, callback) {
+  let raw = "";
+  request.setEncoding("utf8");
+  request.on("data", (chunk) => { raw += chunk; });
+  request.on("end", () => {
+    let payload = {};
+    try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = {}; }
+    callback(payload);
+  });
+}
+
 function routeApi(request, response) {
   const url = new URL(request.url, "http://127.0.0.1");
   if (url.pathname === "/app-config.json") return json(response, 200, { version: "live-ui-fixture", project_id: projectId, default_project_id: projectId, projects: [{ project_id: projectId, label: "Project Atlas", display_name: "Project Atlas", project_root: "/tmp/aor-live-ui", onboarding_summary: { initialized: true, state_exists: true } }] });
@@ -136,7 +168,13 @@ function routeApi(request, response) {
   if (suffix === "/delivery-manifests") return json(response, 200, { items: [] });
   if (suffix === "/operator-requests") return json(response, 200, { requests: [] });
   if (suffix === "/topology") return json(response, 200, { project_id: projectId, components: [], read_only: true });
-  if (suffix === "/execution-profile") return json(response, 200, { project_id: projectId, readiness: "ready", route_id: runner.route_id, read_only: true });
+  if (suffix === "/execution-profile" && request.method === "GET") return json(response, 200, executionProfile());
+  if (suffix === "/execution-profile/actions" && request.method === "POST") {
+    return collectBody(request, (payload) => {
+      if (payload?.action === "select" && payload?.route_id) selectedRunnerRoute = payload.route_id;
+      return json(response, 200, { execution_profile: executionProfile() });
+    });
+  }
   return json(response, 404, { code: "not_found", detail: "Fixture route not found." });
 }
 

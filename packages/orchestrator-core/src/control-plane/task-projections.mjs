@@ -132,6 +132,23 @@ function taskAttentionItems(flow) {
   }));
 }
 
+function intentAttentionItem(submission, submissionId) {
+  const blocker = submission?.blocker && typeof submission.blocker === "object" && !Array.isArray(submission.blocker)
+    ? submission.blocker
+    : {};
+  const message = asString(blocker.message) ?? "Intent preparation is blocked.";
+  const code = asString(blocker.code);
+  return {
+    item_id: `${submissionId}.attention.1`,
+    consequence: message,
+    ...(code ? { code } : {}),
+    message,
+    recovery_action: asString(blocker.recovery_action) ?? "Configure an approved runner and retry preparation.",
+    state: "needs-attention",
+    evidence_refs: asStringArray(submission.normalization_refs),
+  };
+}
+
 function taskReviewProjection(flow) {
   const closure = flow.closure_state ?? {};
   const status = asString(closure.review_status) ?? (flow.status === "completed" ? "unknown" : "pending");
@@ -244,6 +261,7 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
   const selection = approvedExecutionSelection({ executionProfile, workType: asString(normalization.work_type) });
   const prepared = preparedContract({ normalization, executionProfile, workType: asString(normalization.work_type), scope: normalization.scope, deliveryMode: asString(normalization.delivery_mode), status, });
   const startAvailable = status === "prepared" && Boolean(selection.route_id) && selection.readiness === "ready";
+  const attentionItem = status === "attention" ? intentAttentionItem(submission, submissionId) : null;
   return {
     schema_version: 1,
     task_id: taskId(projectId, `intent.${submissionId}`),
@@ -265,7 +283,7 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
       run_ids: [],
     },
     source_items: sourceItems,
-    attention_items: status === "attention" ? [{ item_id: `${submissionId}.attention.1`, consequence: "Intent preparation is blocked.", state: "needs-attention", evidence_refs: asStringArray(submission.normalization_refs) }] : [],
+    attention_items: attentionItem ? [attentionItem] : [],
     review: { status: status === "prepared" ? "pending" : "not-ready", verification_status: "unknown", delivery_status: "unknown", changed_paths: [], evidence_refs: asStringArray(submission.normalization_refs), read_only: true },
     completion: { status: "incomplete", immutable: false, verification_status: "unknown", delivery_status: "unknown", evidence_refs: asStringArray(submission.normalization_refs), follow_up_eligible: false },
     revision: Number.isInteger(normalization.revision) ? normalization.revision : null,
@@ -284,7 +302,7 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
       operator_control: status === "prepared" ? "Start task" : "Resume task preparation",
       reason: status === "prepared"
         ? (startAvailable ? "Prepared task is ready for revision-checked start." : selection.unavailable_reason)
-        : status === "attention" ? "Resolve the recorded preparation blocker." : "Continue the intent-first task flow.",
+        : status === "attention" ? attentionItem.message : "Continue the intent-first task flow.",
       available: status === "prepared" ? startAvailable : true,
     }, status),
     runner_selection: {
@@ -292,8 +310,8 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
       source: "project-default",
       ...selection,
       readiness: status === "attention" ? "blocked" : selection.readiness,
-      unavailable_reason: status === "attention" ? "Intent preparation is blocked." : selection.unavailable_reason,
-      recovery_action: status === "attention" ? "Revise or retry the intent preparation." : selection.recovery_action,
+      unavailable_reason: status === "attention" ? attentionItem.message : selection.unavailable_reason,
+      recovery_action: status === "attention" ? attentionItem.recovery_action : selection.recovery_action,
     },
     prepared_contract: prepared,
     updated_at: asString(submission.updated_at) ?? asString(submission.created_at),

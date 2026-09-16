@@ -129,7 +129,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     { ...base, task_id: `${base.task_id}.upload`, display_title: "Uploaded Markdown", status: "prepared", source_items: [{ schema_version: 1, source_id: "source.upload", kind: "upload-snapshot", immutable: true, stale: false, digest: "b".repeat(64), preview: { filename: "notes.md", media_type: "text/markdown", byte_length: 12 } }] },
     { ...base, task_id: `${base.task_id}.repository`, display_title: "Repository Markdown", status: "prepared", source_items: [{ schema_version: 1, source_id: "source.repository", kind: "repository-markdown", immutable: true, stale: false, digest: "c".repeat(64), preview: { project_relative_path: "docs/task.md", pinned_base_revision: "abc123", sanitized_markdown: "# Repository source" } }] },
     { ...base, task_id: `${base.task_id}.stale`, display_title: "Stale source", status: "attention", status_detail: "blocked", attention_count: 1, blocker_count: 1, source_items: [{ schema_version: 1, source_id: "source.stale", kind: "repository-markdown", immutable: true, stale: true, digest: "d".repeat(64), preview: { project_relative_path: "docs/stale.md", pinned_base_revision: "def456", sanitized_markdown: "# Stale source" } }] },
-    { ...base, task_id: `${base.task_id}.unavailable`, display_title: "Unavailable runner", status: "attention", status_detail: "blocked", attention_count: 1, blocker_count: 1, runner_selection: { ...base.runner_selection, readiness: "unavailable", unavailable_reason: "Approved route is unavailable in this local fixture.", recovery_action: "Choose another approved route." } },
+    { ...base, task_id: `${base.task_id}.unavailable`, display_title: "Unavailable runner", status: "attention", status_detail: "blocked", attention_count: 1, blocker_count: 1, primary_action: { ...base.primary_action, action_id: "retry", operator_control: "Retry preparation", reason: "Configure and authenticate an approved runner before preparing this task.", available: true }, attention_items: [{ item_id: "blocker.unavailable", code: "intent_provider.not_ready", message: "Configure and authenticate an approved runner before preparing this task.", consequence: "Configure and authenticate an approved runner before preparing this task.", recovery_action: "Choose another approved route." }], runner_selection: { ...base.runner_selection, readiness: "unavailable", unavailable_reason: "Approved route is unavailable in this local fixture.", recovery_action: "Choose another approved route." } },
     { ...base, task_id: `${base.task_id}.failure`, display_title: "Failed task", status: "attention", status_detail: "failed", attention_count: 1, blocker_count: 1 },
     { ...base, task_id: `${base.task_id}.review`, display_title: "Review task", status: "active", review: { verification_status: "pass", delivery_status: "pending", changed_paths: ["docs/task.md"], evidence_refs: ["evidence://review"] } },
     { ...base, task_id: `${base.task_id}.completed`, display_title: "Completed task", status: "completed", status_detail: "completed", completed_read_only: true, completion: { status: "blocked", verification_status: "partial", delivery_status: "pending", evidence_refs: ["evidence://partial"], follow_up_eligible: true } },
@@ -159,6 +159,8 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   }
   await page.getByRole("button", { name: "Unavailable runner" }).click();
   await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
+  await expect(page.locator(".task-bullet-list")).toContainText("Configure and authenticate an approved runner before preparing this task.");
+  await expect(page.locator(".task-bullet-list")).toContainText("intent_provider.not_ready");
   await captureMobileEvidence(page, testInfo, "w70-mobile-attention-390x844", "06-attention-390x844.png");
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
@@ -319,7 +321,35 @@ test("Task Workspace creates a server-owned prepared Task before exposing Start"
   let tasks = [];
   let submissionPayload = null;
   let actionPayload = null;
+  let profileActionPayload = null;
+  let selectedRouteId = "route.implement.simulation";
+  const executionProfile = () => ({
+    profile_id: `execution-profile.${state.project_id}`,
+    project_id: state.project_id,
+    revision: 3,
+    initialized: true,
+    routes: [{
+      step: "implement",
+      route_id: selectedRouteId,
+      readiness: "ready",
+      requested_model: "coding-primary",
+      effective_model: "coding-primary",
+      requested_reasoning_effort: "high",
+      effective_reasoning_effort: "high",
+      approved_routes: [
+        { route_id: "route.implement.default", mode: "live", provider: "openai", requested_model: "coding-primary", requested_reasoning_effort: "high" },
+        { route_id: "route.implement.simulation", mode: "simulation", provider: "none", requested_model: "gpt-5", requested_reasoning_effort: "high" },
+      ],
+    }],
+    read_only: true,
+  });
   await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", onboarding_summary: { initialized: true, state_exists: true } }) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/execution-profile$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(executionProfile()) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/execution-profile/actions$`, "u"), async (route) => {
+    profileActionPayload = route.request().postDataJSON();
+    selectedRouteId = profileActionPayload.route_id;
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ execution_profile: executionProfile() }) });
+  });
   await page.route(new RegExp(`/api/projects/${state.project_id}/tasks(?:\\?.*)?$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, selected_task_id: tasks[0]?.task_id ?? null, tasks, read_only: true }) }));
   await page.route(new RegExp(`/api/projects/${state.project_id}/intent-submissions$`, "u"), async (route) => {
     if (route.request().method() === "POST") {
@@ -339,6 +369,11 @@ test("Task Workspace creates a server-owned prepared Task before exposing Start"
   await page.goto(state.app_url);
   await expect(page.locator(".task-workspace__breadcrumb h1")).toHaveText("Tasks");
   await page.getByRole("button", { name: "New task", exact: true }).click();
+  const runnerSelect = page.locator('select[aria-label="Runner"]');
+  await expect(runnerSelect).toBeEnabled();
+  await runnerSelect.selectOption("route.implement.default");
+  await expect(runnerSelect).toHaveValue("route.implement.default");
+  expect(profileActionPayload).toEqual({ action: "select", step: "implement", route_id: "route.implement.default", expected_revision: 3 });
   await page.getByLabel("Task outcome").fill("Make the task creation path durable.");
   await page.getByRole("button", { name: "Prepare task", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Prepared Task", exact: true })).toBeVisible();

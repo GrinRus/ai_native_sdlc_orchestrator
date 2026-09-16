@@ -75,6 +75,7 @@ function TaskApp() {
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState(initialLocation.projectId);
   const [tasks, setTasks] = useState([]);
+  const [executionProfile, setExecutionProfile] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(initialLocation.taskId);
   const [connectionState, setConnectionState] = useState("loading");
   const [resourceError, setResourceError] = useState(null);
@@ -112,6 +113,7 @@ function TaskApp() {
       setActiveProjectId(nextProjectId);
       if (!nextProjectId) {
         setTasks([]);
+        setExecutionProfile(null);
         setConnectionState("connected");
         setLoaded(true);
         writeTaskLocation();
@@ -119,10 +121,15 @@ function TaskApp() {
       }
 
       const base = `/api/projects/${encodeURIComponent(nextProjectId)}`;
-      const [stateResult, taskResult] = await Promise.allSettled([readJson(`${base}/state`), readJson(`${base}/tasks`)]);
+      const [stateResult, taskResult, executionProfileResult] = await Promise.allSettled([
+        readJson(`${base}/state`),
+        readJson(`${base}/tasks`),
+        readJson(`${base}/execution-profile`),
+      ]);
       const taskPayload = taskResult.status === "fulfilled" ? taskResult.value : { tasks: [] };
       const nextTasks = Array.isArray(taskPayload.tasks) ? taskPayload.tasks : [];
       const state = stateResult.status === "fulfilled" ? stateResult.value : null;
+      setExecutionProfile(executionProfileResult.status === "fulfilled" ? executionProfileResult.value : null);
       setProjects((current) => current.map((project) => project.project_id === nextProjectId && state?.onboarding_summary
         ? { ...project, onboarding_summary: state.onboarding_summary }
         : project));
@@ -212,6 +219,24 @@ function TaskApp() {
     return readJson(`${apiProjectBase}/tasks/${encodeURIComponent(taskId)}/review${query}`);
   }
 
+  async function selectRunner(step, routeId) {
+    if (!apiProjectBase || !executionProfile || !Number.isInteger(executionProfile.revision) || !step || !routeId || busy) return null;
+    setBusy(true); setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action: "select", step, route_id: routeId, expected_revision: executionProfile.revision }),
+      });
+      if (result?.execution_profile) setExecutionProfile(result.execution_profile);
+      await refresh({ silent: true });
+      return result;
+    } catch (selectionError) {
+      setError(selectionError instanceof Error ? selectionError.message : String(selectionError));
+      return null;
+    } finally { setBusy(false); }
+  }
+
   async function selectProject(projectId) {
     setProjectDialogOpen(false); setSelectedTaskId(null); setTasks([]);
     await refresh({ projectId, keepSelection: false });
@@ -254,7 +279,7 @@ function TaskApp() {
   if (!activeProject) return <><EmptyWorkspace onOpenProject={() => setProjectDialogOpen(true)} error={error} onRetry={() => void refresh()} />{projectDialog}</>;
 
   return <div className="task-app" data-app-surface="task-workspace">
-    <TaskWorkspace project={activeProject} tasks={tasks} selectedTaskId={selectedTaskId} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
+    <TaskWorkspace project={activeProject} tasks={tasks} selectedTaskId={selectedTaskId} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} executionProfile={executionProfile} onSelectRunner={selectRunner} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
     {projectDialog}
   </div>;
 }

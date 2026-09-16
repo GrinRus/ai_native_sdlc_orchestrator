@@ -500,8 +500,9 @@ function isProviderRunControlInterrupted(runControlState) {
 
 /**
  * @param {Record<string, unknown>} providerStepStatus
+ * @param {Array<Record<string, unknown>>} providerProgressEvents
  */
-function markProviderRunControlInterrupted(providerStepStatus) {
+function markProviderRunControlInterrupted(providerStepStatus, providerProgressEvents = []) {
   const stateFile = asOptionalString(providerStepStatus.state_file);
   if (!stateFile) {
     return;
@@ -509,8 +510,19 @@ function markProviderRunControlInterrupted(providerStepStatus) {
   const nowIso = new Date().toISOString();
   const state = readProviderRunControlState(providerStepStatus);
   const previous = asRecord(state.provider_step_status);
+  const latestProgress = Array.isArray(providerProgressEvents) && providerProgressEvents.length > 0
+    ? asRecord(providerProgressEvents.at(-1))
+    : {};
   state.provider_step_status = {
     ...previous,
+    ...(Object.keys(latestProgress).length > 0
+      ? {
+          last_progress_at: asOptionalString(latestProgress.observed_at) || asOptionalString(previous.last_progress_at) || null,
+          last_progress_kind: asOptionalString(latestProgress.kind) || asOptionalString(previous.last_progress_kind) || null,
+          last_progress_label: asOptionalString(latestProgress.label) || asOptionalString(previous.last_progress_label) || null,
+          progress_event_count: providerProgressEvents.length,
+        }
+      : {}),
     status: "interrupted",
     interruption_owner: asOptionalString(previous.interruption_owner) || "operator",
     interruption_reason:
@@ -3375,9 +3387,6 @@ export function createLiveAdapter(options) {
       const durableProviderRunControlState = readProviderRunControlState(asRecord(envelope.provider_step_status));
       const invocationInterrupted =
         invocationError?.code === "EINTERRUPTED" || isProviderRunControlInterrupted(durableProviderRunControlState);
-      if (invocationInterrupted) {
-        markProviderRunControlInterrupted(asRecord(envelope.provider_step_status));
-      }
       const sessionBudgetReport =
         invocation.sessionBudget && Object.keys(asRecord(invocation.sessionBudget)).length > 0
           ? asRecord(invocation.sessionBudget)
@@ -3395,6 +3404,9 @@ export function createLiveAdapter(options) {
       const providerProgressEvents = Array.isArray(invocation.providerProgressEvents)
         ? invocation.providerProgressEvents.map((event) => asRecord(event))
         : [];
+      if (invocationInterrupted) {
+        markProviderRunControlInterrupted(asRecord(envelope.provider_step_status), providerProgressEvents);
+      }
       const malformedProviderToolCallSummary = summarizeProviderMalformedToolCallError(
         stdout,
         stderr,
