@@ -28,6 +28,7 @@ function ownerProcessAlive(owner) {
 export function acquireFileLock(lockDirectory, options = {}) {
   const timeoutMs = options.timeoutMs ?? 10_000;
   const staleAfterMs = options.staleAfterMs ?? 60_000;
+  const deadOwnerGraceMs = options.deadOwnerGraceMs ?? 1_000;
   const retryMs = options.retryMs ?? 5;
   const startedAt = Date.now();
   const owner = {
@@ -56,8 +57,26 @@ export function acquireFileLock(lockDirectory, options = {}) {
           throw statError;
         }
       }
-      if (processAlive === false || (Number.isFinite(expiresAt) && expiresAt < Date.now())) {
+      const now = Date.now();
+      const acquiredAt = Date.parse(currentOwner?.acquired_at ?? "");
+      const ownerAgeMs = Number.isFinite(acquiredAt) ? now - acquiredAt : Number.POSITIVE_INFINITY;
+      const impossibleOwnerPid = Number.isInteger(currentOwner?.pid) && currentOwner.pid > 10_000_000;
+      const deadOwnerGraceElapsed = ownerAgeMs >= deadOwnerGraceMs || impossibleOwnerPid;
+      if ((processAlive === false && deadOwnerGraceElapsed) || (Number.isFinite(expiresAt) && expiresAt < now)) {
         try {
+          // Re-read the owner immediately before reclaiming so a lock released and
+          // reacquired between checks cannot be stolen by a waiter.
+          const latestOwner = readOwner(lockDirectory);
+          if (currentOwner?.lock_id && latestOwner?.lock_id !== currentOwner.lock_id) continue;
+          const latestAlive = ownerProcessAlive(latestOwner);
+          const latestAcquiredAt = Date.parse(latestOwner?.acquired_at ?? "");
+          const latestOwnerAgeMs = Number.isFinite(latestAcquiredAt) ? now - latestAcquiredAt : Number.POSITIVE_INFINITY;
+          const latestImpossiblePid = Number.isInteger(latestOwner?.pid) && latestOwner.pid > 10_000_000;
+          const latestExpiresAt = Date.parse(latestOwner?.expires_at ?? "");
+          const latestExpiredAt = Number.isFinite(latestExpiresAt) ? latestExpiresAt : expiresAt;
+          const latestExpired = Number.isFinite(latestExpiredAt) && latestExpiredAt < now;
+          const latestDead = latestAlive === false && (latestOwnerAgeMs >= deadOwnerGraceMs || latestImpossiblePid);
+          if (!latestDead && !latestExpired) continue;
           const staleDirectory = `${lockDirectory}.stale-${crypto.randomUUID()}`;
           fs.renameSync(lockDirectory, staleDirectory);
           fs.rmSync(staleDirectory, { recursive: true, force: true });
