@@ -3096,6 +3096,34 @@ test("provider-pinned route materialization honors profile step timeout override
   });
 });
 
+test("provider-pinned external routes preserve runner-native model defaults", () => {
+  withTempRoot((tempRoot) => {
+    const routesRoot = path.join(tempRoot, "routes");
+    fs.cpSync(path.join(repoRoot, "examples/routes"), routesRoot, { recursive: true });
+
+    materializeProviderPinnedRouteOverrides({
+      routesRoot,
+      providerVariant: {
+        provider: "anthropic",
+        primary_adapter: "claude-code",
+        route_override_policy: { steps: ["implement"] },
+      },
+      providerVariantId: "anthropic-primary",
+      profile: { live_e2e: {} },
+    });
+
+    const implementRoute = loadContractFile({
+      filePath: path.join(routesRoot, "implement-anthropic-primary.yaml"),
+      family: "provider-route-profile",
+    });
+    assert.equal(implementRoute.ok, true);
+    assert.equal(implementRoute.document.primary.adapter, "claude-code");
+    assert.equal(implementRoute.document.primary.provider, "anthropic");
+    assert.equal(implementRoute.document.primary.model, undefined);
+    assert.equal(implementRoute.document.primary.reasoning_effort, undefined);
+  });
+});
+
 test("provider-pinned policy materialization honors bounded retry and repair overrides", () => {
   withTempRoot((tempRoot) => {
     const policiesRoot = path.join(tempRoot, "policies");
