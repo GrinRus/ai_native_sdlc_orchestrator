@@ -88,10 +88,7 @@ function TaskApp() {
 
   const activeProject = useMemo(() => projects.find((project) => project.project_id === activeProjectId) ?? null, [activeProjectId, projects]);
   const apiProjectBase = activeProjectId ? `/api/projects/${encodeURIComponent(activeProjectId)}` : null;
-  const liveRunId = useMemo(() => {
-    const activeTask = tasks.find((task) => ["active", "running"].includes(task.status));
-    return activeTask?.run_ids?.[0] ?? null;
-  }, [tasks]);
+  const liveRunIds = useMemo(() => [...new Set(tasks.filter((task) => ["active", "running"].includes(task.status)).flatMap((task) => task.run_ids || []).filter(Boolean))], [tasks]);
 
   const refresh = useCallback(async ({ projectId = null, silent = false, keepSelection = true } = {}) => {
     if (!silent) setConnectionState("loading");
@@ -138,7 +135,7 @@ function TaskApp() {
       setResourceError(taskResult.status === "rejected" ? taskResult.reason : null);
       if (taskResult.status === "rejected") setError(taskResult.reason instanceof Error ? taskResult.reason.message : String(taskResult.reason));
       const taskId = keepSelection && nextTasks.some((task) => task.task_id === selectedTaskId) ? selectedTaskId : null;
-      if (!taskId && !keepSelection) setSelectedTaskId(null);
+      setSelectedTaskId(taskId);
       writeTaskLocation({ projectId: nextProjectId, taskId });
       setLoaded(true);
       return { tasks: nextTasks, projectId: nextProjectId };
@@ -157,13 +154,14 @@ function TaskApp() {
   useEffect(() => { void refreshRef.current(); }, []);
 
   useEffect(() => {
-    if (!apiProjectBase || !liveRunId || typeof EventSource === "undefined") return undefined;
-    return subscribeToLiveRunEvents({
+    if (!apiProjectBase || !liveRunIds.length || typeof EventSource === "undefined") return undefined;
+    const stops = liveRunIds.map((liveRunId) => subscribeToLiveRunEvents({
       eventSourceUrl: `${apiProjectBase}/runs/${encodeURIComponent(liveRunId)}/events`,
       onEvent: () => { void refreshRef.current({ silent: true }); },
       EventSourceImpl: EventSource,
-    });
-  }, [apiProjectBase, liveRunId]);
+    }));
+    return () => stops.forEach((stop) => stop());
+  }, [apiProjectBase, liveRunIds]);
 
   async function runTaskAction(task, action, payload = {}) {
     if (!apiProjectBase || !task?.task_id || busy) return null;
