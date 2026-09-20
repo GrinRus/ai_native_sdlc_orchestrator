@@ -847,12 +847,12 @@ export function materializeProviderPinnedRouteOverrides(options) {
       primary.adapter = pinnedAdapter;
     }
     const runtimeSelection = asRecord(options.runtimeSelection);
-    if (asNonEmptyString(runtimeSelection.model)) {
-      primary.model = asNonEmptyString(runtimeSelection.model);
-    }
-    if (asNonEmptyString(runtimeSelection.reasoning_effort)) {
-      primary.reasoning_effort = asNonEmptyString(runtimeSelection.reasoning_effort);
-    }
+    const selectedModel = asNonEmptyString(runtimeSelection.model);
+    if (selectedModel) primary.model = selectedModel;
+    else delete primary.model;
+    const selectedReasoningEffort = asNonEmptyString(runtimeSelection.reasoning_effort);
+    if (selectedReasoningEffort) primary.reasoning_effort = selectedReasoningEffort;
+    else delete primary.reasoning_effort;
     pinnedRoute.primary = primary;
     pinnedRoute.fallback = [];
     pinnedRoute.route_id = `${originalRouteId}.${normalizeId(options.providerVariantId)}`;
