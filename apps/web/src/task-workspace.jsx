@@ -65,7 +65,7 @@ function approvedRunnerOptions(executionProfile, step, runnerSelection) {
 
 function taskStatusLabel(task) { return { draft: "Draft", prepared: "Ready", completed: "Completed", attention: "Needs attention", failed: "Failed", blocked: "Blocked", active: "Running", running: "Running" }[task?.status] || "Status unavailable"; }
 
-function taskStatusTone(task) { return { completed: "neutral", draft: "neutral", prepared: "success", attention: "warning", failed: "warning", blocked: "warning" }[task?.status] || "success"; }
+function taskStatusTone(task) { return { completed: "neutral", draft: "neutral", prepared: "success", attention: "warning", failed: "warning", blocked: "warning", active: "success", running: "success" }[task?.status] || "warning"; }
 
 function taskTitle(task) {
   return task?.display_title || "Untitled task";
