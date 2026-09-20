@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "daa284f41929352e99648b112e19ee8930b9fa4add97a7dfc221b77d82315a0a",
+  "source_hash": "4f0f829db448451051f5b6095ef743b98dda2cadc4158b308059ab9f72d95afe",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -18,13 +18,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-C5b0cdq3.js",
+    "apps/web/dist/assets/index-OyMyGYRo.js",
     "apps/web/dist/assets/index-TW3tf8O0.css",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-C5b0cdq3.js": "f7e5d6374a1781033f51e6f780159b572c2ee7268465ff37d5d576cb424898bf",
+    "apps/web/dist/assets/index-OyMyGYRo.js": "a8d59f6f20f4fe6f565409b257deae2741c0ab270fbda920762e192b9fab16ca",
     "apps/web/dist/assets/index-TW3tf8O0.css": "4a8b41fbdb87e55680872ecf8baa5f658b746553086fe3e03c7d8373558a61cd",
-    "apps/web/dist/index.html": "6f17123290ef667e38927e57c31832a65461739882846123d6f6692d84d0fb00"
+    "apps/web/dist/index.html": "7e79bd385f3085e831db0ee10bbd90b7b40b36c2a987326eabd120bd3e62ec55"
   }
 }

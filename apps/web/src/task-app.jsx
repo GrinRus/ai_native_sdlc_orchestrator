@@ -109,7 +109,7 @@ function TaskApp() {
       setProjects(availableProjects);
       setActiveProjectId(nextProjectId);
       if (!nextProjectId) {
-        setTasks([]);
+        setTasks([]); setSelectedTaskId(null);
         setExecutionProfile(null);
         setConnectionState("connected");
         setLoaded(true);
