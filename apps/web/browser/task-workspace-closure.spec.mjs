@@ -113,6 +113,14 @@ test("clean installed project opens Task Workspace without a legacy surface over
   await expect(page.locator(".task-workspace__breadcrumb h1")).toHaveText("Tasks");
   await expect(page.getByRole("heading", { name: "No tasks yet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "New task", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Help", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Help and shortcuts" })).toBeVisible();
+  await expect(page.getByText("Prepare is read-only.", { exact: false })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Help and shortcuts" })).toHaveCount(0);
+  await page.keyboard.press("?");
+  await expect(page.getByRole("dialog", { name: "Help and shortcuts" })).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByText("Quiet Cockpit", { exact: true })).toHaveCount(0);
   await expect(page.getByText("New Flow", { exact: true })).toHaveCount(0);
   await expect(page).not.toHaveURL(/surface=|flow=|console=/u);
