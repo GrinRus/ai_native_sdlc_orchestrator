@@ -7,6 +7,19 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.24] - 2026-09-21
+
+- Improved the installed Task Workspace flow across project selection, runner
+  readiness, task status, lifecycle synchronization, accessible tabs, and
+  responsive review/completion layouts.
+- Preserved native provider model defaults and clarified runtime diagnostics so
+  provider-backed execution reports the configured model without accidental
+  AOR overrides.
+- Stabilized guided acceptance checks by aligning profile diagnostic bounds
+  and allowing the complete browser proof matrix to finish on cold runtimes.
+- Hardened release and runtime verification paths so packaged alpha behavior,
+  browser proof, and no-upstream-write guarantees remain aligned.
+
 ## [0.1.0-alpha.23] - 2026-09-15
 
 - Expanded the certified installed CLI matrix to Node.js 22.x and 26.x with
