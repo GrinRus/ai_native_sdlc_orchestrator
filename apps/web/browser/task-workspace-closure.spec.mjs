@@ -229,6 +229,11 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   const mobileActiveActions = await page.locator(".task-active-heading .task-inline-actions").boundingBox();
   expect(mobileActiveActions).not.toBeNull();
   expect(mobileActiveActions.x).toBeLessThan(170);
+  const activeTabGeometry = await page.locator('[role="tablist"][aria-label="Task activity sections"] [role="tab"]').evaluateAll((tabs) => ({ viewportWidth: window.innerWidth, tabs: tabs.map((tab) => {
+    const rect = tab.getBoundingClientRect();
+    return { label: tab.textContent?.trim(), left: rect.left, right: rect.right };
+  }) }));
+  expect(activeTabGeometry.tabs.every(({ left, right }) => left >= 0 && right <= activeTabGeometry.viewportWidth)).toBe(true);
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("tab", { name: /Changes/u }).click();
   await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
@@ -253,6 +258,22 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   ]));
 
   await captureMobileEvidence(page, testInfo, "w70-mobile-review-390x844", "07-review-changes-390x844.png");
+  const reviewFooterGeometry = await page.locator(".task-review-layout .task-screen-footer").evaluate((footer) => {
+    const footerRect = footer.getBoundingClientRect();
+    const buttons = [...footer.querySelectorAll(".aor-button")].map((button) => {
+      const rect = button.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, clientWidth: button.clientWidth, scrollWidth: button.scrollWidth };
+    });
+    return {
+      footer: { left: footerRect.left, right: footerRect.right, top: footerRect.top, bottom: footerRect.bottom },
+      buttons,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(reviewFooterGeometry.footer.left).toBeGreaterThanOrEqual(0);
+  expect(reviewFooterGeometry.footer.right).toBeLessThanOrEqual(reviewFooterGeometry.viewportWidth);
+  expect(reviewFooterGeometry.buttons.every(({ left, right, top, bottom, clientWidth, scrollWidth }) => left >= 0 && right <= reviewFooterGeometry.viewportWidth && top >= reviewFooterGeometry.footer.top && bottom <= reviewFooterGeometry.footer.bottom && scrollWidth <= clientWidth)).toBe(true);
   const contextBackButton = page.locator(".task-context-back");
   await contextBackButton.focus();
   await expect(contextBackButton).toBeFocused();
