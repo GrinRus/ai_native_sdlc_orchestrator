@@ -551,8 +551,9 @@
   .task-source-row__menu, .task-source-row .task-icon-button { grid-column: 3; grid-row: 1 / span 2; }
   .task-active-main .task-meta { margin-top: 22px; }
   .task-active-main .task-lifecycle { margin-block: 26px 20px; }
-  .task-active-main .task-detail-tabs { justify-content: space-between; gap: 12px; margin-top: 20px; overflow-x: visible; }
-  .task-active-main .task-detail-tabs button { white-space: nowrap; }
+  .task-active-main .task-detail-tabs { justify-content: space-between; gap: 6px; margin-top: 20px; overflow-x: hidden; }
+  .task-active-main .task-detail-tabs button { flex: 1 1 0; min-width: 0; white-space: nowrap; font-size: .9rem; }
+  .task-active-main .task-detail-tabs button span { margin-left: 2px; }
   .task-active-main .task-activity-panel li { min-height: 54px; }
   .task-active-heading h2 { font-size: 1.75rem; }
   .task-active-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 65%); gap: 12px; }

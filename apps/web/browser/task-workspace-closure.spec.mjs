@@ -231,9 +231,9 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   expect(mobileActiveActions.x).toBeLessThan(170);
   const activeTabGeometry = await page.locator('[role="tablist"][aria-label="Task activity sections"] [role="tab"]').evaluateAll((tabs) => ({ viewportWidth: window.innerWidth, tabs: tabs.map((tab) => {
     const rect = tab.getBoundingClientRect();
-    return { label: tab.textContent?.trim(), left: rect.left, right: rect.right };
+    return { label: tab.textContent?.trim(), left: rect.left, right: rect.right, width: rect.width };
   }) }));
-  expect(activeTabGeometry.tabs.every(({ left, right }) => left >= 0 && right <= activeTabGeometry.viewportWidth)).toBe(true);
+  expect(activeTabGeometry.tabs.every(({ left, right, width }) => left >= 0 && right <= activeTabGeometry.viewportWidth && width > 0)).toBe(true);
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("tab", { name: /Changes/u }).click();
   await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
