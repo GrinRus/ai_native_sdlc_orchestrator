@@ -2066,7 +2066,7 @@ export function collectGuidedBrowserTaskProof(options) {
   };
   const { result, attempts } = runGuidedBrowserTaskCollector({
     pythonBin, collectorScriptFile, payload, env: collectorEnv,
-    timeoutMs: 180_000,
+    timeoutMs: 600_000,
     proofFile: options.browserTaskProofFile,
   });
   const stdout = asNonEmptyString(result.stdout);

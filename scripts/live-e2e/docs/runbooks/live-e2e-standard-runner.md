@@ -834,6 +834,9 @@ runtime. Auto-collection is still fail-closed: if the browser runtime, screensho
 keyboard focus sequence, or required accessibility checks are missing, the run
 remains blocked as UI validation evidence rather than being accepted from web
 smoke alone.
+The full installed-console matrix can take several minutes on a cold local
+runtime; the runner bounds the collector process at 600 seconds separately from
+each browser action's readiness timeout.
 The collector must not inherit target verification `PLAYWRIGHT_BROWSERS_PATH`
 by default, because browser-task proof checks AOR operator UI rather than the
 target repository. Target verification uses a content-addressed cache keyed by
