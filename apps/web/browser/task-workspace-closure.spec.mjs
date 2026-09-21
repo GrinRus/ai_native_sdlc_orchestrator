@@ -218,6 +218,13 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByRole("button", { name: "Review task" }).click();
   await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Activity", exact: true })).toBeVisible();
+  const activeTabReferences = await page.locator('[role="tablist"][aria-label="Task activity sections"] [role="tab"]').evaluateAll((tabs) => tabs.map((tab) => {
+    const controls = tab.getAttribute("aria-controls");
+    const panel = controls ? document.getElementById(controls) : null;
+    const labelledBy = panel?.getAttribute("aria-labelledby");
+    return { id: tab.id, selected: tab.getAttribute("aria-selected") === "true", controls, panelExists: Boolean(panel), panelLabelsTab: !panel || labelledBy === tab.id };
+  }));
+  expect(activeTabReferences.every(({ id, selected, controls, panelExists, panelLabelsTab }) => Boolean(id) && (!selected || (Boolean(controls) && panelExists && panelLabelsTab)))).toBe(true);
   await captureMobileEvidence(page, testInfo, "w70-mobile-active-task-390x844", "05-active-task-390x844.png");
   const mobileActiveActions = await page.locator(".task-active-heading .task-inline-actions").boundingBox();
   expect(mobileActiveActions).not.toBeNull();
@@ -276,6 +283,13 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   directProofUrl.searchParams.set("task", `${base.task_id}.complete-proof`);
   await page.goto(directProofUrl.href);
   await expect(page.getByRole("heading", { name: "Completion & Evidence" })).toBeVisible();
+  const completionTabReferences = await page.locator('[role="tablist"][aria-label="Completion sections"] [role="tab"]').evaluateAll((tabs) => tabs.map((tab) => {
+    const controls = tab.getAttribute("aria-controls");
+    const panel = controls ? document.getElementById(controls) : null;
+    const labelledBy = panel?.getAttribute("aria-labelledby");
+    return { id: tab.id, selected: tab.getAttribute("aria-selected") === "true", controls, panelExists: Boolean(panel), panelLabelsTab: !panel || labelledBy === tab.id };
+  }));
+  expect(completionTabReferences.every(({ id, selected, controls, panelExists, panelLabelsTab }) => Boolean(id) && (!selected || (Boolean(controls) && panelExists && panelLabelsTab)))).toBe(true);
   contrastReport.push(...await collectContrastSamples(page, "completion-evidence", [
     { label: "task title", selector: ".task-context-title h2" },
     { label: "completion status", selector: ".task-context-status--complete" },

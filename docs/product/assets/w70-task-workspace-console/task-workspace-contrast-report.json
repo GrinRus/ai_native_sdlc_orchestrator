@@ -8,120 +8,120 @@
       "label": "screen heading",
       "selector": ".task-workspace__breadcrumb h1",
       "status": "pass",
-      "ratio": 15.59,
+      "ratio": 15.15,
       "required_ratio": 3,
-      "font_size": 26.25,
+      "font_size": 29.12,
       "font_weight": 760,
-      "foreground": "rgb(23, 37, 44)",
-      "background": "rgb(255, 254, 253)"
+      "foreground": "rgb(23, 40, 50)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "new-task",
       "label": "section heading",
       "selector": ".task-form-section h2",
       "status": "pass",
-      "ratio": 16.17,
+      "ratio": 15.15,
       "required_ratio": 4.5,
-      "font_size": 18,
-      "font_weight": 750,
-      "foreground": "rgb(23, 33, 43)",
-      "background": "rgb(255, 254, 253)"
+      "font_size": 18.4,
+      "font_weight": 700,
+      "foreground": "rgb(23, 40, 50)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "new-task",
       "label": "runner readiness",
       "selector": ".task-readiness",
       "status": "pass",
-      "ratio": 5.46,
+      "ratio": 5.5,
       "required_ratio": 4.5,
-      "font_size": 13.5,
+      "font_size": 14.4,
       "font_weight": 400,
       "foreground": "rgb(43, 119, 64)",
-      "background": "rgb(255, 254, 253)"
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "new-task",
       "label": "safety note",
       "selector": ".task-safety",
       "status": "pass",
-      "ratio": 6.36,
+      "ratio": 4.82,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
-      "foreground": "rgb(82, 97, 106)",
-      "background": "rgb(255, 254, 253)"
+      "foreground": "rgb(101, 116, 126)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "new-task",
       "label": "provider note",
       "selector": ".task-provider-note",
       "status": "pass",
-      "ratio": 6.36,
+      "ratio": 4.82,
       "required_ratio": 4.5,
-      "font_size": 12.1875,
-      "font_weight": 650,
-      "foreground": "rgb(82, 97, 106)",
-      "background": "rgb(255, 254, 253)"
+      "font_size": 13.12,
+      "font_weight": 400,
+      "foreground": "rgb(101, 116, 126)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "review-changes",
       "label": "task title",
       "selector": ".task-context-title h2",
       "status": "pass",
-      "ratio": 15.59,
+      "ratio": 15.15,
       "required_ratio": 3,
-      "font_size": 36.75,
+      "font_size": 39.2,
       "font_weight": 760,
-      "foreground": "rgb(23, 37, 44)",
-      "background": "rgb(255, 254, 253)"
+      "foreground": "rgb(23, 40, 50)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "review-changes",
       "label": "tasks navigation",
       "selector": ".task-context-back",
       "status": "pass",
-      "ratio": 4.83,
+      "ratio": 4.86,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
       "foreground": "rgb(8, 126, 130)",
-      "background": "rgb(255, 254, 253)"
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "review-changes",
       "label": "review status",
       "selector": ".task-context-status--review",
       "status": "pass",
-      "ratio": 5.39,
+      "ratio": 5.22,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
       "foreground": "rgb(150, 88, 0)",
-      "background": "rgb(255, 248, 237)"
+      "background": "rgb(255, 244, 223)"
     },
     {
       "screen": "review-changes",
       "label": "changed file",
       "selector": ".task-review-files button.is-selected span",
       "status": "pass",
-      "ratio": 14.06,
+      "ratio": 13.54,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
-      "foreground": "rgb(23, 37, 44)",
-      "background": "rgb(232, 245, 244)"
+      "foreground": "rgb(23, 40, 50)",
+      "background": "rgb(231, 245, 244)"
     },
     {
       "screen": "review-changes",
       "label": "rendered diff",
       "selector": ".task-rendered-comparison pre",
       "status": "pass",
-      "ratio": 15.59,
+      "ratio": 15.15,
       "required_ratio": 4.5,
-      "font_size": 13.5,
+      "font_size": 14.4,
       "font_weight": 400,
-      "foreground": "rgb(23, 37, 44)",
-      "background": "rgb(255, 254, 253)"
+      "foreground": "rgb(23, 40, 50)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "review-changes",
@@ -130,7 +130,7 @@
       "status": "pass",
       "ratio": 4.86,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
       "foreground": "rgb(255, 255, 255)",
       "background": "rgb(8, 126, 130)"
@@ -140,48 +140,48 @@
       "label": "task title",
       "selector": ".task-context-title h2",
       "status": "pass",
-      "ratio": 15.59,
+      "ratio": 15.15,
       "required_ratio": 3,
-      "font_size": 36.75,
+      "font_size": 39.2,
       "font_weight": 760,
-      "foreground": "rgb(23, 37, 44)",
-      "background": "rgb(255, 254, 253)"
+      "foreground": "rgb(23, 40, 50)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "completion-evidence",
       "label": "completion status",
       "selector": ".task-context-status--complete",
       "status": "pass",
-      "ratio": 5.5,
+      "ratio": 5.54,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
       "foreground": "rgb(35, 112, 55)",
-      "background": "rgb(235, 246, 237)"
+      "background": "rgb(237, 247, 234)"
     },
     {
       "screen": "completion-evidence",
       "label": "completion summary",
-      "selector": ".task-complete-main > header p",
+      "selector": ".task-completion-summary > header p",
       "status": "pass",
-      "ratio": 6.36,
+      "ratio": 15.15,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
-      "foreground": "rgb(82, 97, 106)",
-      "background": "rgb(255, 254, 253)"
+      "foreground": "rgb(23, 40, 50)",
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "completion-evidence",
       "label": "delivery success",
       "selector": ".task-delivery-success",
       "status": "pass",
-      "ratio": 4.79,
+      "ratio": 4.82,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 700,
       "foreground": "rgb(38, 130, 67)",
-      "background": "rgb(255, 254, 253)"
+      "background": "rgb(255, 255, 255)"
     },
     {
       "screen": "completion-evidence",
@@ -190,7 +190,7 @@
       "status": "pass",
       "ratio": 4.86,
       "required_ratio": 4.5,
-      "font_size": 14.0625,
+      "font_size": 16,
       "font_weight": 400,
       "foreground": "rgb(255, 255, 255)",
       "background": "rgb(8, 126, 130)"
