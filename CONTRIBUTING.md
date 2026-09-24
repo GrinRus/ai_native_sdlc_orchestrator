@@ -148,8 +148,12 @@ The repository uses a repository-integrity workflow plus focused security workfl
 
 The repository-integrity workflow runs on:
 - pull requests;
-- pushes to `main`;
 - manual `workflow_dispatch`.
+
+The `main` ruleset requires pull requests with up-to-date status checks, so the
+full integrity gate runs before merge instead of repeating after the resulting
+push. CodeQL and OpenSSF Scorecard retain their main-branch push triggers for
+security analysis and SARIF upload.
 
 What the workflows prove today:
 - `pnpm check` runs lint, type checking, tests, build, quality ratchets,
