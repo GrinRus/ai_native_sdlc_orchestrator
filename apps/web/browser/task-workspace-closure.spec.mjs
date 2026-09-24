@@ -140,12 +140,14 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     { ...base, task_id: `${base.task_id}.stale`, display_title: "Stale source", status: "attention", status_detail: "blocked", attention_count: 1, blocker_count: 1, source_items: [{ schema_version: 1, source_id: "source.stale", kind: "repository-markdown", immutable: true, stale: true, digest: "d".repeat(64), preview: { project_relative_path: "docs/stale.md", pinned_base_revision: "d".repeat(40), sanitized_markdown: "# Stale source" } }] },
     { ...base, task_id: `${base.task_id}.unavailable`, display_title: "Unavailable runner", status: "attention", status_detail: "blocked", attention_count: 1, blocker_count: 1, primary_action: { ...base.primary_action, action_id: "retry", operator_control: "Retry preparation", reason: "Configure and authenticate an approved runner before preparing this task.", available: true }, attention_items: [{ item_id: "blocker.unavailable", code: "intent_provider.not_ready", message: "Configure and authenticate an approved runner before preparing this task.", consequence: "Configure and authenticate an approved runner before preparing this task.", recovery_action: "Choose another approved route." }], runner_selection: { ...base.runner_selection, readiness: "unavailable", unavailable_reason: "Approved route is unavailable in this local fixture.", recovery_action: "Choose another approved route." } },
     { ...base, task_id: `${base.task_id}.failure`, display_title: "Failed task", status: "attention", status_detail: "failed", attention_count: 1, blocker_count: 1, primary_action: { ...base.primary_action, action_id: "request", operator_control: "Request revision", available: true } },
+    { ...base, task_id: `${base.task_id}.held-review`, display_title: "Held task", status: "attention", status_detail: "blocked", current_step: "review", attention_count: 1, blocker_count: 1, primary_action: { ...base.primary_action, action_id: "resolve-review-hold", operator_control: "Resolve review hold", reason: "A review hold blocks delivery until a decision is recorded.", available: true }, review: { status: "held", verification_status: "pass", delivery_status: "pass", changed_paths: ["docs/task.md"], evidence_refs: ["evidence://review"] } },
     { ...base, task_id: `${base.task_id}.review`, display_title: "Review task", status: "active", run_state: { run_id: "run.closure", status: "running" }, review: { verification_status: "pass", delivery_status: "pending", changed_paths: ["docs/task.md"], evidence_refs: ["evidence://review"] } },
     { ...base, task_id: `${base.task_id}.completed`, display_title: "Completed task", status: "completed", status_detail: "completed", completed_read_only: true, completion: { status: "blocked", verification_status: "partial", delivery_status: "pending", evidence_refs: ["evidence://partial"], follow_up_eligible: true } },
     { ...base, task_id: `${base.task_id}.complete-proof`, display_title: "Completed proof task", status: "completed", status_detail: "completed", completed_read_only: true, completion: { status: "complete", verification_status: "pass", delivery_status: "pass", patch_ref: "evidence://delivery/closure.patch", digest: "e".repeat(64), evidence_refs: ["evidence://completion/closure"], follow_up_eligible: true } },
   ];
   let offline = false;
   let actionPayloads = [];
+  let reviewDecisionPayloads = [];
   let operatorRequests = [];
   let operatorRequestRunCount = 0;
   await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", onboarding_summary: { initialized: true, state_exists: true } }) }));
@@ -159,7 +161,11 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(operatorRequests) });
   });
-  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/review(?:\\?.*)?$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ schema_version: 1, task_id: `${base.task_id}.review`, project_id: state.project_id, availability: "available", files: [{ path: "docs/task.md", kind: "markdown", additions: 2, deletions: 1, diff_available: true, truncated: false }], selected_path: "docs/task.md", selected_file: { path: "docs/task.md", kind: "markdown", additions: 2, deletions: 1, diff_available: true, truncated: false, hunks: [{ old_start: 1, old_lines: 1, new_start: 1, new_lines: 2, rows: [{ kind: "deletion", old_line: 1, new_line: null, text: "Old bounded behavior." }, { kind: "addition", old_line: null, new_line: 1, text: "New deterministic behavior." }] }], rendered: { before: "Old bounded behavior.", after: "New deterministic behavior.", sanitized: true, partial: true }, source_ref: "evidence://review/task.patch" }, evidence_refs: ["evidence://review/task.patch"], freshness: { status: "current", updated_at: "2026-08-21T00:00:00.000Z" }, read_only: true }) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/review(?:\\?.*)?$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ schema_version: 1, task_id: new URL(route.request().url()).pathname.split("/").at(-2), project_id: state.project_id, availability: "available", files: [{ path: "docs/task.md", kind: "markdown", additions: 2, deletions: 1, diff_available: true, truncated: false }], selected_path: "docs/task.md", selected_file: { path: "docs/task.md", kind: "markdown", additions: 2, deletions: 1, diff_available: true, truncated: false, hunks: [{ old_start: 1, old_lines: 1, new_start: 1, new_lines: 2, rows: [{ kind: "deletion", old_line: 1, new_line: null, text: "Old bounded behavior." }, { kind: "addition", old_line: null, new_line: 1, text: "New deterministic behavior." }] }], rendered: { before: "Old bounded behavior.", after: "New deterministic behavior.", sanitized: true, partial: true }, source_ref: "evidence://review/task.patch" }, evidence_refs: ["evidence://review/task.patch"], freshness: { status: "current", updated_at: "2026-08-21T00:00:00.000Z" }, read_only: true }) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/lifecycle-command/actions$`, "u"), async (route) => {
+    reviewDecisionPayloads.push(route.request().postDataJSON());
+    await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ readback: { status: "active" } }) });
+  });
   await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/actions$`, "u"), async (route) => {
     const payload = route.request().postDataJSON();
     actionPayloads.push(payload);
@@ -354,6 +360,24 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByRole("button", { name: "Request revision", exact: true }).click();
   await expect(page.getByText("Latest request waiting to resume: Request a bounded revision.", { exact: true })).toBeVisible();
   expect(actionPayloads.at(-1)).toEqual({ action: "request", expected_revision: 3, request_text: "Request a bounded revision." });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Held task" }).click();
+  await expect(page.getByRole("heading", { name: "Resolve review hold" })).toBeVisible();
+  const openHeldReview = page.getByRole("button", { name: "Open review", exact: true });
+  await expect(openHeldReview).toBeEnabled();
+  const openHeldReviewBox = await openHeldReview.boundingBox();
+  expect(openHeldReviewBox).not.toBeNull();
+  expect(openHeldReviewBox.x).toBeGreaterThanOrEqual(0);
+  expect(openHeldReviewBox.x + openHeldReviewBox.width).toBeLessThanOrEqual(390);
+  await openHeldReview.focus();
+  await expect(openHeldReview).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve changes", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Approve changes", exact: true }).click();
+  await expect(page.getByText("Decision recorded durably. Waiting for the server to publish closure evidence.", { exact: true })).toBeVisible();
+  expect(reviewDecisionPayloads.at(-1)).toEqual({ command: "review decide", flags: { run_id: "run.closure", decision: "approve" } });
 
   const directReviewUrl = new URL(state.app_url);
   directReviewUrl.searchParams.set("task", `${base.task_id}.review`);

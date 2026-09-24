@@ -89,7 +89,9 @@ presentation change.
 5. **Active Task Workspace** — monitor current work, send a durable operator
    request, inspect changes/checks/evidence, pause, or stop.
 6. **Attention** — resolve one authoritative human decision with consequence,
-   source evidence, and durable readback.
+   source evidence, and durable readback. When a blocked Task needs a review
+   decision, open its current review evidence from Attention and record the
+   decision through the shared review action.
 7. **Review Changes** — review file tree, Markdown/code diff, checks, and
    delivery effects before accepting or requesting revision.
 8. **Completion and Evidence** — inspect outcome, verification, delivery, and
