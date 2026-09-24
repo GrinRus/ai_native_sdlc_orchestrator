@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
+import { sanitizeMarkdownPreview } from "../../contracts/src/markdown-sanitization.mjs";
 import { readJsonState, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { readCanonicalContainedFile } from "./shared/canonical-paths.mjs";
@@ -150,31 +151,6 @@ function attachmentRecords(init, submissionId, attachments) {
       storage_ref: `inputs/${submissionId}/${generatedName}`,
     };
   });
-}
-
-function sanitizeMarkdownPreview(value) {
-  const input = String(value ?? "");
-  let output = "";
-  let index = 0;
-  while (index < input.length) {
-    if (input[index] !== "<") {
-      output += input[index];
-      index += 1;
-      continue;
-    }
-    const remainder = input.slice(index).toLowerCase();
-    if (remainder.startsWith("<script")) {
-      const closingStart = remainder.indexOf("</script");
-      if (closingStart < 0) break;
-      const closingEnd = input.indexOf(">", index + closingStart + 2);
-      index = closingEnd < 0 ? input.length : closingEnd + 1;
-      continue;
-    }
-    const tagEnd = input.indexOf(">", index + 1);
-    if (tagEnd < 0) break;
-    index = tagEnd + 1;
-  }
-  return output.replace(/!\[[^\]]*\]\(https?:\/\/[^)]+\)/giu, "[remote embed omitted]");
 }
 
 function repositoryMarkdownRecords(context, markdownSources) {

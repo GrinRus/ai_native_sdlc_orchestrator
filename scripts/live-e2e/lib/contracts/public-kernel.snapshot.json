@@ -4,8 +4,8 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 29,
-    "source_manifest_sha256": "3dbadf9d461247fb8050755d80fd3373c914d488bafdb99c51a7f2285e2ada56"
+    "source_file_count": 30,
+    "source_manifest_sha256": "cf591cc2c77e34c01bb9228f270c3c99c2ce903a8fe67e649d2c6509b344b43d"
   },
   "files": {
     "canonical-values.mjs": "5daafd2f2fccd296cdcccb878b1f1ec8d132f631aed64420e2d3aa50fbf6d4ac",
@@ -24,6 +24,7 @@
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "c227966a564ab2c2c016c5de2e3f40ecc4da4f538986b617cbaf417b209a5980",
     "loader.mjs": "d04fb2068eee06fc6ae1954fe6c83144e3a19d023102685e5a79de2e87fb962e",
+    "markdown-sanitization.mjs": "c95f188524640806a75f5c15caacb685e984f14599b123fc2a238cddb4cb9450",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "ee8ab3c944f3513a393a79a9f7a8729ed6308451cf30d9c5dd1dfbbeb1e3ae8b",
     "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",

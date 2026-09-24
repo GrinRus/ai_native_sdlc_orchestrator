@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { sanitizeMarkdownPreview } from "../../../packages/contracts/src/markdown-sanitization.mjs";
 import { Button, Icon, useRovingTabs } from "./ui/components.jsx";
 
 const MAX_SOURCE_COUNT = 10;
@@ -14,31 +15,6 @@ const PREVIEW_TABS = [
   { id: "preview", label: "Preview", controls: "task-preview-panel" },
   { id: "source", label: "Source", controls: "task-preview-panel" },
 ];
-
-function sanitizeMarkdown(value) {
-  const input = String(value ?? "");
-  let output = "";
-  let index = 0;
-  while (index < input.length) {
-    if (input[index] !== "<") {
-      output += input[index];
-      index += 1;
-      continue;
-    }
-    const remainder = input.slice(index).toLowerCase();
-    if (remainder.startsWith("<script")) {
-      const closingStart = remainder.indexOf("</script");
-      if (closingStart < 0) break;
-      const closingEnd = input.indexOf(">", index + closingStart + 2);
-      index = closingEnd < 0 ? input.length : closingEnd + 1;
-      continue;
-    }
-    const tagEnd = input.indexOf(">", index + 1);
-    if (tagEnd < 0) break;
-    index = tagEnd + 1;
-  }
-  return output.replace(/!\[[^\]]*\]\(https?:\/\/[^)]+\)/giu, "[remote embed omitted]");
-}
 
 function safeProjectRelativePath(value) {
   const path = String(value ?? "").trim();
@@ -271,7 +247,7 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
         immutable: true,
         stale: false,
         digest: `sha256:${digest}`,
-        preview: { filename: name, media_type: "text/markdown", byte_length: byteLength, sanitized_markdown: sanitizeMarkdown(content) },
+        preview: { filename: name, media_type: "text/markdown", byte_length: byteLength, sanitized_markdown: sanitizeMarkdownPreview(content) },
         attachment: { name, content },
       });
     }
@@ -338,7 +314,7 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
   }
 
   const previewText = mode === "paste"
-    ? sanitizeMarkdown(pastedText)
+    ? sanitizeMarkdownPreview(pastedText)
     : activeSource?.kind === "upload-snapshot"
     ? activeSource.preview?.sanitized_markdown || ""
     : activeSource?.kind === "repository-markdown"
