@@ -234,9 +234,21 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await repositorySourceRow.locator(".task-source-preview-button").click();
   await expect(page.locator(".task-markdown-preview__content h1")).toHaveText("Repository source");
   await page.getByRole("tab", { name: "Upload snapshot", exact: true }).click();
-  await page.getByLabel("Upload Markdown").setInputFiles({ name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("# Uploaded\n<script>alert('blocked')</script>") });
+  await page.getByLabel("Upload Markdown").setInputFiles({ name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from([
+    "# Uploaded",
+    "<script>window.__aorMarkdownXss = true</script>",
+    "[unsafe](javascript:window.__aorMarkdownXss = true)",
+    '[quoted](https://example.com/" onmouseover="window.__aorMarkdownXss = true)',
+    "[safe](https://example.com/path)",
+  ].join("\n")) });
   await expect(page.locator(".task-markdown-preview__content h1")).toHaveText("Uploaded");
-  await expect(page.locator(".task-markdown-preview")).not.toContainText("alert");
+  const markdownPreview = page.locator(".task-markdown-preview__content");
+  await expect(markdownPreview.locator("script")).toHaveCount(0);
+  await expect(markdownPreview.locator("a[href^='javascript:']")).toHaveCount(0);
+  const safeLink = markdownPreview.locator("a[href^='https://example.com/path']");
+  await expect(safeLink).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(markdownPreview.locator("a[onmouseover]")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__aorMarkdownXss ?? false)).toBe(false);
   await page.getByRole("tab", { name: "Repository file", exact: true }).click();
   await page.getByLabel("Project-relative Markdown path").fill("docs/other.md");
   await page.getByLabel("Pinned current base revision").fill("abc123");

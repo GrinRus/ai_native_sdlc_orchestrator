@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "dcb786ae806d03bbaaa0b406585c96a6c5b86e551b915b4b6684eba3c4e9fb23",
+  "source_hash": "fb965e088bf1fb62adc1caef6328f34dae84eab0a626932df4125f944d3c1dd0",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -22,12 +22,12 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-6wPMK-b6.css",
-    "apps/web/dist/assets/index-BoZH9SJY.js",
+    "apps/web/dist/assets/index-BlMyfy0W.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
     "apps/web/dist/assets/index-6wPMK-b6.css": "3f50023fd50bb46077eeb60c258e0d205ac74da0b159520cec85cea200c63a1a",
-    "apps/web/dist/assets/index-BoZH9SJY.js": "eeb3414328a2380b7fc2a54364806899332b4a80ec90dea2ca8c87e3e5d1c744",
-    "apps/web/dist/index.html": "47533fc2ede498b46fa23d8e824b7ec3092bb128a7416a1b576ded6bb899b94f"
+    "apps/web/dist/assets/index-BlMyfy0W.js": "75b32b06e1bac6c897ee0250f07a1d2f5ca5902981b5fccfc198294bc16b45ad",
+    "apps/web/dist/index.html": "c48e4169fc25b0c2741a7a1d4c5860b16f93a1e6a4271763c273dc9f825d9ec3"
   }
 }

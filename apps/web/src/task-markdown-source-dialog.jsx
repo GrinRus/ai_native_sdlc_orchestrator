@@ -65,9 +65,20 @@ function inlineMarkdown(value, keyPrefix) {
     const link = piece.match(/^\[([^\]]+)\]\(([^)]+)\)$/u);
     if (!link) return <span key={key}>{piece}</span>;
     const [, label, destination] = link;
-    if (!/^https?:\/\//iu.test(destination)) return <span key={key}>{label} <small>(destination: {destination})</small></span>;
-    return <span key={key}><a href={destination} target="_blank" rel="noopener noreferrer">{label}</a> <small>(destination: {destination})</small></span>;
+    const href = safeExternalHref(destination);
+    if (!href) return <span key={key}>{label} <small>(destination: {destination})</small></span>;
+    return <span key={key}><a href={href} target="_blank" rel="noopener noreferrer">{label}</a> <small>(destination: {href})</small></span>;
   });
+}
+
+function safeExternalHref(value) {
+  try {
+    const url = new URL(String(value));
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 function renderMarkdown(value) {
