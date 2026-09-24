@@ -750,6 +750,127 @@ test("Task Workspace follows asynchronous preparation without resubmitting the a
   expect(submissionPayload).toMatchObject({ request_text: "Wait for server preparation.", preparation_route_id: "route.intake-normalize.default", auto_prepare: true });
 });
 
+test("Attention resumes blocked preparation and lets the operator change its runner", async ({ page }) => {
+  const state = readHarnessState();
+  await blockExternalNetwork(page, state.app_url);
+  const submissionId = "intent.browser-blocked-preparation";
+  const sourceId = `${submissionId}.source.1`;
+  const blockedTask = taskFixture(state, {
+    task_id: `task.${state.project_id}.intent.${submissionId}`,
+    display_title: "Blocked preparation task",
+    work_type: "code-change",
+    status: "attention",
+    status_detail: "blocked",
+    current_step: "prepare",
+    current_step_label: "Attention",
+    flow_id: null,
+    mission_id: null,
+    lineage: { intent_submission_id: submissionId, intent_submission_ref: `evidence://intent/${submissionId}`, mission_id: null, flow_id: null },
+    source_items: [{ schema_version: 1, source_id: sourceId, kind: "upload-snapshot", immutable: true, stale: false, digest: "d".repeat(64), preview: { filename: "requirements.md", media_type: "text/markdown", byte_length: 24, sanitized_markdown: "Keep the deployment bounded." } }],
+    normalization: { outcome: "Prepare a bounded deployment task.", work_type: "code-change", acceptance: ["Keep the deployment bounded."] },
+    prepared_contract: { ...taskFixture(state).prepared_contract, outcome: "Prepare a bounded deployment task." },
+    primary_action: { action_id: "intent.resume", operator_control: "Resume task preparation", reason: "Check another approved preparation runner or change the selected runner.", available: true },
+    runner_selection: { ...taskFixture(state).runner_selection, route_id: null, readiness: "blocked", unavailable_reason: "The selected task-preparation runner is not ready.", recovery_action: "Check another approved preparation runner." },
+    revision: 2,
+  });
+  const nextSubmissionId = "intent.browser-blocked-preparation-revised";
+  const preparedTask = taskFixture(state, {
+    task_id: `task.${state.project_id}.intent.${nextSubmissionId}`,
+    display_title: "Prepare a bounded deployment task.",
+    work_type: "code-change",
+    status: "prepared",
+    status_detail: "prepared",
+    current_step: "confirm",
+    current_step_label: "Ready for review",
+    flow_id: null,
+    mission_id: null,
+    lineage: { intent_submission_id: nextSubmissionId, intent_submission_ref: `evidence://intent/${nextSubmissionId}`, mission_id: null, flow_id: null },
+    source_items: blockedTask.source_items,
+    normalization: { outcome: "Prepare a bounded deployment task.", work_type: "code-change", acceptance: ["Keep the deployment bounded."] },
+    primary_action: { action_id: "start", operator_control: "Start task", reason: "Check the selected execution route", available: false },
+    runner_selection: { ...taskFixture(state).runner_selection, readiness: "unconfigured", readiness_revision: null },
+    revision: 1,
+  });
+  let tasks = [blockedTask];
+  let profileRevision = 8;
+  let claudeReadiness = "auth-missing";
+  let claudeReadinessRevision = null;
+  let taskActionPayload = null;
+  let submissionPayload = null;
+  const executionProfile = () => ({
+    profile_id: `execution-profile.${state.project_id}`,
+    project_id: state.project_id,
+    revision: profileRevision,
+    initialized: true,
+    routes: [{
+      step: "implement",
+      route_id: "route.implement.simulation",
+      readiness: "ready",
+      readiness_revision: profileRevision,
+      approved_routes: [{ route_id: "route.implement.simulation", mode: "simulation", provider: "none", requested_model: "gpt-5", requested_reasoning_effort: "high", readiness: "ready", readiness_revision: profileRevision }],
+    }],
+    preparation_runners: [
+      { route_id: "route.intake-normalize.default", adapter: "codex-cli", readiness: "auth-missing", readiness_revision: null },
+      { route_id: "route.intake-normalize.claude", adapter: "claude-code", readiness: claudeReadiness, readiness_revision: claudeReadinessRevision },
+    ],
+    read_only: true,
+  });
+  await page.route(new RegExp(`/api/projects/${state.project_id}/execution-profile$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(executionProfile()) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/execution-profile/actions$`, "u"), async (route) => {
+    const payload = route.request().postDataJSON();
+    expect(payload).toEqual({ action: "check", step: "discovery", route_id: "route.intake-normalize.claude", expected_revision: 8 });
+    profileRevision += 1;
+    claudeReadiness = "ready";
+    claudeReadinessRevision = profileRevision;
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ execution_profile: executionProfile() }) });
+  });
+  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks(?:\\?.*)?$`, "u"), (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ project_id: state.project_id, selected_task_id: tasks[0]?.task_id ?? null, tasks, read_only: true }),
+  }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/actions$`, "u"), async (route) => {
+    taskActionPayload = route.request().postDataJSON();
+    await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ task_id: blockedTask.task_id, action: taskActionPayload.action, preparation: { status: "preparing" }, readback: { durable: true } }) });
+  });
+  await page.route(new RegExp(`/api/projects/${state.project_id}/intent-submissions$`, "u"), async (route) => {
+    if (route.request().method() !== "POST") return route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, submissions: [], read_only: true }) });
+    submissionPayload = route.request().postDataJSON();
+    tasks = [preparedTask];
+    await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ submission: { submission_id: nextSubmissionId, status: "prepared", request_text: submissionPayload.request_text } }) });
+  });
+
+  const url = new URL(state.app_url);
+  url.searchParams.set("task", blockedTask.task_id);
+  await page.goto(url.href);
+  await expect(page.getByRole("heading", { name: "Attention", exact: true })).toBeVisible();
+  const resumeButton = page.getByRole("button", { name: "Resume task preparation", exact: true });
+  await expect(resumeButton).toBeEnabled();
+  await resumeButton.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => taskActionPayload).toEqual({ action: "intent.resume" });
+  const changeRunnerButton = page.getByRole("button", { name: "Change preparation runner", exact: true });
+  await expect(changeRunnerButton).toBeEnabled();
+  await changeRunnerButton.click();
+  await expect(page.getByRole("heading", { name: "New Task", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Task outcome")).toHaveValue("Prepare a bounded deployment task.");
+  await expect(page.getByText("requirements.md", { exact: true })).toBeVisible();
+  const preparationRunnerSelect = page.locator('select[aria-label="Task preparation runner"]');
+  await preparationRunnerSelect.selectOption("route.intake-normalize.claude");
+  await page.getByRole("button", { name: "Check runner", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Prepare task", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Prepare task", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Prepared Task", exact: true })).toBeVisible();
+  expect(submissionPayload).toMatchObject({
+    request_text: "Prepare a bounded deployment task.",
+    attachments: [],
+    markdown_sources: [],
+    source_submission_id: submissionId,
+    source_ids: [sourceId],
+    preparation_route_id: "route.intake-normalize.claude",
+    auto_prepare: true,
+  });
+});
+
 test("Task Workspace answers runner questions through the control plane and shows continuation state", async ({ page }) => {
   const state = readHarnessState();
   await blockExternalNetwork(page, state.app_url);

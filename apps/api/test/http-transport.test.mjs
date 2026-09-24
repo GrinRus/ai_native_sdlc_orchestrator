@@ -2058,6 +2058,38 @@ test("intent submission API preserves immutable input and creates normalization 
   });
 });
 
+test("Task intent.resume action retries preparation and publishes the blocked recovery state", async () => {
+  await withTempRepo(async (projectRoot) => {
+    const transport = await createControlPlaneHttpServer({ cwd: projectRoot, projectRef: projectRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const createResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`, {
+        request_text: "Prepare this task after a task-preparation runner is configured.",
+        auto_prepare: false,
+      });
+      assert.equal(createResponse.status, 202);
+      const created = await createResponse.json();
+      const taskListUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/tasks`;
+      const initialTasks = await getJson(taskListUrl);
+      const initialTask = (await initialTasks.json()).tasks.find((task) => task.lineage.intent_submission_id === created.submission.submission_id);
+      assert.ok(initialTask);
+      assert.equal(initialTask.primary_action.action_id, "intent.resume");
+
+      const resumeResponse = await postJson(`${taskListUrl}/${encodeURIComponent(initialTask.task_id)}/actions`, { action: "intent.resume" });
+      assert.equal(resumeResponse.status, 409);
+      assert.equal((await resumeResponse.json()).error.code, "intent_provider.not_ready");
+
+      const blockedTasks = await getJson(taskListUrl);
+      const blockedTask = (await blockedTasks.json()).tasks.find((task) => task.task_id === initialTask.task_id);
+      assert.equal(blockedTask.status, "attention");
+      assert.equal(blockedTask.status_detail, "blocked");
+      assert.equal(blockedTask.primary_action.action_id, "intent.resume");
+      assert.equal(blockedTask.primary_action.available, true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("intent submission API exposes pinned repository Markdown metadata without fetching remote content", async () => {
   await withTempRepo(async (projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, "docs"), { recursive: true });

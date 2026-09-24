@@ -91,7 +91,10 @@ presentation change.
 6. **Attention** — resolve one authoritative human decision with consequence,
    source evidence, and durable readback. When a blocked Task needs a review
    decision, open its current review evidence from Attention and record the
-   decision through the shared review action.
+   decision through the shared review action. A blocked intent preparation can
+   resume through its published action or open a linked edit where the operator
+   can check a different preparation runner while carrying selected sources
+   forward.
 7. **Review Changes** — review file tree, Markdown/code diff, checks, and
    delivery effects before accepting or requesting revision.
 8. **Completion and Evidence** — inspect outcome, verification, delivery, and
