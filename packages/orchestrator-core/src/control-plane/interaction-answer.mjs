@@ -7,6 +7,7 @@ import { initializeProjectRuntime } from "../project-init.mjs";
 import { resumeRunJobAfterInput } from "../run-job.mjs";
 
 import { appendRunEvent } from "./live-event-stream.mjs";
+import { toRequestedInteractionEventSummary } from "./interaction-projection.mjs";
 import { listStepResults, toEvidenceRef } from "./read-artifact-readers.mjs";
 
 export class InteractionAnswerError extends Error {
@@ -407,6 +408,7 @@ export function submitInteractionAnswer(options) {
     evidence_refs: uniqueStrings([...asStringArray(match.document.evidence_refs), answerAuditRef]),
   };
   fs.writeFileSync(match.file, `${JSON.stringify(nextDocument, null, 2)}\n`, "utf8");
+  const eventInteraction = toRequestedInteractionEventSummary(requestedInteraction, match.artifactRef);
 
   const evidenceEvent = appendRunEvent({
     cwd: options.cwd,
@@ -432,12 +434,9 @@ export function submitInteractionAnswer(options) {
     eventType: "step.updated",
     payload: {
       interaction: {
-        interaction_id: options.interactionId,
+        ...eventInteraction,
         status: "answered",
-        step_result_ref: match.artifactRef,
-        question_summary: questionSummary,
         answer_required: false,
-        answer_audit_refs: [answerAuditRef],
         continuation: {
           next_action: "resume_from_boundary",
           reason_code: "answer-accepted",
@@ -455,12 +454,9 @@ export function submitInteractionAnswer(options) {
     eventType: "step.updated",
     payload: {
       interaction: {
-        interaction_id: options.interactionId,
+        ...eventInteraction,
         status: canResume ? "resumed" : "blocked",
-        step_result_ref: match.artifactRef,
-        question_summary: questionSummary,
         answer_required: false,
-        answer_audit_refs: [answerAuditRef],
         continuation: {
           next_action: canResume ? "continue_run" : "remain_blocked",
           reason_code: canResume ? "answer-resumed" : blockedReason?.code,

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { toRequestedInteractionEventSummary } from "../../control-plane/interaction-projection.mjs";
 
 import {
   CliUsageError,
@@ -41,7 +42,6 @@ import {
   resolveOptionalIntegerFlag,
   resolveOptionalCsvFlag,
   readJson,
-  asStringArray,
   asPlainObject,
   toEvidenceRef,
   resolveOptionalRefOrPathFlag,
@@ -699,27 +699,12 @@ export function handleRunControlCommand(context) {
       });
 
       const requestedInteraction = asPlainObject(routedExecution.stepResult.requested_interaction);
-      const interactionStatus =
-        typeof requestedInteraction.status === "string" && requestedInteraction.status.trim().length > 0
-          ? requestedInteraction.status.trim()
-          : "requested";
       const interactionPayload =
         requestedInteraction.requested === true
-          ? {
-              interaction_id:
-                typeof requestedInteraction.interaction_id === "string" ? requestedInteraction.interaction_id : null,
-              status: interactionStatus,
-              step_result_ref: toEvidenceRef(controlResult.projectRoot, routedExecution.stepResultPath),
-              question_summary:
-                typeof requestedInteraction.prompt_summary === "string"
-                  ? requestedInteraction.prompt_summary
-                  : typeof requestedInteraction.summary === "string"
-                    ? requestedInteraction.summary
-                    : null,
-              answer_required: interactionStatus === "requested",
-              answer_audit_refs: asStringArray(requestedInteraction.answer_audit_refs),
-              continuation: asPlainObject(requestedInteraction.continuation),
-            }
+          ? toRequestedInteractionEventSummary(
+              requestedInteraction,
+              toEvidenceRef(controlResult.projectRoot, routedExecution.stepResultPath),
+            )
           : null;
 
       const stepEvent = appendRunEvent({

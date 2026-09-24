@@ -12,6 +12,7 @@ import { validateContextBudgetEstimate, validateContextSizeSources } from "./con
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"], WORK_TYPE_VALUES = ["analyze", "explain", "review", "document-change", "code-change"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
+const INTERACTION_PERMISSION_DECISION_VALUES = ["approve_once", "deny", "approve_for_run"];
 const LEARNING_LOOP_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LEARNING_LOOP_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary", "qwen-primary"];
 const COMPILED_CONTEXT_BUDGET_STATUS_VALUES = ["pass", "warn", "fail", "not_configured"];
@@ -3185,6 +3186,59 @@ function validateLiveRunEvent(document, source) {
       issues,
       required: false,
     });
+    validateNestedEnumStringField({
+      record: interaction,
+      source,
+      field: "payload.interaction.interaction_type",
+      allowedValues: INTERACTION_TYPE_VALUES,
+      issues,
+      required: false,
+    });
+    const permissionRequest = validateOptionalObjectField({
+      record: interaction,
+      source,
+      field: "payload.interaction.permission_request",
+      issues,
+    });
+    if (permissionRequest) {
+      for (const field of ["operation_type", "resource_type", "resource_label"]) {
+        validateNestedStringField({
+          record: permissionRequest,
+          source,
+          field: `payload.interaction.permission_request.${field}`,
+          issues,
+          required: false,
+        });
+      }
+      validateOptionalStringArrayField({
+        record: permissionRequest,
+        source,
+        field: "payload.interaction.permission_request.capabilities",
+        issues,
+      });
+      const allowedDecisions = validateOptionalArrayField({
+        record: permissionRequest,
+        source,
+        field: "payload.interaction.permission_request.allowed_decisions",
+        issues,
+      });
+      allowedDecisions?.forEach((decision, index) => {
+        validateEnumString(
+          decision,
+          source,
+          `payload.interaction.permission_request.allowed_decisions[${index}]`,
+          INTERACTION_PERMISSION_DECISION_VALUES,
+          issues,
+        );
+      });
+      validateUnsupportedNestedFields({
+        record: permissionRequest,
+        source,
+        parentField: "payload.interaction.permission_request",
+        fields: ["answer", "answer_text", "raw_answer", "canonical_resource", "command", "command_args", "target", "target_path"],
+        issues,
+      });
+    }
     validateNestedBooleanField({
       record: interaction,
       source,

@@ -712,3 +712,107 @@ test("Task Workspace follows asynchronous preparation without resubmitting the a
   expect(taskReadsAfterSubmission).toBeGreaterThanOrEqual(3);
   expect(submissionPayload).toMatchObject({ request_text: "Wait for server preparation.", preparation_route_id: "route.intake-normalize.default", auto_prepare: true });
 });
+
+test("Task Workspace answers runner questions through the control plane and shows continuation state", async ({ page }) => {
+  const state = readHarnessState();
+  await blockExternalNetwork(page, state.app_url);
+  const questionTask = taskFixture(state, {
+    task_id: "task.runner-question",
+    display_title: "Answer deployment question",
+    status: "attention",
+    status_detail: "waiting-input",
+    run_ids: ["run.runner-question"],
+    attention_count: 1,
+    blocker_count: 1,
+  });
+  const permissionTask = taskFixture(state, {
+    task_id: "task.runner-permission",
+    display_title: "Review runner permission",
+    status: "active",
+    status_detail: "waiting-input",
+    run_ids: ["run.runner-permission"],
+  });
+  let answerPayload = null;
+  let questionHistory = {
+    run_id: "run.runner-question",
+    total_events: 1,
+    events: [{ event_id: "event.question.requested", event_type: "step.updated", interaction: {
+      interaction_id: "interaction.question", status: "requested", step_result_ref: "evidence://runner/question",
+      question_summary: "Which deployment target should the runner use?", interaction_type: "clarification_question",
+      answer_required: true, answer_audit_refs: [], continuation: { next_action: "resume_from_boundary", reason_code: "operator-answer-required" },
+    } }],
+  };
+  let permissionHistory = {
+    run_id: "run.runner-permission",
+    total_events: 1,
+    events: [{ event_id: "event.permission.requested", event_type: "step.updated", interaction: {
+      interaction_id: "interaction.permission", status: "requested", step_result_ref: "evidence://runner/permission",
+      question_summary: "The runner requested permission for this operation.", interaction_type: "permission_request",
+      permission_request: { operation_type: "file_write", resource_type: "filesystem", resource_label: "src/deploy.ts", capabilities: ["filesystem_write"], allowed_decisions: ["approve_once", "deny", "approve_for_run"] },
+      answer_required: true, answer_audit_refs: [], continuation: { next_action: "resume_from_boundary", reason_code: "operator-answer-required" },
+    } }],
+  };
+  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks(?:\\?.*)?$`, "u"), (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ project_id: state.project_id, tasks: [questionTask, permissionTask], read_only: true }),
+  }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/runs/([^/]+)/events/history(?:\\?.*)?$`, "u"), (route) => {
+    const runId = new URL(route.request().url()).pathname.split("/")[5];
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify(runId === "run.runner-question" ? questionHistory : permissionHistory) });
+  });
+  await page.route(new RegExp(`/api/projects/${state.project_id}/interactions/answers$`, "u"), async (route) => {
+    answerPayload = route.request().postDataJSON();
+    if (answerPayload.interaction_id === "interaction.question") {
+      questionHistory = { ...questionHistory, total_events: 2, events: [{ event_id: "event.question.resumed", event_type: "step.updated", interaction: { ...questionHistory.events[0].interaction, status: "resumed", answer_required: false, answer_audit_refs: ["evidence://runner/question-answer"], continuation: { next_action: "continue_run", reason_code: "answer-resumed" } } }] };
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ interaction_answer: { interaction_id: answerPayload.interaction_id, interaction_status: "resumed", answer_accepted: true } }) });
+      return;
+    }
+    permissionHistory = {
+      ...permissionHistory,
+      total_events: 2,
+      events: [
+        {
+          event_id: "event.permission.blocked",
+          event_type: "step.updated",
+          interaction: {
+            ...permissionHistory.events[0].interaction,
+            status: "blocked",
+            answer_required: false,
+            answer_audit_refs: ["evidence://runner/permission-answer"],
+            continuation: { next_action: "remain_blocked", reason_code: "continuation.reinvoke_required" },
+          },
+        },
+      ],
+    };
+    await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: { code: "interaction.continuation_blocked", message: "The run remains blocked until the approved operation is invoked again." }, interaction_answer: { interaction_id: answerPayload.interaction_id, interaction_status: "blocked", answer_accepted: true } }) });
+  });
+
+  const url = new URL(state.app_url);
+  url.searchParams.set("task", questionTask.task_id);
+  await page.goto(url.href);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Attention", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Runner question", exact: true })).toBeVisible();
+  await expect(page.getByText("Which deployment target should the runner use?", { exact: true })).toBeVisible();
+  await page.getByLabel("Answer").fill("staging");
+  await page.getByRole("button", { name: "Submit answer", exact: true }).click();
+  await expect(page.getByText("Answer recorded. The run resumed from this interaction.", { exact: true })).toBeVisible();
+  expect(answerPayload).toEqual({ run_id: "run.runner-question", interaction_id: "interaction.question", answer: "staging", reason: "" });
+  await expect(page.locator(".task-interaction-card")).not.toContainText("staging");
+
+  await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
+  await page.getByRole("button", { name: "Review runner permission", exact: false }).click();
+  await expect(page.getByRole("heading", { name: "Runner permission request", exact: true })).toBeVisible();
+  await expect(page.locator(".task-interaction-card")).toContainText("src/deploy.ts");
+  await expect(page.locator(".task-interaction-card")).toContainText("filesystem_write");
+  const approveOnce = page.getByRole("radio", { name: "Approve once" });
+  await approveOnce.focus();
+  await page.keyboard.press("Space");
+  await expect(approveOnce).toBeChecked();
+  const viewport = await page.evaluate(() => ({ width: window.innerWidth, contentWidth: document.documentElement.scrollWidth }));
+  expect(viewport.contentWidth).toBeLessThanOrEqual(viewport.width);
+  await page.getByRole("button", { name: "Submit decision", exact: true }).click();
+  await expect(page.getByText("Answer recorded, but the run remains blocked.", { exact: true })).toBeVisible();
+  await expect(page.locator(".task-interaction-card")).toContainText("continuation.reinvoke_required");
+  expect(answerPayload).toEqual({ run_id: "run.runner-permission", interaction_id: "interaction.permission", decision: "approve_once", reason: "" });
+});

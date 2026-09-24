@@ -163,6 +163,12 @@ function routeApi(request, response) {
   if (suffix === "/next-action-report") return json(response, 404, { code: "next_action.not_found", detail: "No next action." });
   if (suffix === "/intent-submissions") return json(response, 200, { submissions: [] });
   if (suffix === "/runs") return json(response, 200, []);
+  if (/^\/runs\/[^/]+\/events\/history$/u.test(suffix)) {
+    return json(response, 200, { run_id: suffix.split("/")[2], total_events: 0, events: [] });
+  }
+  if (suffix === "/interactions/answers" && request.method === "POST") {
+    return collectBody(request, (payload) => json(response, 200, { interaction_answer: { interaction_id: payload.interaction_id, interaction_status: "resumed", answer_accepted: true } }));
+  }
   if (suffix === "/packets") return json(response, 200, { packets: [] });
   if (suffix === "/step-results") return json(response, 200, { items: [] });
   if (suffix === "/delivery-manifests") return json(response, 200, { items: [] });

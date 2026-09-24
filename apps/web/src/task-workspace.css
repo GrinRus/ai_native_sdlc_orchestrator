@@ -338,6 +338,25 @@
 .task-attention-detail h3 { margin: 28px 0 15px; font-size: 1.25rem; }
 .task-attention-task { display: flex; align-items: center; gap: 10px; margin: 0; }
 .task-warning-callout { margin-top: 24px; padding: 17px 18px; border: 1px solid var(--aor-task-warning-callout-border); border-radius: 6px; background: var(--task-warning-soft); }
+.task-interactions { display: grid; gap: 12px; margin: 18px 0; }
+.task-interaction-card { display: grid; gap: 12px; min-width: 0; padding: 18px; border: 1px solid var(--task-line); border-left: 4px solid var(--task-teal); border-radius: 6px; background: var(--task-surface); }
+.task-interaction-card h3, .task-interaction-card p { margin: 0; }
+.task-interaction-card h3 { font-size: 1.08rem; }
+.task-interaction-card > p { color: var(--task-muted); line-height: 1.5; overflow-wrap: anywhere; }
+.task-interaction-card dl { display: grid; gap: 8px; margin: 0; }
+.task-interaction-card dl > div { display: grid; grid-template-columns: minmax(92px, .35fr) minmax(0, 1fr); gap: 12px; }
+.task-interaction-card dt { color: var(--task-muted); font-size: .83rem; }
+.task-interaction-card dd { margin: 0; overflow-wrap: anywhere; font-family: var(--aor-font-mono); font-size: .82rem; }
+.task-interaction-card form { display: grid; gap: 12px; }
+.task-interaction-card form > label { display: grid; gap: 6px; font-size: .86rem; font-weight: 650; }
+.task-interaction-card textarea { width: 100%; min-height: 78px; padding: 9px 10px; border: 1px solid var(--aor-task-input-border); border-radius: 5px; background: var(--task-surface); color: var(--task-ink); resize: vertical; }
+.task-interaction-card :is(textarea, input):focus-visible { outline: 3px solid var(--task-teal); outline-offset: 2px; }
+.task-interaction-card fieldset { display: grid; gap: 9px; margin: 0; padding: 12px; border: 1px solid var(--task-line); border-radius: 5px; }
+.task-interaction-card legend { padding: 0 5px; font-size: .86rem; font-weight: 700; }
+.task-interaction-card fieldset label { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.task-interaction-card input[type="radio"] { accent-color: var(--task-teal); }
+.task-interaction-card [role="alert"] { color: var(--aor-color-danger-fg); overflow-wrap: anywhere; }
+.task-interaction-card > code { color: var(--task-muted); overflow-wrap: anywhere; }
 .task-bullet-list, .task-check-list { display: grid; gap: 13px; margin: 0; padding: 0; list-style: none; }
 .task-bullet-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: baseline; }
 .task-bullet-list li > strong, .task-bullet-list li > code, .task-bullet-list li > span { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
@@ -559,6 +578,8 @@
   .task-attention-layout { display: block; min-height: 0; }
   .task-attention-list { border-right: 0; }
   .task-attention-detail { padding: 28px 17px 100px; border-right: 0; }
+  .task-interaction-card { padding: 14px; }
+  .task-interaction-card dl > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .task-review-layout { display: block; padding-bottom: 126px; }
   .task-review-files { border-right: 0; border-bottom: 1px solid var(--task-line); }
   .task-review-files button { min-height: 55px; }
@@ -590,8 +611,10 @@
   .task-active-main .task-detail-tabs button span { margin-left: 2px; }
   .task-active-main .task-activity-panel li { min-height: 54px; }
   .task-active-heading h2 { font-size: 1.75rem; }
-  .task-active-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 65%); gap: 12px; }
-  .task-active-heading .task-inline-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: start; gap: 8px; min-width: 0; }
+  .task-active-heading { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .task-active-heading > div:first-child { min-width: 0; }
+  .task-active-heading h2 { overflow-wrap: anywhere; }
+  .task-active-heading .task-inline-actions { display: grid; grid-column: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: start; gap: 8px; min-width: 0; }
   .task-active-heading .task-inline-actions .task-inspector-trigger { grid-column: 1 / -1; min-width: 0; }
   .task-active-heading .task-inline-actions .aor-button { min-width: 0; width: 100%; }
   .task-workspace-shell[data-screen="prepared"] .task-status-chip { display: none; }

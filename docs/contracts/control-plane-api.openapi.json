@@ -4139,6 +4139,28 @@
               "null"
             ]
           },
+          "interaction_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "permission_request",
+              "clarification_question",
+              "auth_required",
+              null
+            ]
+          },
+          "permission_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InteractionPermissionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "answer_required": {
             "type": [
               "boolean",
@@ -4163,6 +4185,48 @@
           }
         },
         "additionalProperties": true
+      },
+      "InteractionPermissionSummary": {
+        "type": "object",
+        "properties": {
+          "operation_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 240
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowed_decisions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "approve_once",
+                "deny",
+                "approve_for_run"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "InteractionContinuation": {
         "type": "object",

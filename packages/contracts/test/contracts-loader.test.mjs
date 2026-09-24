@@ -2024,6 +2024,28 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     "required_field_missing",
     "payload.interaction.continuation.next_action",
   );
+  const invalidLiveRunEventInteractionType = structuredClone(liveRunEvent.document);
+  invalidLiveRunEventInteractionType.payload.interaction.interaction_type = "shell_command";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-run-event",
+      document: invalidLiveRunEventInteractionType,
+      source: "test://w24-live-run-event-invalid-interaction-type",
+    }),
+    "enum_value_invalid",
+    "payload.interaction.interaction_type",
+  );
+  const unsafeLiveRunEventPermission = structuredClone(liveRunEvent.document);
+  unsafeLiveRunEventPermission.payload.interaction.permission_request.command = "git push https://user:token@example.test";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-run-event",
+      document: unsafeLiveRunEventPermission,
+      source: "test://w24-live-run-event-unsafe-permission-summary",
+    }),
+    "unsupported_field_present",
+    "payload.interaction.permission_request.command",
+  );
 
   const incidentReport = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/incident-report.canonical.yaml"),

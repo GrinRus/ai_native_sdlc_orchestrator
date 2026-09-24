@@ -31,6 +31,32 @@ function projectLabel(project) {
   return project?.display_name || project?.label || project?.project_id || "Project";
 }
 
+async function readTaskInteractions(projectBase, tasks) {
+  const runIds = [...new Set(tasks
+    .filter((task) => ["active", "attention"].includes(task?.status))
+    .flatMap((task) => Array.isArray(task?.run_ids) ? task.run_ids : [])
+    .filter((runId) => typeof runId === "string" && runId.length > 0))];
+  const results = await Promise.allSettled(runIds.map((runId) => readJson(
+    `${projectBase}/runs/${encodeURIComponent(runId)}/events/history?limit=50`,
+  )));
+  const interactionsByRun = {};
+  const failures = [];
+  results.forEach((result, index) => {
+    const runId = runIds[index];
+    if (result.status === "rejected") {
+      failures.push(`interaction history (${runId}): ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
+      return;
+    }
+    const interactions = new Map();
+    for (const event of result.value?.events ?? []) {
+      const interaction = event?.interaction;
+      if (interaction?.interaction_id) interactions.set(interaction.interaction_id, { ...interaction, run_id: runId });
+    }
+    interactionsByRun[runId] = [...interactions.values()];
+  });
+  return { interactionsByRun, failures };
+}
+
 function ProjectDialog({ open, projects, activeProjectId, busy, result, form, setForm, onClose, onSelect, onConnect, onPickFolder }) {
   const sourceValue = form.sourceKind === "git" ? form.gitUrl : form.projectRef;
   return <Dialog open={open} onClose={onClose} labelledBy="task-project-dialog-title" className="task-project-dialog">
@@ -75,6 +101,7 @@ function TaskApp() {
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState(initialLocation.projectId);
   const [tasks, setTasks] = useState([]);
+  const [interactionsByRun, setInteractionsByRun] = useState({});
   const [operatorRequests, setOperatorRequests] = useState([]);
   const [executionProfile, setExecutionProfile] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(initialLocation.taskId);
@@ -112,6 +139,7 @@ function TaskApp() {
       setActiveProjectId(nextProjectId);
       if (!nextProjectId) {
         setTasks([]); setSelectedTaskId(null);
+        setInteractionsByRun({});
         setOperatorRequests([]);
         setExecutionProfile(null);
         setConnectionState("connected");
@@ -127,14 +155,16 @@ function TaskApp() {
         readJson(`${base}/execution-profile`),
         readJson(`${base}/operator-requests`),
       ]);
+      const taskPayload = taskResult.status === "fulfilled" ? taskResult.value : { tasks: [] };
+      const nextTasks = Array.isArray(taskPayload.tasks) ? taskPayload.tasks : [];
+      const interactionResult = await readTaskInteractions(base, nextTasks);
+      setInteractionsByRun(interactionResult.interactionsByRun);
       const unavailableReads = [
         ["project state", stateResult],
         ["tasks", taskResult],
         ["runner profile", executionProfileResult],
         ["operator requests", operatorRequestResult],
       ].filter(([, result]) => result.status === "rejected");
-      const taskPayload = taskResult.status === "fulfilled" ? taskResult.value : { tasks: [] };
-      const nextTasks = Array.isArray(taskPayload.tasks) ? taskPayload.tasks : [];
       const nextOperatorRequests = operatorRequestResult.status === "fulfilled" && Array.isArray(operatorRequestResult.value)
         ? operatorRequestResult.value
         : [];
@@ -145,16 +175,18 @@ function TaskApp() {
         : project));
       if (taskResult.status === "fulfilled") setTasks(nextTasks);
       if (operatorRequestResult.status === "fulfilled") setOperatorRequests(nextOperatorRequests);
-      setConnectionState(taskResult.status === "rejected" ? "offline" : unavailableReads.length ? "partial" : "connected");
-      setResourceError(unavailableReads.length ? {
-        detail: unavailableReads.map(([label, result]) => {
+      setConnectionState(taskResult.status === "rejected" ? "offline" : unavailableReads.length || interactionResult.failures.length ? "partial" : "connected");
+      const resourceFailures = [
+        ...unavailableReads.map(([label, result]) => {
           const reason = result.reason;
           const message = typeof reason?.detail === "string"
             ? reason.detail
             : reason instanceof Error ? reason.message : String(reason);
           return `${label}: ${message}`;
-        }).join(" "),
-      } : null);
+        }),
+        ...interactionResult.failures,
+      ];
+      setResourceError(resourceFailures.length ? { detail: resourceFailures.join(" ") } : null);
       const staysOnCurrentProject = nextProjectId === activeProjectId
         || (!activeProjectId && !initialLocation.projectId && Boolean(initialLocation.taskId));
       const selectionIsAvailable = taskResult.status === "rejected"
@@ -226,6 +258,25 @@ function TaskApp() {
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : String(actionError));
       return null;
+    } finally { setBusy(false); }
+  }
+
+  async function answerInteraction(interaction, answerPayload) {
+    if (!apiProjectBase || !interaction?.run_id || !interaction?.interaction_id || busy) {
+      throw new Error("The runner interaction is unavailable until its run is selected.");
+    }
+    setBusy(true); setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/interactions/answers`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ run_id: interaction.run_id, interaction_id: interaction.interaction_id, ...answerPayload }),
+      });
+      await refresh({ silent: true });
+      return result;
+    } catch (answerError) {
+      await refresh({ silent: true });
+      throw answerError;
     } finally { setBusy(false); }
   }
 
@@ -408,7 +459,7 @@ function TaskApp() {
   if (!activeProject) return <><EmptyWorkspace onOpenProject={() => setProjectDialogOpen(true)} error={error} onRetry={() => void refresh()} />{projectDialog}</>;
 
   return <div className="task-app" data-app-surface="task-workspace">
-    <TaskWorkspace project={activeProject} tasks={tasks} operatorRequests={operatorRequests} selectedTaskId={selectedTaskId} pendingPreparation={pendingSubmission?.projectId === activeProjectId} pendingSubmissionId={pendingSubmission?.projectId === activeProjectId ? pendingSubmission.submissionId : null} onStopFollowingPreparation={() => setPendingSubmission((current) => current?.projectId === activeProjectId ? null : current)} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} onResumeOperatorRequest={resumeOperatorRequest} executionProfile={executionProfile} onSelectRunner={selectRunner} onCheckPreparationRunner={checkPreparationRunner} onCheckExecutionRunner={checkExecutionRunner} onInitializeRunnerProfile={initializeRunnerProfile} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
+    <TaskWorkspace project={activeProject} tasks={tasks} interactionsByRun={interactionsByRun} operatorRequests={operatorRequests} selectedTaskId={selectedTaskId} pendingPreparation={pendingSubmission?.projectId === activeProjectId} pendingSubmissionId={pendingSubmission?.projectId === activeProjectId ? pendingSubmission.submissionId : null} onStopFollowingPreparation={() => setPendingSubmission((current) => current?.projectId === activeProjectId ? null : current)} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} onAnswerInteraction={answerInteraction} onResumeOperatorRequest={resumeOperatorRequest} executionProfile={executionProfile} onSelectRunner={selectRunner} onCheckPreparationRunner={checkPreparationRunner} onCheckExecutionRunner={checkExecutionRunner} onInitializeRunnerProfile={initializeRunnerProfile} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
     {projectDialog}
   </div>;
 }

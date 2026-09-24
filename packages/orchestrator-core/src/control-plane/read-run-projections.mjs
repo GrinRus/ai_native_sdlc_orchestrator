@@ -9,6 +9,7 @@ import { createProjectReadContext } from "./project-context.mjs";
 import { attachParentRunProjections } from "./parent-run-read-model.mjs";
 import { listExternalRunHealthProjectionsForRuntime } from "./external-run-health-read-model.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
+import { toInteractionHistorySummary } from "./interaction-projection.mjs";
 import { runProjectionCoordinator } from "../operator-projection-services.mjs";
 import { applyReadModelLimit, listPacketArtifacts, listQualityArtifacts, listRunControlAudits, listRunControlStateFiles, listStepResults } from "./read-artifact-readers.mjs";
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
@@ -979,7 +980,6 @@ export function readRunEventHistory(options) {
     const payload = asRecord(event.payload);
     const policyContext = asRecord(payload.policy_context);
     const interaction = asRecord(payload.interaction);
-    const continuation = asRecord(interaction.continuation);
     const providerStepStatus = normalizeProviderStepStatus(asRecord(payload.provider_step_status), {
       nowMs: toTimestampMs(event.timestamp) ?? undefined,
     });
@@ -996,24 +996,7 @@ export function readRunEventHistory(options) {
       step_result_ref: asString(payload.step_result_ref),
       answer_audit_ref: asString(payload.answer_audit_ref),
       provider_step_status: providerStepStatus,
-      interaction:
-        Object.keys(interaction).length > 0
-          ? {
-              interaction_id: asString(interaction.interaction_id),
-              status: asString(interaction.status),
-              step_result_ref: asString(interaction.step_result_ref),
-              question_summary: asString(interaction.question_summary),
-              answer_required: asBoolean(interaction.answer_required),
-              answer_audit_refs: asStringArray(interaction.answer_audit_refs),
-              continuation:
-                Object.keys(continuation).length > 0
-                  ? {
-                      next_action: asString(continuation.next_action),
-                      reason_code: asString(continuation.reason_code),
-                    }
-                  : null,
-            }
-          : null,
+      interaction: Object.keys(interaction).length > 0 ? toInteractionHistorySummary(interaction) : null,
       policy_context:
         Object.keys(policyContext).length > 0
           ? {

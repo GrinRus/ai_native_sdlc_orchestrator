@@ -612,7 +612,7 @@ Lifecycle command mutations must:
 - return existing command response fields and durable artifact refs where available;
 - preserve policy, approval, validation, and blocked-next-step evidence in stable response shapes;
 - support the interactive continuation flow described by `step-result.requested_interaction`;
-- include an answer-submission command mutation for unresolved runner-requested interactions before web full-flow claims answer support.
+- let Task Workspace read the run-scoped event history, show unresolved runner questions, and submit answers through the existing interaction-answer route.
 
 HTTP lifecycle command mutation baseline:
 - route: `POST /api/projects/:projectId/lifecycle-command/actions`;
@@ -636,6 +636,7 @@ HTTP interactive answer mutation baseline:
 - non-resumable boundaries return HTTP `409` with `error.code=interaction.continuation_blocked` and keep the run blocked with evidence refs;
 - live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
 - CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
+- Task Workspace renders clarification questions as text-answer forms and permission requests from the live-event allowlist; it renders resumed or blocked continuation status from the latest event and never owns resume logic.
 - for runtime permission requests, `decision` is required; legacy free-text `answer` is only compatible with ordinary clarification questions.
 - for runtime permission requests, answer submission records the structured decision but must not claim a pass unless an actual continuation or reinvocation has run. Current coarse external-process adapters report `continuation.reinvoke_required` after user approval so the next runtime action is explicit.
 - `approve_once` applies only to the recorded operation. `approve_for_run` creates an expiring grant, but reuse still requires the same project, run, step, operation identity, canonical resource, and capability set after hard-deny checks pass; it cannot broaden resources or cross a step boundary and is not persisted globally.
