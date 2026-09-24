@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { listTaskProjections, projectTaskFromFlow } from "../src/control-plane/task-projections.mjs";
+import { derivePublicId } from "../../contracts/src/index.mjs";
+import { readRunJobStatus } from "../src/run-job.mjs";
 
 const baseFlow = {
   flow_id: "flow.project-alpha.mission-1",
@@ -37,6 +42,25 @@ test("Task projection has stable lineage identity and delegates lifecycle to Flo
   assert.equal(task.primary_action.operator_control, "Run discovery");
   assert.deepEqual(task.run_ids, ["run.task-projection.v1"]);
   assert.equal(task.read_only, true);
+});
+
+test("Task projection publishes only the selected durable run-job status", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-task-run-state-"));
+  const runId = "run.task-projection.v1";
+  const runtimeLayout = { stateRoot: path.join(root, "state") };
+  const jobId = derivePublicId([runId, "job"], "job");
+  const jobDirectory = path.join(runtimeLayout.stateRoot, "run-jobs");
+  const jobFile = path.join(jobDirectory, `run-job-${jobId}.json`);
+  fs.mkdirSync(jobDirectory, { recursive: true });
+  fs.writeFileSync(jobFile, JSON.stringify({ run_id: runId, status: "paused", revision: 3 }));
+  try {
+    const runState = readRunJobStatus({ runtimeLayout, runId });
+    assert.deepEqual(runState, { run_id: runId, status: "paused" });
+    assert.deepEqual(projectTaskFromFlow({ projectId: "project-alpha", flow: baseFlow, runState }).run_state, runState);
+    assert.equal(readRunJobStatus({ runtimeLayout, runId: "run.unrelated" }), null);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("completed Flow projects to immutable completed Task without inventing a next action", () => {

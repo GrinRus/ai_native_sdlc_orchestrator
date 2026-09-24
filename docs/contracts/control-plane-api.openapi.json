@@ -2954,11 +2954,21 @@
           "primary_action": { "$ref": "#/components/schemas/JsonObject" },
           "prepared_contract": { "$ref": "#/components/schemas/TaskPreparedContract" },
           "runner_selection": { "$ref": "#/components/schemas/TaskRunnerSelection" },
+          "run_state": { "$ref": "#/components/schemas/TaskRunState" },
           "updated_at": { "type": ["string", "null"], "format": "date-time" },
           "completed_read_only": { "type": "boolean" },
           "read_only": { "type": "boolean", "const": true }
         },
         "additionalProperties": true
+      },
+      "TaskRunState": {
+        "type": "object",
+        "required": ["run_id", "status"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "paused", "waiting-input", "canceling", "succeeded", "failed", "canceled"] }
+        },
+        "additionalProperties": false
       },
       "TaskPreparedContract": {
         "type": "object",

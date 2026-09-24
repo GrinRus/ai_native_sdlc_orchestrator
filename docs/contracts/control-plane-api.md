@@ -92,7 +92,8 @@ Flow lineage:
 
 - `GET /api/projects/:projectId/tasks` returns stable public `task_id` values,
   draft/prepared/active/attention/completed status projections, source refs, runtime lifecycle path, attention/blocker counts,
-  runner-readiness metadata, and one server-owned primary action;
+  runner-readiness metadata, an optional bounded `run_state` from the durable
+  run-job, and one server-owned primary action;
 - Every Task response is the versioned `task-projection` read model. Its
   `prepared_contract` carries the exact normalized outcome, acceptance,
   bounded scope, delivery mode, normalization revision, approved execution

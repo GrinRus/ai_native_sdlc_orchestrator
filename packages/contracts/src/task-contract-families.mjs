@@ -28,6 +28,7 @@ export const TASK_CONTRACT_FAMILIES = Object.freeze([
       run_ids: "array", lineage: "object", source_items: "array", attention_items: "array",
       review: "object", completion: "object", lifecycle_path: "object", runner_selection: "object",
       primary_action: "object", prepared_contract: "object", completed_read_only: "boolean", read_only: "boolean",
+      run_state: "object",
     },
     enumChecks: [{ field: "status", allowedValues: ["draft", "prepared", "active", "attention", "completed"] }],
   },

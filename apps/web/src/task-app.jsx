@@ -253,6 +253,7 @@ function TaskApp() {
       const result = await readJson(`${apiProjectBase}/tasks/${encodeURIComponent(task.task_id)}/actions`, {
         method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ action, ...payload }),
       });
+      if (["pause", "resume"].includes(action)) await new Promise((resolve) => window.setTimeout(resolve, 300));
       await refresh({ silent: true });
       return result;
     } catch (actionError) {

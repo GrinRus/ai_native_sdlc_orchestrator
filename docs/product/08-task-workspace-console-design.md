@@ -223,6 +223,8 @@ offline/reconnect, disabled, success, and keyboard focus. Active Task additional
 covers queued, running, interaction-required, paused, canceling, failed,
 repairing, and completed. Narrow layouts replace the right inspector with a
 drawer and keep state, safety, and the primary action visible.
+Pause is available for a running job and Resume for a paused job; the visible
+run state comes from durable run-job evidence.
 
 ## Acceptance criteria
 

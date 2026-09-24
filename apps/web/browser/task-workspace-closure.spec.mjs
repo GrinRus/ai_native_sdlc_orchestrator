@@ -140,7 +140,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     { ...base, task_id: `${base.task_id}.stale`, display_title: "Stale source", status: "attention", status_detail: "blocked", attention_count: 1, blocker_count: 1, source_items: [{ schema_version: 1, source_id: "source.stale", kind: "repository-markdown", immutable: true, stale: true, digest: "d".repeat(64), preview: { project_relative_path: "docs/stale.md", pinned_base_revision: "d".repeat(40), sanitized_markdown: "# Stale source" } }] },
     { ...base, task_id: `${base.task_id}.unavailable`, display_title: "Unavailable runner", status: "attention", status_detail: "blocked", attention_count: 1, blocker_count: 1, primary_action: { ...base.primary_action, action_id: "retry", operator_control: "Retry preparation", reason: "Configure and authenticate an approved runner before preparing this task.", available: true }, attention_items: [{ item_id: "blocker.unavailable", code: "intent_provider.not_ready", message: "Configure and authenticate an approved runner before preparing this task.", consequence: "Configure and authenticate an approved runner before preparing this task.", recovery_action: "Choose another approved route." }], runner_selection: { ...base.runner_selection, readiness: "unavailable", unavailable_reason: "Approved route is unavailable in this local fixture.", recovery_action: "Choose another approved route." } },
     { ...base, task_id: `${base.task_id}.failure`, display_title: "Failed task", status: "attention", status_detail: "failed", attention_count: 1, blocker_count: 1, primary_action: { ...base.primary_action, action_id: "request", operator_control: "Request revision", available: true } },
-    { ...base, task_id: `${base.task_id}.review`, display_title: "Review task", status: "active", review: { verification_status: "pass", delivery_status: "pending", changed_paths: ["docs/task.md"], evidence_refs: ["evidence://review"] } },
+    { ...base, task_id: `${base.task_id}.review`, display_title: "Review task", status: "active", run_state: { run_id: "run.closure", status: "running" }, review: { verification_status: "pass", delivery_status: "pending", changed_paths: ["docs/task.md"], evidence_refs: ["evidence://review"] } },
     { ...base, task_id: `${base.task_id}.completed`, display_title: "Completed task", status: "completed", status_detail: "completed", completed_read_only: true, completion: { status: "blocked", verification_status: "partial", delivery_status: "pending", evidence_refs: ["evidence://partial"], follow_up_eligible: true } },
     { ...base, task_id: `${base.task_id}.complete-proof`, display_title: "Completed proof task", status: "completed", status_detail: "completed", completed_read_only: true, completion: { status: "complete", verification_status: "pass", delivery_status: "pass", patch_ref: "evidence://delivery/closure.patch", digest: "e".repeat(64), evidence_refs: ["evidence://completion/closure"], follow_up_eligible: true } },
   ];
@@ -163,6 +163,12 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/actions$`, "u"), async (route) => {
     const payload = route.request().postDataJSON();
     actionPayloads.push(payload);
+    if (["pause", "resume"].includes(payload.action)) {
+      const taskId = new URL(route.request().url()).pathname.split("/").at(-2);
+      const taskIndex = tasks.findIndex((task) => task.task_id === taskId);
+      const task = tasks[taskIndex];
+      tasks[taskIndex] = { ...task, run_state: { ...task.run_state, status: payload.action === "pause" ? "paused" : "running" } };
+    }
     if (payload.action === "request") {
       operatorRequests = [{
         operator_request_ref: "packet://operator-request@evidence://reports/operator-request-ask-aor.json",
@@ -258,6 +264,13 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Review task" }).click();
   await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
+  expect(actionPayloads.at(-1)).toEqual({ action: "pause" });
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  expect(actionPayloads.at(-1)).toEqual({ action: "resume" });
   await page.getByLabel("Task guidance").fill("Inspect this bounded change.");
   const sendAskAorRequest = page.getByRole("button", { name: "Send request", exact: true });
   await sendAskAorRequest.focus();

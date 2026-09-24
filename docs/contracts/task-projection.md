@@ -16,6 +16,12 @@ Mission/Flow/run lineage. The projection is not a second lifecycle store.
 - `status` is one of `draft`, `prepared`, `active`, `attention`, or
   `completed`. A completed projection is immutable and must set
   `completed_read_only=true`.
+- `run_state` is an optional bounded view of the durable run-job selected by
+  `run_ids[0]`. It contains only that `run_id`, the canonical run-job
+  `status`. Worker identity, revision, and execution details remain private.
+  Consumers can use it to show queued, running,
+  paused, waiting-input, canceling, and terminal run states while the Flow
+  projection catches up.
 - Older projections may omit additive fields. Consumers must treat a missing
   prepared contract as `unknown`, never infer a route or write permission, and
   must keep the stable identity derived from the existing lineage fields.

@@ -5,6 +5,7 @@ const DELIVERY_MODES = ["no-write", "patch-only", "local-branch", "fork-first-pr
 const ROUTE_STEPS = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const ROUTE_SOURCES = ["project-default", "task-override"];
 const READINESS_VALUES = ["ready", "unknown", "stale", "unavailable", "blocked"];
+const RUN_STATUSES = ["queued", "running", "paused", "waiting-input", "canceling", "succeeded", "failed", "canceled"];
 
 function requiredString(record, field, source, issues) {
   if (typeof record[field] !== "string" || !record[field].trim()) {
@@ -50,6 +51,14 @@ export function validateTaskProjection(document, source) {
     if (lineage.intent_submission_id !== null && lineage.intent_submission_id !== undefined) requiredString(lineage, "intent_submission_id", source, issues);
   }
   requiredArray(document, "run_ids", source, issues);
+  if (document.run_state !== undefined) {
+    const runState = requiredObject(document, "run_state", source, issues);
+    if (runState) {
+      if (typeof runState.run_id !== "string" || !runState.run_id.trim()) issues.push(issue({ code: "field_type_mismatch", source, field: "run_state.run_id", expected: "non-empty string", actual: typeof runState.run_id, message: "Run state run_id must be a non-empty string." }));
+      if (typeof runState.status !== "string" || !RUN_STATUSES.includes(runState.status)) issues.push(issue({ code: "enum_value_invalid", source, field: "run_state.status", expected: RUN_STATUSES.join("|"), actual: String(runState.status ?? "missing"), message: `Run state status must be one of ${RUN_STATUSES.join(", ")}.` }));
+      if (Array.isArray(document.run_ids) && !document.run_ids.includes(runState.run_id)) issues.push(issue({ code: "enum_value_invalid", source, field: "run_state.run_id", expected: "one of run_ids", actual: String(runState.run_id), message: "Run state must belong to a Task run_id." }));
+    }
+  }
   const prepared = requiredObject(document, "prepared_contract", source, issues);
   if (!prepared) return issues;
   if (prepared.schema_version !== 1) issues.push(issue({ code: "enum_value_invalid", source, field: "prepared_contract.schema_version", expected: "1", actual: String(prepared.schema_version ?? "missing"), message: "Prepared contract schema_version must be 1." }));

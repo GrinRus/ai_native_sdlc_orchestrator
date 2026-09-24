@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import { listFlowProjections } from "./flow-projections.mjs";
 import { readExecutionProfile } from "./execution-profile.mjs";
 import { getTaskActionDefinition } from "./task-action-catalog.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
+import { readRunJobStatus } from "../run-job.mjs";
 
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -361,7 +363,7 @@ function taskSourceItems(flow) {
  * model. This module owns presentation identity only; lifecycle and mutations
  * remain owned by intent, Mission, Flow, and Runtime Harness services.
  */
-export function projectTaskFromFlow({ projectId, flow, executionProfile, intentSubmission = null }) {
+export function projectTaskFromFlow({ projectId, flow, executionProfile, intentSubmission = null, runState = null }) {
   const id = taskId(projectId, flow.flow_id);
   const status = taskStatus(flow);
   const latestNormalization = intentSubmission?.normalization;
@@ -412,6 +414,7 @@ export function projectTaskFromFlow({ projectId, flow, executionProfile, intentS
       reason: null,
       available: false,
     }, status),
+    ...(runState ? { run_state: runState } : {}),
     runner_selection: selection,
     prepared_contract: preparedContract({
       normalization,
@@ -432,6 +435,7 @@ export function projectTaskFromFlow({ projectId, flow, executionProfile, intentS
 
 export function listTaskProjections(options = {}) {
   const flows = listFlowProjections(options);
+  const runtimeLayout = flows.flows.length ? createProjectReadContext(options).runtimeLayout : null;
   let executionProfile = options.executionProfile ?? null;
   if (!executionProfile && options.registry && options.projectId) {
     try {
@@ -449,6 +453,7 @@ export function listTaskProjections(options = {}) {
     flow,
     executionProfile,
     intentSubmission: intentByFlow.get(flow.flow_id) ?? null,
+    runState: flowRunIds(flow)[0] ? readRunJobStatus({ runtimeLayout, runId: flowRunIds(flow)[0] }) : null,
   }));
   const intentTasks = intentEntries.length
     ? intentEntries.map((entry) => projectIntentTask({ projectId: flows.project_id, entry, executionProfile })).filter(Boolean)
