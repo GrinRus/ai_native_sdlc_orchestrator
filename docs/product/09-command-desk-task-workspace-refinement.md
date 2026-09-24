@@ -12,7 +12,9 @@ boundary defined by the W70 Task Workspace contract.
 
 - **Tasks** is the default queue and remains the first landing surface.
 - **Attention** is a filtered recovery queue for tasks that need an operator.
-- **Evidence** opens the selected task's review or immutable completion proof.
+- **Evidence** opens a searchable index of durable references published by
+  project Tasks. Selecting a reference returns to its owning Task; detailed
+  review and immutable completion proof remain task-scoped.
 - **Project** opens the existing explicit project connection dialog.
 - Runs, source previews, review, and completion evidence stay inside the Task
   context; the redesign does not introduce a second runtime state store.

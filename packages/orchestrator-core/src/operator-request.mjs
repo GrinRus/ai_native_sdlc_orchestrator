@@ -459,6 +459,7 @@ function resolveTargetStep(intentType, targetStage) {
  *   deliveryMode?: string,
  *   targetFlowId?: string,
  *   idempotencyKey?: string,
+ *   queueForRun?: boolean,
  * }} options
  */
 export function createOperatorRequest(options) {
@@ -570,6 +571,7 @@ export function createOperatorRequest(options) {
     const requestId = boundedDerivedId("operator-request", `operator-request.${init.projectId}.${suffix}`);
     const filePath = path.join(init.runtimeLayout.reportsRoot, `operator-request-${normalizeForId(requestId)}.json`);
     const operatorRequestRef = toOperatorRequestPacketRef(init.projectRoot, filePath);
+    const initialStatus = options.queueForRun === true ? "run-pending" : "created";
     const document = {
       request_id: requestId,
       idempotency_key: idempotencyKey,
@@ -584,12 +586,15 @@ export function createOperatorRequest(options) {
       target_refs: targetRefs,
       allowed_paths: allowedPaths,
       delivery_mode: deliveryMode,
-      status: "created",
+      status: initialStatus,
       attempt: 0,
       created_at: timestamp,
       updated_at: timestamp,
       result_refs: [],
       evidence_refs: [operatorRequestRef],
+      ...(initialStatus === "run-pending"
+        ? { execution: { status: "run-pending", recovery_action: "request run" } }
+        : {}),
     };
     assertValidOperatorRequest(document, filePath);
     writeJsonAtomic(filePath, document);
@@ -598,7 +603,7 @@ export function createOperatorRequest(options) {
       operatorRequestFile: filePath,
       operatorRequestRef,
       requestId,
-      status: "created",
+      status: initialStatus,
       idempotencyKey,
       idempotent: false,
       projectRoot: init.projectRoot,

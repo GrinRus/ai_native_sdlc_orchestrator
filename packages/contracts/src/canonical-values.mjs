@@ -29,6 +29,15 @@ function invalidResult(valueClass, migration) {
   return { ok: false, value_class: valueClass, migration };
 }
 
+function isDeclarativeFieldSchema(value) {
+  return Boolean(value
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && typeof value.type === "string"
+    && typeof value.required === "boolean"
+    && Object.keys(value).every((key) => ["type", "required", "ui_required"].includes(key)));
+}
+
 export function validatePublicId(value) {
   if (typeof value !== "string") {
     return invalidResult("non-string", "Supply a lowercase ASCII identifier string.");
@@ -293,7 +302,7 @@ export function validateCanonicalContractValues(document, source) {
     if (!value || typeof value !== "object") return;
     for (const [key, entry] of Object.entries(value)) {
       const entryField = field ? `${field}.${key}` : key;
-      if ((PUBLIC_ID_FIELD_SET.has(key) || key.endsWith("_id")) && entry !== null) {
+      if ((PUBLIC_ID_FIELD_SET.has(key) || key.endsWith("_id")) && entry !== null && !isDeclarativeFieldSchema(entry)) {
         const validation = validatePublicId(entry);
         if (!validation.ok) {
           issues.push(

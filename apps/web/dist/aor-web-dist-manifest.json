@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "7926df0f512f1b61193528f93058a45ce3966c00ab89ecea644c52ff4f43c08d",
+  "source_hash": "dcb786ae806d03bbaaa0b406585c96a6c5b86e551b915b4b6684eba3c4e9fb23",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -9,6 +9,9 @@
     "apps/web/src/live-run-stream.js",
     "apps/web/src/task-app.css",
     "apps/web/src/task-app.jsx",
+    "apps/web/src/task-ask-aor-panel.jsx",
+    "apps/web/src/task-markdown-source-dialog.jsx",
+    "apps/web/src/task-projection-content.js",
     "apps/web/src/task-workspace.css",
     "apps/web/src/task-workspace.jsx",
     "apps/web/src/ui/components.css",
@@ -18,13 +21,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-6JUPXZFn.css",
-    "apps/web/dist/assets/index-BmgGwFOr.js",
+    "apps/web/dist/assets/index-6wPMK-b6.css",
+    "apps/web/dist/assets/index-BoZH9SJY.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-6JUPXZFn.css": "45f9e4694e80dec1a3e75a089b00c36b4f482c661c156ef8929faa968db97bb1",
-    "apps/web/dist/assets/index-BmgGwFOr.js": "21f3db02f41aba66e9ded901226fcf96eb7ba1d2c75b019e066e149b68f2197f",
-    "apps/web/dist/index.html": "a5e6a3a643b135d83478ae61f4ccd9fb65a5cdff5beeec5317c64cbe16b5452b"
+    "apps/web/dist/assets/index-6wPMK-b6.css": "3f50023fd50bb46077eeb60c258e0d205ac74da0b159520cec85cea200c63a1a",
+    "apps/web/dist/assets/index-BoZH9SJY.js": "eeb3414328a2380b7fc2a54364806899332b4a80ec90dea2ca8c87e3e5d1c744",
+    "apps/web/dist/index.html": "47533fc2ede498b46fa23d8e824b7ec3092bb128a7416a1b576ded6bb899b94f"
   }
 }

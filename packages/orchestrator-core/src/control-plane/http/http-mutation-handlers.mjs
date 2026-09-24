@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { HttpRequestBodyError, asString, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
+import { HttpRequestBodyError, asString, asStringArray, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
 import {
   toInteractionAnswerResponse,
   toLifecycleCommandResponse,
@@ -11,7 +11,7 @@ import { InteractionAnswerError, submitInteractionAnswer } from "../interaction-
 import { runLifecycleCommand } from "../lifecycle-command.mjs";
 import { resolveAorHome, resolveLogicalEvidenceRef } from "../../aor-home.mjs";
 import { requestRunJobCancel } from "../../run-job.mjs";
-import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from "../../operator-request.mjs";
+import { OPERATOR_REQUEST_STAGES, OperatorRequestError, createOperatorRequest, getOperatorRequestStatus, runOperatorRequest } from "../../operator-request.mjs";
 import { applyRunControlAction } from "../run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
 import { readFlowProjection } from "../flow-projections.mjs";
@@ -25,6 +25,7 @@ import {
 } from "../../task-plan-service.mjs";
 import { applyTopologyAction, TopologyManagementError } from "../topology-management.mjs";
 import { applyExecutionProfileAction, ExecutionProfileError } from "../execution-profile.mjs";
+import { getCommandDefinition } from "../../operator-cli/command-catalog.mjs";
 import { connectAdditionalRepository, createProjectConnectionJob, deleteProjectData, disconnectProject, refreshProjectSource } from "../project-source.mjs";
 import { materializeParentIntegration, provisionProjectWorkspaceSet, workspaceSetDigest } from "../../workspace-set-service.mjs";
 import { openNativeFolderPicker } from "../folder-picker.mjs";
@@ -40,6 +41,7 @@ import {
   prepareIntentSubmission,
   retryIntentStart,
   reviseIntentSubmission,
+  selectIntentExecutionRoute,
 } from "../../intent-service.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
@@ -396,7 +398,10 @@ export async function handleIntentSubmissionCreate({ request, response, params, 
       requestText: typeof payload.request_text === "string" ? payload.request_text : "",
       attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
       markdownSources: Array.isArray(payload.markdown_sources) ? payload.markdown_sources : [],
+      sourceSubmissionId: asString(payload.source_submission_id) ?? null,
+      sourceIds: Array.isArray(payload.source_ids) ? payload.source_ids : [],
       autoPrepare: payload.auto_prepare !== false,
+      preparationRouteId: asString(payload.preparation_route_id) ?? undefined,
     });
     sendJson(response, 202, { ...result, status_ref: `/api/projects/${encodeURIComponent(params.projectId)}/intent-submissions/${encodeURIComponent(result.submission.submission_id)}` });
   } catch (error) {
@@ -521,6 +526,31 @@ export async function handleTaskAction({ request, response, params, registry, ru
         ...(status ? { result_status: status } : {}),
       };
     };
+    if (definition.dispatch === "intent.select-runner" || definition.dispatch === "intent.reset-runner") {
+      const submissionId = asString(task.lineage?.intent_submission_id);
+      if (!submissionId || task.status !== "prepared") {
+        sendError(response, 409, "task.runner_selection_unavailable", "Runner selection is available only for a prepared intent-backed Task.");
+        return;
+      }
+      const result = selectIntentExecutionRoute({
+        registry,
+        projectId: params.projectId,
+        submissionId,
+        routeId: definition.dispatch === "intent.select-runner" ? asString(payload.route_id) : null,
+        expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision,
+        expectedSelectionRevision: Number.isInteger(payload.expected_selection_revision)
+          ? payload.expected_selection_revision
+          : task.runner_selection?.selection_revision ?? 0,
+      });
+      sendJson(response, 200, {
+        task_id: task.task_id,
+        action,
+        runner_selection: result.submission.execution_route_override ?? null,
+        selection_revision: result.submission.runner_selection_revision ?? 0,
+        readback: durableReadback(result.submission, result.idempotent ? "unchanged" : "updated"),
+      });
+      return;
+    }
     if (["confirm", "start"].includes(action)) {
       if (action === "start" && task.status === "prepared") {
         const route = task.prepared_contract?.approved_execution_route;
@@ -537,8 +567,8 @@ export async function handleTaskAction({ request, response, params, registry, ru
         return;
       }
       const result = action === "confirm"
-        ? confirmIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision })
-        : confirmAndStartIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision });
+        ? confirmIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision, expectedSelectionRevision: Number.isInteger(payload.expected_selection_revision) ? payload.expected_selection_revision : task.runner_selection?.selection_revision ?? 0 })
+        : confirmAndStartIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision, expectedSelectionRevision: Number.isInteger(payload.expected_selection_revision) ? payload.expected_selection_revision : task.runner_selection?.selection_revision ?? 0 });
       sendJson(response, action === "start" ? 202 : 200, { task_id: task.task_id, action, confirmation: result, readback: durableReadback(result, action === "start" ? "accepted" : "confirmed") });
       return;
     }
@@ -563,10 +593,14 @@ export async function handleTaskAction({ request, response, params, registry, ru
         sendError(response, 400, "task.request_text_required", "A durable Task request requires request_text.");
         return;
       }
-      const result = createOperatorRequest({
+      const currentStep = asString(task.current_step);
+      const targetStage = OPERATOR_REQUEST_STAGES.includes(currentStep)
+        ? currentStep
+        : task.status === "active" ? "implement" : "readiness";
+      const created = createOperatorRequest({
         ...runtimeOptions,
         sourceSurface: "task-workspace",
-        targetStage: asString(task.current_step) ?? "implement",
+        targetStage,
         intentType: action === "retry" ? "repair" : (asString(payload.intent_type) ?? "analyze"),
         requestText,
         targetFlowId: task.flow_id ?? undefined,
@@ -574,18 +608,79 @@ export async function handleTaskAction({ request, response, params, registry, ru
         allowedPaths: asStringArray(payload.allowed_paths),
         idempotencyKey: asString(payload.idempotency_key) ?? asString(payload.command_id) ?? undefined,
         deliveryMode: "no-write",
+        queueForRun: true,
       });
-      sendJson(response, result.idempotent ? 200 : 201, {
+      let result;
+      try {
+        result = runOperatorRequest({
+          ...runtimeOptions,
+          requestRef: created.operatorRequestRef,
+        });
+      } catch (error) {
+        const pending = getOperatorRequestStatus({ ...runtimeOptions, requestRef: created.operatorRequestRef });
+        if (!["created", "run-pending", "running"].includes(pending.status)) throw error;
+        sendJson(response, 202, {
+          task_id: task.task_id,
+          action,
+          operator_request: {
+            request_id: pending.requestId,
+            operator_request_ref: pending.operatorRequestRef,
+            status: pending.status,
+            idempotent: created.idempotent === true,
+            document: pending.operatorRequest,
+          },
+          operator_request_run: {
+            request_id: pending.requestId,
+            operator_request_ref: pending.operatorRequestRef,
+            status: pending.status,
+            recovery_action: "request run",
+            idempotent: created.idempotent === true,
+          },
+          readback: {
+            ...durableReadback(null, pending.status),
+            operator_request_ref: pending.operatorRequestRef,
+            operator_request_status: pending.status,
+            recovery_action: "request run",
+            evidence_refs: [...new Set([...(task.evidence_refs ?? []), pending.operatorRequestRef])],
+          },
+        });
+        return;
+      }
+      const requestEvidenceRefs = [
+        result.operatorRequestRef,
+        result.routedStepResultRef,
+        result.compiledContextRef,
+        result.nextActionReportRef,
+        ...result.proposalRefs,
+        ...result.patchRefs,
+      ].filter((ref) => typeof ref === "string" && ref.length > 0);
+      sendJson(response, result.status === "completed" ? 200 : 202, {
         task_id: task.task_id,
         action,
         operator_request: {
           request_id: result.requestId,
           operator_request_ref: result.operatorRequestRef,
-          status: result.status,
-          idempotent: result.idempotent === true,
+          status: result.operatorRequest.status,
+          idempotent: created.idempotent === true || result.idempotent === true,
           document: result.operatorRequest,
         },
-        readback: durableReadback(result),
+        operator_request_run: {
+          request_id: result.requestId,
+          operator_request_ref: result.operatorRequestRef,
+          run_id: result.runId,
+          routed_step_result_ref: result.routedStepResultRef,
+          compiled_context_ref: result.compiledContextRef,
+          proposal_refs: result.proposalRefs,
+          patch_refs: result.patchRefs,
+          status: result.status,
+          idempotent: result.idempotent === true,
+        },
+        readback: {
+          ...durableReadback(result, result.status),
+          operator_request_ref: result.operatorRequestRef,
+          operator_request_status: result.status,
+          evidence_refs: [...new Set([...(task.evidence_refs ?? []), ...requestEvidenceRefs])],
+        },
       });
       return;
     }
@@ -611,8 +706,16 @@ export async function handleTaskAction({ request, response, params, registry, ru
         flags.mode = task.prepared_contract?.delivery_mode ?? "no-write";
         flags["require-review-decision"] = true;
       }
+      const taskRunner = task.runner_selection;
+      const commandDefinition = getCommandDefinition(definition.lifecycle_command);
+      if (taskRunner?.source === "task-override"
+        && taskRunner.route_id
+        && taskRunner.step
+        && commandDefinition?.inputs?.some((input) => input.startsWith("--route-overrides "))) {
+        flags["route-overrides"] = `${taskRunner.step}=${taskRunner.route_id}`;
+      }
       for (const [key, value] of Object.entries(payload)) {
-        if (["action", "expected_revision", "command_id", "request_text", "allowed_paths", "intent_type"].includes(key)) continue;
+        if (["action", "expected_revision", "expected_selection_revision", "command_id", "request_text", "allowed_paths", "intent_type"].includes(key)) continue;
         if (value !== undefined) flags[key] = value;
       }
       const lifecycle = runLifecycleCommand({
@@ -810,113 +913,6 @@ export async function handleQualityRepairAction({ request, response, runtimeOpti
     return;
   }
   sendJson(response, 200, { quality_repair: toLifecycleCommandResponse(result.result) });
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {{
- *   request: import("node:http").IncomingMessage,
- *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
- * }} options
- */
-export async function handleOperatorRequestCreate({ request, response, runtimeOptions }) {
-  const payload = await readMutationPayload(request, response);
-  if (!payload) {
-    return;
-  }
-
-  try {
-    const result = createOperatorRequest({
-      ...runtimeOptions,
-      sourceSurface: asString(payload.source_surface) ?? "api",
-      targetStage: asString(payload.target_stage) ?? "",
-      intentType: asString(payload.intent_type) ?? "",
-      requestText: asString(payload.request_text) ?? asString(payload.request) ?? "",
-      targetFlowId: asString(payload.target_flow_id) ?? undefined,
-      idempotencyKey: asString(payload.idempotency_key) ?? undefined,
-      targetRefs: asStringArray(payload.target_refs),
-      allowedPaths: asStringArray(payload.allowed_paths),
-      deliveryMode: asString(payload.delivery_mode) ?? undefined,
-    });
-    sendJson(response, result.idempotent ? 200 : 201, {
-      operator_request: {
-        request_id: result.requestId,
-        operator_request_ref: result.operatorRequestRef,
-        operator_request_file: result.operatorRequestFile,
-        status: result.status,
-        idempotent: result.idempotent === true,
-        document: result.operatorRequest,
-      },
-    });
-  } catch (error) {
-    if (error instanceof OperatorRequestError) {
-      sendError(response, error.statusCode, error.code, error.message);
-      return;
-    }
-    throw error;
-  }
-}
-
-/**
- * @param {{
- *   request: import("node:http").IncomingMessage,
- *   response: import("node:http").ServerResponse,
- *   params: Record<string, string>,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
- * }} options
- */
-export async function handleOperatorRequestAction({ request, response, params, runtimeOptions }) {
-  const payload = await readMutationPayload(request, response);
-  if (!payload) {
-    return;
-  }
-
-  const action = asString(payload.action);
-  if (action !== "run") {
-    sendError(response, 400, "operator_request.invalid_action", `Unsupported operator request action '${action ?? "missing"}'.`);
-    return;
-  }
-
-  try {
-    const requestRef = asString(payload.request_ref) ?? params.requestId;
-    const result = runOperatorRequest({
-      ...runtimeOptions,
-      requestRef,
-      targetStep: asString(payload.target_step) ?? undefined,
-    });
-    sendJson(response, 200, {
-      operator_request_run: {
-        request_id: result.requestId,
-        operator_request_ref: result.operatorRequestRef,
-        operator_request_file: result.operatorRequestFile,
-        run_id: result.runId,
-        routed_step_result_file: result.routedStepResultFile,
-        routed_step_result_ref: result.routedStepResultRef,
-        compiled_context_ref: result.compiledContextRef,
-        proposal_refs: result.proposalRefs,
-        patch_refs: result.patchRefs,
-        next_action_report_file: result.nextActionReportFile,
-        next_action_report_ref: result.nextActionReportRef,
-        document: result.operatorRequest,
-      },
-    });
-  } catch (error) {
-    if (error instanceof OperatorRequestError) {
-      sendError(response, error.statusCode, error.code, error.message);
-      return;
-    }
-    throw error;
-  }
 }
 
 /**

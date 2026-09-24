@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { createLocalProjectRegistry } from "../src/control-plane/local-project-registry.mjs";
+import { applyExecutionProfileAction } from "../src/control-plane/execution-profile.mjs";
 import { listTaskProjections } from "../src/control-plane/task-projections.mjs";
 import {
   IntentServiceError,
@@ -142,14 +143,16 @@ test("concurrent intent preparation reuses one ordered normalization revision", 
   });
 });
 
-test("intent attachment validation covers empty input, traversal names, UTF-8 replacement, total size, and restart recovery", async () => {
+test("intent attachment validation covers empty input, NUL bytes, total size, and restart recovery", async () => {
   await withTempRepo({ prefix: "aor-intent-boundaries-", workspaceRoot }, (projectRoot) => {
     const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-boundaries-home-"));
     try {
       const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
       const projectId = registry.defaultProjectId;
       assert.throws(() => createIntentSubmission({ registry, projectId, autoPrepare: false }), (error) => error.code === "intent_submission.empty");
-      assert.throws(() => createIntentSubmission({ registry, projectId, attachments: [{ name: "bad.txt", content: "bad\uFFFDtext" }], autoPrepare: false }), (error) => error.code === "intent_attachment.invalid_utf8");
+      const replacementCharacter = createIntentSubmission({ registry, projectId, attachments: [{ name: "valid.txt", content: "valid \uFFFD character" }], autoPrepare: false });
+      assert.equal(replacementCharacter.submission.attachments[0].byte_length, Buffer.byteLength("valid \uFFFD character"));
+      assert.throws(() => createIntentSubmission({ registry, projectId, attachments: [{ name: "bad.txt", content: "bad\0text" }], autoPrepare: false }), (error) => error.code === "intent_attachment.invalid_utf8");
       assert.throws(() => createIntentSubmission({ registry, projectId, attachments: Array.from({ length: 6 }, (_, index) => ({ name: `${index}.txt`, content: "x".repeat(900 * 1024) })), autoPrepare: false }), (error) => error.code === "intent_attachment.total_too_large");
       const created = createIntentSubmission({ registry, projectId, attachments: [{ name: "../nested\\requirements.md", content: "safe" }], autoPrepare: false });
       assert.equal(created.submission.attachments[0].original_name, "requirements.md");
@@ -184,6 +187,24 @@ test("repository Markdown sources are pinned, sanitized, and fail closed on unsa
       assert.equal(source.stale, false);
       fs.appendFileSync(path.join(projectRoot, "docs", "requirements.md"), "\nChanged after pin.\n", "utf8");
       assert.equal(readIntentSubmission({ registry, projectId: registry.defaultProjectId, submissionId: created.submission.submission_id }).submission.markdown_sources[0].stale, true);
+      reviseIntentSubmission({
+        registry,
+        projectId: registry.defaultProjectId,
+        submissionId: created.submission.submission_id,
+        normalization: {
+          title: "Use the pinned Markdown source",
+          outcome: "Preserve the submitted repository snapshot.",
+          constraints: [],
+          acceptance: ["Stale sources block confirmation."],
+          scope: ["docs/**"],
+          work_type: "document-change",
+          assumptions: [],
+          open_questions: [],
+          confidence: 0.9,
+        },
+      });
+      assert.throws(() => confirmIntent({ registry, projectId: registry.defaultProjectId, submissionId: created.submission.submission_id, expectedRevision: 1 }), (error) => error.code === "intent_source.stale" && error.statusCode === 409);
+      assert.equal(readIntentSubmission({ registry, projectId: registry.defaultProjectId, submissionId: created.submission.submission_id }).submission.confirmation, undefined);
       const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-markdown-outside-"));
       try {
         fs.writeFileSync(path.join(outsideRoot, "secret.md"), "secret\n", "utf8");
@@ -192,6 +213,61 @@ test("repository Markdown sources are pinned, sanitized, and fail closed on unsa
       } finally { fs.rmSync(outsideRoot, { recursive: true, force: true }); }
       assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "../outside.md" }], autoPrepare: false }), (error) => error.code === "intent_source.invalid_path");
       assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "missing.md" }], autoPrepare: false }), (error) => error.code === "intent_source.not_found");
+      fs.writeFileSync(path.join(projectRoot, "docs", "invalid-utf8.md"), Buffer.from([0xff, 0xfe]));
+      assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "docs/invalid-utf8.md" }], autoPrepare: false }), (error) => error.code === "intent_source.invalid_utf8");
+      assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "docs/requirements.md", pinned_base_revision: "f".repeat(40) }], autoPrepare: false }), (error) => error.code === "intent_source.revision_mismatch" && error.statusCode === 409);
+    } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
+  });
+});
+
+test("new intent submissions retain only selected immutable sources from the same project", async () => {
+  await withTempRepo({ prefix: "aor-intent-source-lineage-", workspaceRoot }, (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-source-lineage-home-"));
+    try {
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const projectId = registry.defaultProjectId;
+      fs.writeFileSync(path.join(projectRoot, "README.md"), "Source for inherited snapshot test.\n", "utf8");
+      const original = createIntentSubmission({
+        registry,
+        projectId,
+        requestText: "Original request.",
+        attachments: [{ name: "requirements.md", content: "Keep this immutable input." }],
+        markdownSources: [{ project_relative_path: "README.md" }],
+        autoPrepare: false,
+      }).submission;
+      const uploadSourceId = `${original.submission_id}.source.1`;
+      const repositorySourceId = original.markdown_sources[0].source_id;
+      const continued = createIntentSubmission({
+        registry,
+        projectId,
+        requestText: "Revise the outcome while keeping its source.",
+        sourceSubmissionId: original.submission_id,
+        sourceIds: [uploadSourceId, repositorySourceId],
+        autoPrepare: false,
+      });
+      assert.deepEqual(continued.submission.source_lineage, {
+        source_submission_id: original.submission_id,
+        source_ids: [uploadSourceId, repositorySourceId],
+      });
+      assert.equal(continued.submission.attachments.length, 1);
+      assert.notEqual(continued.submission.attachments[0].storage_ref, original.attachments[0].storage_ref);
+      const continuedFile = path.join(path.dirname(continued.submission_file), path.basename(continued.submission.attachments[0].storage_ref));
+      assert.equal(fs.readFileSync(continuedFile, "utf8"), "Keep this immutable input.");
+      assert.equal(continued.submission.markdown_sources.length, 1);
+      assert.equal(continued.submission.markdown_sources[0].digest, original.markdown_sources[0].digest);
+
+      fs.appendFileSync(path.join(projectRoot, "README.md"), "\nChanged after the original snapshot.\n");
+      assert.throws(() => createIntentSubmission({
+        registry,
+        projectId,
+        requestText: "This must not silently refresh a stale source.",
+        sourceSubmissionId: original.submission_id,
+        sourceIds: [repositorySourceId],
+        autoPrepare: false,
+      }), (error) => error.code === "intent_source.stale_inherited" && error.statusCode === 409);
+
+      assert.throws(() => createIntentSubmission({ registry, projectId, requestText: "Unknown source.", sourceSubmissionId: original.submission_id, sourceIds: ["source.unknown"], autoPrepare: false }), (error) => error.code === "intent_source.unknown_selection");
+      assert.throws(() => createIntentSubmission({ registry, projectId, requestText: "Reject a traversal ID.", sourceSubmissionId: "../../outside", sourceIds: [], autoPrepare: false }), (error) => error.code === "intent_source.invalid_submission_id");
     } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
   });
 });
@@ -251,6 +327,19 @@ test("normalization blockers remain retryable and confirmation is idempotent", a
       const resumable = listIntentSubmissions({ registry, projectId });
       assert.equal(resumable.read_only, true);
       assert.equal(resumable.submissions[0].submission.submission_id, created.submission.submission_id);
+      const runnerBin = path.join(aorHome, "bin");
+      fs.mkdirSync(runnerBin, { recursive: true });
+      fs.writeFileSync(path.join(runnerBin, "codex"), "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+      const readiness = applyExecutionProfileAction({
+        registry,
+        projectId,
+        action: "check",
+        step: "implement",
+        routeId: "route.implement.default",
+        expectedRevision: registry.revision,
+        environment: { ...process.env, PATH: `${runnerBin}${path.delimiter}${process.env.PATH ?? ""}`, AOR_AUTH_READY_CODEX_CLI: "true" },
+      });
+      assert.equal(readiness.readiness_report.status, "ready");
       const first = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       const second = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       assert.equal(second.mission.command_output?.mission_id ?? second.mission.command, first.mission.command_output?.mission_id ?? first.mission.command);

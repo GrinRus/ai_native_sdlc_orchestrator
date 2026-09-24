@@ -53,6 +53,7 @@ lifecycle_path:
 runner_selection:
   schema_version: 1
   source: project-default
+  selection_revision: 0
   route_id: route.implement.default
   readiness: ready
   requested_model: coding-primary

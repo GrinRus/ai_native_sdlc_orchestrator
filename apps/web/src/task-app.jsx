@@ -75,12 +75,14 @@ function TaskApp() {
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState(initialLocation.projectId);
   const [tasks, setTasks] = useState([]);
+  const [operatorRequests, setOperatorRequests] = useState([]);
   const [executionProfile, setExecutionProfile] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(initialLocation.taskId);
   const [connectionState, setConnectionState] = useState("loading");
   const [resourceError, setResourceError] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingSubmission, setPendingSubmission] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [projectForm, setProjectForm] = useState({ ...EMPTY_PROJECT_FORM });
@@ -110,6 +112,7 @@ function TaskApp() {
       setActiveProjectId(nextProjectId);
       if (!nextProjectId) {
         setTasks([]); setSelectedTaskId(null);
+        setOperatorRequests([]);
         setExecutionProfile(null);
         setConnectionState("connected");
         setLoaded(true);
@@ -118,23 +121,46 @@ function TaskApp() {
       }
 
       const base = `/api/projects/${encodeURIComponent(nextProjectId)}`;
-      const [stateResult, taskResult, executionProfileResult] = await Promise.allSettled([
+      const [stateResult, taskResult, executionProfileResult, operatorRequestResult] = await Promise.allSettled([
         readJson(`${base}/state`),
         readJson(`${base}/tasks`),
         readJson(`${base}/execution-profile`),
+        readJson(`${base}/operator-requests`),
       ]);
+      const unavailableReads = [
+        ["project state", stateResult],
+        ["tasks", taskResult],
+        ["runner profile", executionProfileResult],
+        ["operator requests", operatorRequestResult],
+      ].filter(([, result]) => result.status === "rejected");
       const taskPayload = taskResult.status === "fulfilled" ? taskResult.value : { tasks: [] };
       const nextTasks = Array.isArray(taskPayload.tasks) ? taskPayload.tasks : [];
+      const nextOperatorRequests = operatorRequestResult.status === "fulfilled" && Array.isArray(operatorRequestResult.value)
+        ? operatorRequestResult.value
+        : [];
       const state = stateResult.status === "fulfilled" ? stateResult.value : null;
       setExecutionProfile(executionProfileResult.status === "fulfilled" ? executionProfileResult.value : null);
       setProjects((current) => current.map((project) => project.project_id === nextProjectId && state?.onboarding_summary
         ? { ...project, onboarding_summary: state.onboarding_summary }
         : project));
       if (taskResult.status === "fulfilled") setTasks(nextTasks);
-      setConnectionState(taskResult.status === "fulfilled" ? "connected" : "offline");
-      setResourceError(taskResult.status === "rejected" ? taskResult.reason : null);
-      if (taskResult.status === "rejected") setError(taskResult.reason instanceof Error ? taskResult.reason.message : String(taskResult.reason));
-      const taskId = keepSelection && nextTasks.some((task) => task.task_id === selectedTaskId) ? selectedTaskId : null;
+      if (operatorRequestResult.status === "fulfilled") setOperatorRequests(nextOperatorRequests);
+      setConnectionState(taskResult.status === "rejected" ? "offline" : unavailableReads.length ? "partial" : "connected");
+      setResourceError(unavailableReads.length ? {
+        detail: unavailableReads.map(([label, result]) => {
+          const reason = result.reason;
+          const message = typeof reason?.detail === "string"
+            ? reason.detail
+            : reason instanceof Error ? reason.message : String(reason);
+          return `${label}: ${message}`;
+        }).join(" "),
+      } : null);
+      const staysOnCurrentProject = nextProjectId === activeProjectId
+        || (!activeProjectId && !initialLocation.projectId && Boolean(initialLocation.taskId));
+      const selectionIsAvailable = taskResult.status === "rejected"
+        ? staysOnCurrentProject && Boolean(selectedTaskId)
+        : nextTasks.some((task) => task.task_id === selectedTaskId);
+      const taskId = keepSelection && staysOnCurrentProject && selectionIsAvailable ? selectedTaskId : null;
       setSelectedTaskId(taskId);
       writeTaskLocation({ projectId: nextProjectId, taskId });
       setLoaded(true);
@@ -152,6 +178,31 @@ function TaskApp() {
   const refreshRef = useRef(refresh);
   useEffect(() => { refreshRef.current = refresh; }, [refresh]);
   useEffect(() => { void refreshRef.current(); }, []);
+
+  useEffect(() => {
+    if (!pendingSubmission || pendingSubmission.projectId !== activeProjectId || connectionState === "offline" || !loaded) return undefined;
+    let cancelled = false;
+    let timeoutId = null;
+    const poll = async () => {
+      const refreshed = await refreshRef.current({ projectId: pendingSubmission.projectId, silent: true });
+      if (cancelled) return;
+      const task = refreshed.tasks.find((entry) => entry?.lineage?.intent_submission_id === pendingSubmission.submissionId) ?? null;
+      if (task) {
+        setSelectedTaskId(task.task_id);
+        writeTaskLocation({ projectId: pendingSubmission.projectId, taskId: task.task_id });
+        if (task.status !== "draft" || !["submitted", "preparing"].includes(task.status_detail)) {
+          setPendingSubmission((current) => current?.submissionId === pendingSubmission.submissionId ? null : current);
+          return;
+        }
+      }
+      timeoutId = window.setTimeout(poll, 1000);
+    };
+    timeoutId = window.setTimeout(poll, 1000);
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
+  }, [activeProjectId, connectionState, loaded, pendingSubmission]);
 
   useEffect(() => {
     if (!apiProjectBase || !liveRunIds.length || typeof EventSource === "undefined") return undefined;
@@ -178,20 +229,49 @@ function TaskApp() {
     } finally { setBusy(false); }
   }
 
-  async function createTask({ requestText, attachments = [], markdownSources = [] } = {}) {
+  async function resumeOperatorRequest(operatorRequest) {
+    const requestId = operatorRequest?.document?.request_id;
+    const requestRef = operatorRequest?.operator_request_ref;
+    if (!apiProjectBase || !requestId || !requestRef || busy) return null;
+    setBusy(true); setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/operator-requests/${encodeURIComponent(requestId)}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action: "run", request_ref: requestRef }),
+      });
+      await refresh({ silent: true });
+      return result;
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : String(actionError));
+      await refresh({ silent: true });
+      return null;
+    } finally { setBusy(false); }
+  }
+
+  async function createTask({ requestText, attachments = [], markdownSources = [], sourceSubmissionId = null, sourceIds = [], preparationRouteId } = {}) {
     if (!apiProjectBase || busy) return null;
     setBusy(true); setError("");
     try {
       const created = await readJson(`${apiProjectBase}/intent-submissions`, {
-        method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ request_text: requestText, attachments, markdown_sources: markdownSources, auto_prepare: true }),
+        method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ request_text: requestText, attachments, markdown_sources: markdownSources, ...(sourceSubmissionId ? { source_submission_id: sourceSubmissionId, source_ids: sourceIds } : {}), preparation_route_id: preparationRouteId, auto_prepare: true }),
       });
-      const refreshed = await refresh({ silent: true });
       const submissionId = created?.submission?.submission_id;
+      if (submissionId) setPendingSubmission({ projectId: activeProjectId, submissionId });
+      const refreshed = await refresh({ silent: true });
       const task = refreshed.tasks.find((entry) => entry?.lineage?.intent_submission_id === submissionId) ?? null;
-      if (task) { setSelectedTaskId(task.task_id); writeTaskLocation({ projectId: activeProjectId, taskId: task.task_id }); }
+      if (task) {
+        setSelectedTaskId(task.task_id);
+        writeTaskLocation({ projectId: activeProjectId, taskId: task.task_id });
+        if (task.status !== "draft" || !["submitted", "preparing"].includes(task.status_detail)) {
+          setPendingSubmission((current) => current?.submissionId === submissionId ? null : current);
+        }
+      }
       return task;
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : String(createError));
+      const message = createError instanceof Error ? createError.message : String(createError);
+      await refresh({ silent: true });
+      setError(message);
       return null;
     } finally { setBusy(false); }
   }
@@ -217,20 +297,71 @@ function TaskApp() {
     return readJson(`${apiProjectBase}/tasks/${encodeURIComponent(taskId)}/review${query}`);
   }
 
-  async function selectRunner(step, routeId) {
+  async function selectRunner(task, step, routeId) {
+    if (!task?.task_id || !step || busy) return null;
+    return runTaskAction(task, routeId ? "select-runner" : "reset-runner", {
+      ...(routeId ? { route_id: routeId } : {}),
+      expected_revision: task.revision,
+      expected_selection_revision: task.runner_selection?.selection_revision ?? 0,
+    });
+  }
+
+  async function initializeRunnerProfile() {
+    if (!apiProjectBase || !executionProfile || !Number.isInteger(executionProfile.revision) || busy) return null;
+    setBusy(true); setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action: "initialize", expected_revision: executionProfile.revision }),
+      });
+      if (result?.execution_profile) setExecutionProfile(result.execution_profile);
+      await refresh({ silent: true });
+      return result;
+    } catch (setupError) {
+      const message = setupError instanceof Error ? setupError.message : String(setupError);
+      await refresh({ silent: true });
+      setError(message);
+      return null;
+    } finally { setBusy(false); }
+  }
+
+  async function checkPreparationRunner(routeId) {
+    if (!apiProjectBase || !executionProfile || !Number.isInteger(executionProfile.revision) || !routeId || busy) return null;
+    setBusy(true); setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action: "check", step: "discovery", route_id: routeId, expected_revision: executionProfile.revision }),
+      });
+      if (result?.execution_profile) setExecutionProfile(result.execution_profile);
+      await refresh({ silent: true });
+      return result;
+    } catch (checkError) {
+      const message = checkError instanceof Error ? checkError.message : String(checkError);
+      await refresh({ silent: true });
+      setError(message);
+      return null;
+    } finally { setBusy(false); }
+  }
+
+  async function checkExecutionRunner(step, routeId) {
     if (!apiProjectBase || !executionProfile || !Number.isInteger(executionProfile.revision) || !step || !routeId || busy) return null;
     setBusy(true); setError("");
     try {
       const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
         method: "POST",
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ action: "select", step, route_id: routeId, expected_revision: executionProfile.revision }),
+        body: JSON.stringify({ action: "check", step, route_id: routeId, expected_revision: executionProfile.revision }),
       });
       if (result?.execution_profile) setExecutionProfile(result.execution_profile);
       await refresh({ silent: true });
       return result;
-    } catch (selectionError) {
-      setError(selectionError instanceof Error ? selectionError.message : String(selectionError));
+    } catch (checkError) {
+      const message = checkError instanceof Error ? checkError.message : String(checkError);
+      await refresh({ silent: true });
+      setError(message);
       return null;
     } finally { setBusy(false); }
   }
@@ -277,7 +408,7 @@ function TaskApp() {
   if (!activeProject) return <><EmptyWorkspace onOpenProject={() => setProjectDialogOpen(true)} error={error} onRetry={() => void refresh()} />{projectDialog}</>;
 
   return <div className="task-app" data-app-surface="task-workspace">
-    <TaskWorkspace project={activeProject} tasks={tasks} selectedTaskId={selectedTaskId} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} executionProfile={executionProfile} onSelectRunner={selectRunner} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
+    <TaskWorkspace project={activeProject} tasks={tasks} operatorRequests={operatorRequests} selectedTaskId={selectedTaskId} pendingPreparation={pendingSubmission?.projectId === activeProjectId} pendingSubmissionId={pendingSubmission?.projectId === activeProjectId ? pendingSubmission.submissionId : null} onStopFollowingPreparation={() => setPendingSubmission((current) => current?.projectId === activeProjectId ? null : current)} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} onResumeOperatorRequest={resumeOperatorRequest} executionProfile={executionProfile} onSelectRunner={selectRunner} onCheckPreparationRunner={checkPreparationRunner} onCheckExecutionRunner={checkExecutionRunner} onInitializeRunnerProfile={initializeRunnerProfile} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
     {projectDialog}
   </div>;
 }

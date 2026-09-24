@@ -1020,7 +1020,7 @@ installed local scenarios, and freeze all source/target/profile/proof identities
    - Validation: The runners retain digest-addressed command journals and runtime evidence refs; source repos remain unchanged and every Task/unit/attempt/repo/diff/digest reference resolves.
 5. **Restore evidence-backed story claims.**
    - Purpose: Promote only outcomes exercised by the merged installed product.
-   - Changes: Re-evaluate OPS-11, OPS-12, PBO-10, and affected W62 multirepo stories against the immutable S14 journals; restore only the installed multirepo coordination and delivery claims, while retaining UI/Ask AOR gaps at `partial`.
+   - Changes: Re-evaluate OPS-11, OPS-12, PBO-10, and affected W62 multirepo stories against the immutable S14 journals; restore only the installed multirepo coordination and delivery claims, while retaining provider-backed Ask AOR and UI lifecycle qualification at `partial` until their evidence is current.
    - Validation: Each promoted row resolves to the current source/package identity, real action journal, durable artifact bytes, before/after safety snapshot, and declared runner mode.
 6. **Regenerate final-commit adversarial proof.**
    - Purpose: Prevent S11 evidence from being reused after quality, hotspot, documentation, or UI integration commits change source identity.

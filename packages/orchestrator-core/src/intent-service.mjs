@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { readJsonState, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { readCanonicalContainedFile } from "./shared/canonical-paths.mjs";
@@ -12,6 +12,7 @@ import { runLifecycleCommand } from "./control-plane/lifecycle-command.mjs";
 import { resolveNextAction } from "./next-action.mjs";
 import { inspectGitIdentity } from "./aor-home.mjs";
 import { buildCorrectionGuidance, extractStructuredCandidate } from "./structured-candidate.mjs";
+import { readExecutionProfile, resolvePreparationRunner } from "./control-plane/execution-profile.mjs";
 
 const EXTENSIONS = new Map([
   [".txt", "text/plain"], [".md", "text/markdown"], [".json", "application/json"],
@@ -39,6 +40,13 @@ const CHANGE_PATH = Object.freeze([
   { id: "delivery", label: "Deliver" },
   { id: "learning", label: "Learn" },
 ]);
+const WORK_TYPE_TO_STEP = Object.freeze({
+  analyze: "discovery",
+  explain: "research",
+  review: "review",
+  "document-change": "implement",
+  "code-change": "implement",
+});
 
 export class IntentServiceError extends Error {
   constructor(code, message, statusCode = 400, details = {}) {
@@ -64,10 +72,10 @@ function stableJson(value) {
   return JSON.stringify(value);
 }
 
-function preparationKey(normalization) {
+function preparationKey(normalization, preparationRouteId = null) {
   return normalization
     ? `operator-${crypto.createHash("sha256").update(stableJson(normalization)).digest("hex")}`
-    : "provider-intake-normalize";
+    : `provider-intake-normalize-${crypto.createHash("sha256").update(preparationRouteId ?? "automatic").digest("hex")}`;
 }
 
 function latestNormalizationReport(loaded) {
@@ -124,7 +132,7 @@ function attachmentRecords(init, submissionId, attachments) {
     const mediaType = EXTENSIONS.get(extension);
     if (!originalName || !mediaType) throw new IntentServiceError("intent_attachment.unsupported", `Attachment '${originalName || index + 1}' must be .txt, .md, .json, .yaml, or .yml.`);
     const content = String(attachment?.content ?? "").normalize("NFC");
-    if (content.includes("\0") || content.includes("\uFFFD")) throw new IntentServiceError("intent_attachment.invalid_utf8", `Attachment '${originalName}' contains invalid UTF-8 text.`);
+    if (content.includes("\0")) throw new IntentServiceError("intent_attachment.invalid_utf8", `Attachment '${originalName}' contains NUL bytes.`);
     const bytes = Buffer.from(content, "utf8");
     if (bytes.length > MAX_FILE_BYTES) throw new IntentServiceError("intent_attachment.too_large", `Attachment '${originalName}' exceeds 1 MiB.`);
     total += bytes.length;
@@ -188,12 +196,19 @@ function repositoryMarkdownRecords(context, markdownSources) {
       throw new IntentServiceError(code, `Repository Markdown source '${relativePath}' could not be read inside the connected project (${read.reason}).`);
     }
     const content = read.bytes;
-    const text = content.toString("utf8");
-    if (text.includes("\uFFFD")) throw new IntentServiceError("intent_source.invalid_utf8", `Repository Markdown source '${relativePath}' is not valid UTF-8.`);
+    let text;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(content);
+    } catch {
+      throw new IntentServiceError("intent_source.invalid_utf8", `Repository Markdown source '${relativePath}' is not valid UTF-8.`);
+    }
     const digest = crypto.createHash("sha256").update(content).digest("hex");
     const pinnedRevision = String(source?.pinned_base_revision ?? head ?? "").trim();
     if (pinnedRevision && !/^[0-9a-f]{40}$/iu.test(pinnedRevision)) {
       throw new IntentServiceError("intent_source.invalid_revision", "Pinned Markdown base revision must be a full Git commit id.");
+    }
+    if (pinnedRevision && pinnedRevision !== String(head ?? "").trim()) {
+      throw new IntentServiceError("intent_source.revision_mismatch", "Pinned Markdown base revision must match the connected checkout's current HEAD.", 409);
     }
     return {
       source_id: `source.${index + 1}.${digest.slice(0, 12)}`,
@@ -231,6 +246,61 @@ function currentMarkdownSourceStatus(context, sources) {
       stale: source.stale === true || !read.ok || currentDigest !== source.digest || (source.pinned_base_revision && head !== source.pinned_base_revision),
     };
   });
+}
+
+function inheritedSubmissionSources({ registry, projectId, sourceSubmissionId, sourceIds }) {
+  const selectedIds = Array.isArray(sourceIds) ? sourceIds.map((value) => String(value).trim()) : [];
+  if (!sourceSubmissionId) {
+    if (selectedIds.length) throw new IntentServiceError("intent_source.lineage_required", "source_ids require a source_submission_id.");
+    return { attachments: [], markdownSources: [], sourceIds: [] };
+  }
+  if (!validatePublicId(sourceSubmissionId).ok) {
+    throw new IntentServiceError("intent_source.invalid_submission_id", "source_submission_id must be a canonical AOR submission ID.");
+  }
+  if (!Array.isArray(sourceIds) || selectedIds.some((value) => !value) || new Set(selectedIds).size !== selectedIds.length) {
+    throw new IntentServiceError("intent_source.invalid_selection", "Source selections must be non-empty unique IDs.");
+  }
+  if (selectedIds.length > MAX_FILES) throw new IntentServiceError("intent_source.count_exceeded", `At most ${MAX_FILES} inherited sources can be selected.`);
+  const loaded = loadSubmission(registry, projectId, sourceSubmissionId);
+  const previous = loaded.submission;
+  const attachmentById = new Map((Array.isArray(previous.attachments) ? previous.attachments : [])
+    .map((attachment, index) => [`${sourceSubmissionId}.source.${index + 1}`, attachment]));
+  const repositoryById = new Map((Array.isArray(previous.markdown_sources) ? previous.markdown_sources : [])
+    .map((source) => [String(source?.source_id ?? ""), source]));
+  const availableIds = new Set([...attachmentById.keys(), ...repositoryById.keys()].filter(Boolean));
+  const unknownIds = selectedIds.filter((sourceId) => !availableIds.has(sourceId));
+  if (unknownIds.length) throw new IntentServiceError("intent_source.unknown_selection", `Source selection is not present in submission '${sourceSubmissionId}'.`);
+
+  const inheritedAttachments = selectedIds.flatMap((sourceId) => {
+    const attachment = attachmentById.get(sourceId);
+    if (!attachment) return [];
+    const storageRef = String(attachment.storage_ref ?? "").replaceAll("\\", "/");
+    if (!storageRef.startsWith(`inputs/${sourceSubmissionId}/`) || storageRef.split("/").includes("..")) {
+      throw new IntentServiceError("intent_source.corrupt_attachment", `Attachment source '${sourceId}' has an invalid runtime reference.`, 409);
+    }
+    const read = readCanonicalContainedFile({ root: loaded.init.runtimeLayout.projectRuntimeRoot, relativePath: storageRef, base: "runtime-relative", maxBytes: MAX_FILE_BYTES });
+    if (!read.ok) throw new IntentServiceError("intent_source.missing_attachment", `Attachment source '${sourceId}' could not be read from its immutable snapshot (${read.reason}).`, 409);
+    const digest = crypto.createHash("sha256").update(read.bytes).digest("hex");
+    if (digest !== attachment.sha256 || read.bytes.length !== attachment.byte_length) {
+      throw new IntentServiceError("intent_source.corrupt_attachment", `Attachment source '${sourceId}' no longer matches its recorded digest.`, 409);
+    }
+    let content;
+    try { content = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes); }
+    catch { throw new IntentServiceError("intent_source.invalid_utf8", `Attachment source '${sourceId}' is not valid UTF-8.`, 409); }
+    return [{ name: attachment.original_name, content }];
+  });
+
+  const selectedRepositorySources = selectedIds.map((sourceId) => repositoryById.get(sourceId)).filter(Boolean);
+  const currentRepositorySources = new Map(currentMarkdownSourceStatus(loaded.context, selectedRepositorySources).map((source) => [source.source_id, source]));
+  const inheritedMarkdownSources = selectedRepositorySources.map((source, index) => {
+    const current = currentRepositorySources.get(source.source_id);
+    if (!current || current.stale === true) {
+      throw new IntentServiceError("intent_source.stale_inherited", `Repository source '${source.project_relative_path}' changed after its snapshot. Remove it and add the current file before preparing a new Task.`, 409);
+    }
+    const digest = String(source.digest ?? "").replace(/^sha256:/u, "");
+    return { ...source, source_id: `source.${index + 1}.${digest.slice(0, 12)}`, stale: false };
+  });
+  return { attachments: inheritedAttachments, markdownSources: inheritedMarkdownSources, sourceIds: selectedIds };
 }
 
 function repositorySnapshot(context) {
@@ -361,16 +431,71 @@ function providerReadiness(registry, projectId) {
   return ready?.[0] ?? null;
 }
 
-export function createIntentSubmission({ registry, projectId, requestText = "", attachments = [], markdownSources = [], autoPrepare = true, normalization }) {
+function requireReadyPreparationRunner(registry, projectId, routeId, { requireCurrentCheck = false } = {}) {
+  let runner;
+  try {
+    runner = resolvePreparationRunner({ registry, projectId, routeId, check: true });
+  } catch (error) {
+    if (error instanceof IntentServiceError) throw error;
+    throw new IntentServiceError(error?.code ?? "intent_provider.route_invalid", error instanceof Error ? error.message : String(error), error?.statusCode ?? 409);
+  }
+  if (runner.readiness !== "ready") {
+    const adapter = runner.adapter ?? "selected runner";
+    const message = runner.readiness === "runner-missing"
+      ? `The selected runner '${adapter}' is not installed or its command is unavailable.`
+      : runner.readiness === "auth-missing"
+        ? `Authenticate the selected runner '${adapter}', then check its readiness again.`
+        : `The selected runner '${adapter}' is not ready (${runner.readiness}).`;
+    throw new IntentServiceError("intent_provider.not_ready", message, 409, { route_id: routeId, readiness: runner.readiness });
+  }
+  if (requireCurrentCheck) {
+    const report = registry.getProjectInput(projectId)?.latestExecutionReadiness;
+    const checked = report?.revision === registry.revision
+      && report.step_results?.some((entry) => entry?.step === "discovery"
+        && entry?.route_id === routeId
+        && entry?.adapter === runner.adapter
+        && entry?.status === "ready");
+    if (!checked) {
+      throw new IntentServiceError("intent_provider.not_checked", "Check the selected task-preparation runner again before creating this task.", 409, { route_id: routeId });
+    }
+  }
+  if (!["codex-cli", "claude-code", "qwen-code"].includes(runner.adapter)) {
+    throw new IntentServiceError("intent_provider.unsupported", `Route '${routeId}' does not select a supported task-preparation runner.`, 409);
+  }
+  return runner;
+}
+
+export function createIntentSubmission({ registry, projectId, requestText = "", attachments = [], markdownSources = [], sourceSubmissionId = null, sourceIds = [], autoPrepare = true, preflightPreparation = autoPrepare, normalization, preparationRouteId }) {
   const { context, init } = resolveProject(registry, projectId);
   const text = String(requestText ?? "").trim();
-  if (!text && (!Array.isArray(attachments) || attachments.length === 0) && (!Array.isArray(markdownSources) || markdownSources.length === 0)) {
+  const sourceId = typeof sourceSubmissionId === "string" ? sourceSubmissionId.trim() : "";
+  const inherited = inheritedSubmissionSources({ registry, projectId, sourceSubmissionId: sourceId, sourceIds });
+  const allAttachments = [...inherited.attachments, ...(Array.isArray(attachments) ? attachments : [])];
+  if (!text && allAttachments.length === 0 && (!Array.isArray(markdownSources) || markdownSources.length === 0) && inherited.markdownSources.length === 0) {
     throw new IntentServiceError("intent_submission.empty", "Enter request text or attach at least one text file.");
   }
-  if (Array.isArray(attachments) && attachments.length > MAX_FILES) throw new IntentServiceError("intent_attachment.count_exceeded", `At most ${MAX_FILES} attachments are allowed.`);
+  if (allAttachments.length > MAX_FILES) throw new IntentServiceError("intent_attachment.count_exceeded", `At most ${MAX_FILES} attachments are allowed.`);
   const repositorySources = repositoryMarkdownRecords(context, markdownSources);
-  if (attachments.length + repositorySources.length > MAX_FILES) throw new IntentServiceError("intent_source.count_exceeded", `At most ${MAX_FILES} total Markdown sources and attachments are allowed.`);
-  const seed = crypto.createHash("sha256").update(`${text}\0${JSON.stringify(attachments.map((entry) => entry?.name))}\0${JSON.stringify(repositorySources.map((entry) => entry.digest))}\0${Date.now()}`).digest("hex").slice(0, 16);
+  const allRepositorySources = [...inherited.markdownSources, ...repositorySources];
+  if (allAttachments.length + allRepositorySources.length > MAX_FILES) throw new IntentServiceError("intent_source.count_exceeded", `At most ${MAX_FILES} total Markdown sources and attachments are allowed.`);
+  if (new Set(allRepositorySources.map((source) => source.project_relative_path)).size !== allRepositorySources.length) {
+    throw new IntentServiceError("intent_source.duplicate", "A repository Markdown path can appear only once in a Task submission.");
+  }
+  let selectedPreparationRouteId = typeof preparationRouteId === "string" ? preparationRouteId.trim() : "";
+  const explicitPreparationRoute = Boolean(selectedPreparationRouteId);
+  const preparationRequested = autoPrepare || preflightPreparation;
+  if (preparationRequested && !normalization && !selectedPreparationRouteId) {
+    const adapter = providerReadiness(registry, projectId);
+    selectedPreparationRouteId = adapter === "claude-code" ? "route.intake-normalize.claude"
+      : adapter === "qwen-code" ? "route.intake-normalize.qwen"
+        : adapter === "codex-cli" ? "route.intake-normalize.default" : "";
+  }
+  if (selectedPreparationRouteId) {
+    requireReadyPreparationRunner(registry, projectId, selectedPreparationRouteId, { requireCurrentCheck: explicitPreparationRoute });
+  } else if (preparationRequested && !normalization) {
+    throw new IntentServiceError("intent_provider.not_ready", "Check a configured task-preparation runner before creating this task.", 409);
+  }
+  const seed = crypto.createHash("sha256").update(`${text}\0${JSON.stringify(allAttachments.map((entry) => entry?.name))}\0${JSON.stringify(allRepositorySources.map((entry) => entry.digest))}\0${sourceId}\0${JSON.stringify(inherited.sourceIds)}\0${Date.now()}`).digest("hex").slice(0, 16);
   const submissionId = derivePublicId(["intent-submission", init.projectId, seed], "intent-submission");
   const createdAt = now();
   const submission = {
@@ -380,9 +505,11 @@ export function createIntentSubmission({ registry, projectId, requestText = "", 
     revision: 1,
     status: "submitted",
     request_text: text,
-    attachments: attachmentRecords(init, submissionId, attachments),
-    markdown_sources: repositorySources,
+    attachments: attachmentRecords(init, submissionId, allAttachments),
+    markdown_sources: allRepositorySources,
+    ...(sourceId ? { source_lineage: { source_submission_id: sourceId, source_ids: inherited.sourceIds } } : {}),
     repository_snapshot: repositorySnapshot(context),
+    ...(selectedPreparationRouteId ? { preparation_route_id: selectedPreparationRouteId } : {}),
     normalization_refs: [],
     created_at: createdAt,
     updated_at: createdAt,
@@ -403,7 +530,7 @@ export function prepareIntentSubmission({ registry, projectId, submissionId, nor
     const { submission, init, context, file } = loaded;
     if (["confirmed", "canceled"].includes(submission.status)) throw new IntentServiceError("intent_submission.terminal", "Terminal intent submissions cannot be prepared again.", 409);
 
-    const key = preparationKey(normalization);
+    const key = preparationKey(normalization, submission.preparation_route_id);
     const latest = latestNormalizationReport(loaded);
     if (submission.status === "prepared" && submission.preparation_key === key && latest.report) {
       return { submission, report: latest.report, report_file: latest.reportFile, idempotent: true };
@@ -422,18 +549,22 @@ export function prepareIntentSubmission({ registry, projectId, submissionId, nor
     submission.preparation_attempt = { attempt_id: attemptId, preparation_key: key, owner_pid: process.pid, started_at: now() };
     submission.updated_at = now();
     atomicJson(file, submission);
-    let provider = normalization
-      ? previousNormalization?.provider?.adapter_id ?? "operator-revision"
-      : providerReadiness(registry, projectId);
-    let selectedRouteId = normalization
-      ? previousNormalization?.provider?.route_id ?? "route.intake-normalize.default"
-      : "route.intake-normalize.default";
     let candidate = normalization ? asRecord(normalization) : {};
     let extraction = null;
     try {
+      let provider = normalization
+        ? previousNormalization?.provider?.adapter_id ?? "operator-revision"
+        : submission.preparation_route_id
+          ? requireReadyPreparationRunner(registry, projectId, submission.preparation_route_id).adapter
+          : providerReadiness(registry, projectId);
+      let selectedRouteId = normalization
+        ? previousNormalization?.provider?.route_id ?? "route.intake-normalize.default"
+        : submission.preparation_route_id ?? "route.intake-normalize.default";
       if (!normalization) {
         if (!provider) throw new IntentServiceError("intent_provider.not_ready", "Configure and authenticate Codex, Claude, or Qwen before preparing this task.", 409);
-        selectedRouteId = provider === "claude-code" ? "route.intake-normalize.claude" : provider === "qwen-code" ? "route.intake-normalize.qwen" : "route.intake-normalize.default";
+        if (!submission.preparation_route_id) {
+          selectedRouteId = provider === "claude-code" ? "route.intake-normalize.claude" : provider === "qwen-code" ? "route.intake-normalize.qwen" : "route.intake-normalize.default";
+        }
         const routed = executeRoutedStep({
           ...context.runtimeOptions,
           stepClass: "discovery",
@@ -488,6 +619,60 @@ export function readIntentSubmission({ registry, projectId, submissionId }) {
     submission: { ...loaded.submission, markdown_sources: currentMarkdownSourceStatus(loaded.context, loaded.submission.markdown_sources) },
     normalization: reportFile && fs.existsSync(reportFile) ? readJsonState(reportFile) : null,
   };
+}
+
+export function selectIntentExecutionRoute({ registry, projectId, submissionId, routeId = null, expectedRevision, expectedSelectionRevision }) {
+  return withSubmissionLock(registry, projectId, submissionId, () => {
+    const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
+    const { submission, file } = loaded;
+    const latest = latestNormalizationReport(loaded);
+    const normalization = latest.report;
+    if (submission.status !== "prepared" || normalization?.status !== "prepared") {
+      throw new IntentServiceError("intent_submission.runner_selection_unavailable", "Choose an execution route only after the Task is prepared.", 409);
+    }
+    if (expectedRevision !== undefined && normalization.revision !== expectedRevision) {
+      throw new IntentServiceError("intent_submission.stale_revision", `Prepared Task revision ${expectedRevision} is stale; the server currently has revision ${normalization.revision}. Refresh before changing its runner.`, 409, {
+        current_revision: normalization.revision,
+        recovery_actions: [{ action: "refresh", payload: { resource: `intent-submission://${submissionId}`, current_revision: normalization.revision } }],
+      });
+    }
+    const currentSelectionRevision = Number.isInteger(submission.runner_selection_revision) ? submission.runner_selection_revision : 0;
+    if (expectedSelectionRevision !== undefined && currentSelectionRevision !== expectedSelectionRevision) {
+      throw new IntentServiceError("intent_submission.stale_runner_selection", `Runner selection revision ${expectedSelectionRevision} is stale; the server currently has revision ${currentSelectionRevision}. Refresh before changing the runner.`, 409, {
+        current_selection_revision: currentSelectionRevision,
+        recovery_actions: [{ action: "refresh", payload: { resource: `intent-submission://${submissionId}`, current_selection_revision: currentSelectionRevision } }],
+      });
+    }
+    const step = WORK_TYPE_TO_STEP[normalization.work_type];
+    if (!step) throw new IntentServiceError("intent_submission.runner_step_unavailable", "The prepared Task does not have an approved execution step.", 409);
+    let nextOverride = null;
+    if (routeId) {
+      let executionProfile;
+      try {
+        executionProfile = readExecutionProfile({ registry, projectId });
+      } catch (error) {
+        throw new IntentServiceError(error?.code ?? "execution-profile.unavailable", error instanceof Error ? error.message : String(error), error?.statusCode ?? 409);
+      }
+      const route = executionProfile.routes
+        ?.find((entry) => entry?.step === step)
+        ?.approved_routes
+        ?.find((entry) => entry?.route_id === routeId);
+      if (!route || routeId.startsWith("route.intake-normalize.")) {
+        throw new IntentServiceError("intent_submission.runner_route_invalid", `Route '${routeId}' is not an approved execution route for step '${step}'.`, 409, { route_id: routeId, step });
+      }
+      nextOverride = { route_id: routeId, step };
+    }
+    const currentRouteId = submission.execution_route_override?.route_id ?? null;
+    if (currentRouteId === (nextOverride?.route_id ?? null)) {
+      return { submission, idempotent: true };
+    }
+    if (nextOverride) submission.execution_route_override = nextOverride;
+    else delete submission.execution_route_override;
+    submission.runner_selection_revision = currentSelectionRevision + 1;
+    submission.updated_at = now();
+    atomicJson(file, submission);
+    return { submission, idempotent: false };
+  });
 }
 
 export function listIntentSubmissions({ registry, projectId }) {
@@ -569,7 +754,89 @@ export function cancelIntentSubmission({ registry, projectId, submissionId }) {
   });
 }
 
-function startConfirmedIntent({ loaded }) {
+function assertRunnerSelectionRevision(submission, expectedSelectionRevision) {
+  if (expectedSelectionRevision === undefined) return;
+  const current = Number.isInteger(submission.runner_selection_revision) ? submission.runner_selection_revision : 0;
+  if (current !== expectedSelectionRevision) {
+    throw new IntentServiceError("intent_submission.stale_runner_selection", `Runner selection revision ${expectedSelectionRevision} is stale; the server currently has revision ${current}. Refresh before starting this Task.`, 409, {
+      current_selection_revision: current,
+      recovery_actions: [{ action: "refresh", payload: { resource: `intent-submission://${submission.submission_id}`, current_selection_revision: current } }],
+    });
+  }
+}
+
+function assertPreparedNormalizationRevision({ report, submissionId, expectedRevision }) {
+  if (!report || report.status !== "prepared") {
+    throw new IntentServiceError("intent_submission.not_prepared", "Prepare and resolve the task preview before confirmation.", 409);
+  }
+  if (expectedRevision !== undefined && report.revision !== expectedRevision) {
+    throw new IntentServiceError(
+      "intent_submission.stale_revision",
+      `Prepared task revision ${expectedRevision} is stale; the server currently has revision ${report.revision}. Refresh before confirming.`,
+      409,
+      {
+        current_revision: report.revision,
+        recovery_actions: [{
+          action: "refresh",
+          payload: {
+            resource: `intent-submission://${submissionId}`,
+            current_revision: report.revision,
+          },
+        }],
+      },
+    );
+  }
+}
+
+function assertMarkdownSourcesCurrent(loaded) {
+  const sources = currentMarkdownSourceStatus(loaded.context, loaded.submission.markdown_sources);
+  const staleSources = sources.filter((source) => source.stale === true);
+  if (staleSources.length) {
+    throw new IntentServiceError(
+      "intent_source.stale",
+      `Repository Markdown sources changed after preparation: ${staleSources.map((source) => source.project_relative_path).join(", ")}. Remove them and add the current files before confirming this Task.`,
+      409,
+      { stale_source_ids: staleSources.map((source) => source.source_id) },
+    );
+  }
+}
+
+function requireReadyExecutionRoute({ registry, projectId, loaded }) {
+  const override = loaded.submission.execution_route_override;
+  const normalization = latestNormalizationReport(loaded).report;
+  const step = override?.step ?? WORK_TYPE_TO_STEP[normalization?.work_type];
+  if (!step) throw new IntentServiceError("intent_execution.route_unavailable", "The prepared Task has no approved execution step.", 409);
+  let executionProfile;
+  try {
+    executionProfile = readExecutionProfile({ registry, projectId });
+  } catch (error) {
+    throw new IntentServiceError(error?.code ?? "execution-profile.unavailable", error instanceof Error ? error.message : String(error), error?.statusCode ?? 409);
+  }
+  const row = executionProfile.routes?.find((entry) => entry?.step === step);
+  const routeId = override?.route_id ?? row?.route_id;
+  const selected = override
+    ? row?.approved_routes?.find((entry) => entry?.route_id === override.route_id)
+    : row;
+  if (!routeId || routeId.startsWith("route.intake-normalize.") || !selected) {
+    throw new IntentServiceError("intent_execution.route_unavailable", "Task start requires an approved execution route for its selected step.", 409, { route_id: routeId ?? null, step });
+  }
+  const routeReadinessCurrent = Number.isInteger(selected.readiness_revision)
+    && selected.readiness_revision === executionProfile.revision;
+  if (selected.readiness !== "ready" || !routeReadinessCurrent) {
+    const readiness = selected.readiness ?? "unknown";
+    throw new IntentServiceError("intent_execution.route_not_ready", `Execution route '${routeId}' is not ready (${readiness}). Check the exact route before starting this Task.`, 409, {
+      route_id: routeId,
+      step,
+      readiness,
+      recovery_actions: [{ action: "refresh", payload: { resource: `task://${loaded.submission.submission_id}` } }],
+    });
+  }
+  return { route_id: routeId, step, source: override ? "task-override" : "project-default" };
+}
+
+function startConfirmedIntent({ loaded, registry }) {
+  assertMarkdownSourcesCurrent(loaded);
+  const executionRoute = requireReadyExecutionRoute({ registry, projectId: loaded.context.projectId, loaded });
   const existingTransaction = loaded.submission.confirmation?.start_transaction;
   if (existingTransaction?.status === "in-progress") {
     throw new IntentServiceError(
@@ -600,7 +867,9 @@ function startConfirmedIntent({ loaded }) {
     projectRef: loaded.context.projectRoot,
     runtimeRoot: loaded.context.runtimeRoot,
     command: "discovery run",
-    flags: {},
+    flags: executionRoute.source === "task-override"
+      ? { "route-overrides": `${executionRoute.step}=${executionRoute.route_id}` }
+      : {},
   });
   loaded.submission.confirmation = {
     ...loaded.submission.confirmation,
@@ -625,12 +894,13 @@ export function retryIntentStart({ registry, projectId, submissionId }) {
       throw new IntentServiceError("intent_submission.not_confirmed", "Confirm the prepared task before retrying its start.", 409);
     }
     if (loaded.submission.confirmation.retryable_start !== true) return loaded.submission.confirmation;
-    return startConfirmedIntent({ loaded });
+    return startConfirmedIntent({ loaded, registry });
   });
 }
 
-function confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision }) {
+function confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision, expectedSelectionRevision }) {
   const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
+  assertRunnerSelectionRevision(loaded.submission, expectedSelectionRevision);
   if (loaded.submission.confirmation) {
     if (loaded.submission.confirmation.next_action) return { confirmation: loaded.submission.confirmation, loaded };
     const next = resolveNextAction({
@@ -649,25 +919,9 @@ function confirmIntentRecordUnlocked({ registry, projectId, submissionId, expect
     return { confirmation, loaded };
   }
   const current = readIntentSubmission({ registry, projectId, submissionId });
+  assertMarkdownSourcesCurrent({ ...loaded, submission: current.submission });
   const report = current.normalization;
-  if (!report || report.status !== "prepared") throw new IntentServiceError("intent_submission.not_prepared", "Prepare and resolve the task preview before confirmation.", 409);
-  if (expectedRevision !== undefined && report.revision !== expectedRevision) {
-    throw new IntentServiceError(
-      "intent_submission.stale_revision",
-      `Prepared task revision ${expectedRevision} is stale; the server currently has revision ${report.revision}. Refresh before confirming.`,
-      409,
-      {
-        current_revision: report.revision,
-        recovery_actions: [{
-          action: "refresh",
-          payload: {
-            resource: `intent-submission://${submissionId}`,
-            current_revision: report.revision,
-          },
-        }],
-      },
-    );
-  }
+  assertPreparedNormalizationRevision({ report, submissionId, expectedRevision });
   const missionId = derivePublicId(["mission", submissionId], "mission");
   const mission = runLifecycleCommand({
     cwd: loaded.context.projectRoot,
@@ -716,17 +970,26 @@ function confirmIntentRecordUnlocked({ registry, projectId, submissionId, expect
   return { confirmation, loaded };
 }
 
-export function confirmIntent({ registry, projectId, submissionId, expectedRevision }) {
-  return withSubmissionLock(registry, projectId, submissionId, () => confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision }).confirmation);
+export function confirmIntent({ registry, projectId, submissionId, expectedRevision, expectedSelectionRevision }) {
+  return withSubmissionLock(registry, projectId, submissionId, () => confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision, expectedSelectionRevision }).confirmation);
 }
 
-export function confirmAndStartIntent({ registry, projectId, submissionId, expectedRevision }) {
+export function confirmAndStartIntent({ registry, projectId, submissionId, expectedRevision, expectedSelectionRevision }) {
   return withSubmissionLock(registry, projectId, submissionId, () => {
     const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
+    assertRunnerSelectionRevision(loaded.submission, expectedSelectionRevision);
+    if (!loaded.submission.confirmation) {
+      assertPreparedNormalizationRevision({
+        report: latestNormalizationReport(loaded).report,
+        submissionId,
+        expectedRevision,
+      });
+    }
+    requireReadyExecutionRoute({ registry, projectId, loaded });
     if (loaded.submission.confirmation?.discovery) return loaded.submission.confirmation;
     const record = loaded.submission.confirmation
       ? { confirmation: loaded.submission.confirmation, loaded }
-      : confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision });
-    return startConfirmedIntent({ loaded: record.loaded });
+      : confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision, expectedSelectionRevision });
+    return startConfirmedIntent({ loaded: record.loaded, registry });
   });
 }

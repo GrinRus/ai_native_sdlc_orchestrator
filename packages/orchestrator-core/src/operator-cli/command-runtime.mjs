@@ -118,7 +118,14 @@ export {
 export { RUNTIME_ROOT_DIRNAME };
 export { createLocalProjectRegistry, summarizeProjectContext } from "../control-plane/local-project-registry.mjs";
 export { connectProjectSourceSync } from "../control-plane/project-source.mjs";
-export { createIntentSubmission, prepareIntentSubmission, confirmAndStartIntent, findIntentSubmissionProject } from "../intent-service.mjs";
+export {
+  createIntentSubmission,
+  prepareIntentSubmission,
+  readIntentSubmission,
+  selectIntentExecutionRoute,
+  confirmAndStartIntent,
+  findIntentSubmissionProject,
+} from "../intent-service.mjs";
 export { exportEvidence, materializeProjectConfig } from "../project-writeback.mjs";
 export { applyTopologyAction, readProjectTopology, TopologyManagementError } from "../control-plane/topology-management.mjs";
 export {

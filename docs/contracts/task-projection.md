@@ -31,6 +31,8 @@ legacy or Flow-only projection) and contains:
 - `normalization_revision`;
 - `approved_execution_route` with canonical `route_id`, `step`, `source`, and
   `readiness`, plus `readiness_revision`;
+- `runner_selection.selection_revision`, a non-negative CAS revision for
+  task-scoped route overrides (optional only on legacy projections);
 - `write_effects` with `mode`, `write_capable`, `target_write_allowed`,
   `upstream_writes_allowed`, and `direct_edits_allowed`.
 

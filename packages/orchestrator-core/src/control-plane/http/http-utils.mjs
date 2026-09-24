@@ -30,6 +30,16 @@ export function asString(value) {
 
 /**
  * @param {unknown} value
+ * @returns {string[]}
+ */
+export function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {unknown} value
  * @returns {number | null}
  */
 export function asPositiveInteger(value) {

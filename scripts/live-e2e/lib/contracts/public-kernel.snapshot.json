@@ -5,10 +5,10 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 29,
-    "source_manifest_sha256": "18358e3248b3afe06d9d312b1b5285e99f1dee917ec246f7f68b4fc578b16951"
+    "source_manifest_sha256": "830b7dfa94c285f4ff051c6bb91a6a45da75b42b0c78e011318265fd70fd1eeb"
   },
   "files": {
-    "canonical-values.mjs": "46b098e0ba673b2bfc6d82ee3bdd71ed5920ab85c5e03b3ada51479a25933c98",
+    "canonical-values.mjs": "5daafd2f2fccd296cdcccb878b1f1ec8d132f631aed64420e2d3aa50fbf6d4ac",
     "context-size-validation.mjs": "47ee7e5e42ed36feaaa17706351e7b8f9d38974bf0d597305c3bb0c83282a8c5",
     "delivery-contract-validation.mjs": "b3f412e88540e167b5873b23137c5f120521d178a7b466a9e60b9de784959775",
     "evidence-reference.mjs": "1f1c29f069dad5eb7d0f77e1683b29e0f3d18b8ac849ba95df26fe3d6e30e625",
@@ -16,13 +16,13 @@
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
     "example-reference-validation.mjs": "2e392196356e875248078cea3d2ef4c1ffc909eea21411be636654a62a26365d",
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
-    "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
+    "execution-readiness-contract-families.mjs": "4eb2e555d57bb9624e19ffcd6328e4c65e30f74d40041ae1c9361baa0cca5f97",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
     "families.mjs": "41bf8f87bec1bccce0b7c61624e8be36cae45f78975574fad486d1065f5cc871",
     "index.d.ts": "aa257b7602222af64b4b3a5c963f8475aea9c541b1179f23ed4e531dbc0ffb3b",
     "index.mjs": "7139b31f836d42ccfd725f777bed9ba5145401bc97915f68559ea577d8b0159b",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
-    "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
+    "intent-contract-families.mjs": "c227966a564ab2c2c016c5de2e3f40ecc4da4f538986b617cbaf417b209a5980",
     "loader.mjs": "3ec905ab65481280f76976241ba83963a4d990aac770e177a82445bb70ecf409",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "ee8ab3c944f3513a393a79a9f7a8729ed6308451cf30d9c5dd1dfbbeb1e3ae8b",
@@ -33,7 +33,7 @@
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
     "structured-task-plan.mjs": "6f6fc9c052a9806d69c285b206fc191dd9431a2eee8b4986036e1c371e21436a",
-    "task-contract-families.mjs": "c4dd99c32ef3813039b81f6a73460d6af68485a6d766943858f59d242093bb5f",
+    "task-contract-families.mjs": "7dba00b8a156b8f3ed2188dbf8d7eee9880952b0137acbbb024ae334b4421489",
     "task-projection-validation.mjs": "6d97496a34ecdde52b6fba2e0d34da34e596c20948d34c5e18e70b42e4df80b0",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
@@ -85,6 +85,10 @@
         "status": "string",
         "request_text": "string",
         "attachments": "array",
+        "preparation_route_id": "string",
+        "execution_route_override": "object",
+        "runner_selection_revision": "number",
+        "source_lineage": "object",
         "repository_snapshot": "array",
         "normalization_refs": "array",
         "created_at": "string",
@@ -365,7 +369,13 @@
             "unknown",
             "stale",
             "unavailable",
-            "blocked"
+            "blocked",
+            "unconfigured",
+            "runner-missing",
+            "auth-missing",
+            "model-unsupported",
+            "capability-mismatch",
+            "policy-denied"
           ]
         }
       ]
@@ -559,6 +569,7 @@
         "revision",
         "initialized",
         "routes",
+        "preparation_runners",
         "read_only"
       ],
       "fieldTypes": {
@@ -567,6 +578,7 @@
         "revision": "number",
         "initialized": "boolean",
         "routes": "array",
+        "preparation_runners": "array",
         "latest_readiness_ref": "string",
         "read_only": "boolean"
       },

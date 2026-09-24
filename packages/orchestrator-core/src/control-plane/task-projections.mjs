@@ -46,32 +46,47 @@ const WORK_TYPE_TO_STEP = Object.freeze({
   "code-change": "implement",
 });
 
-function approvedExecutionSelection({ executionProfile, workType, step }) {
-  const selectedStep = step ?? WORK_TYPE_TO_STEP[workType] ?? null;
+function approvedExecutionSelection({ executionProfile, workType, step, override = null, selectionRevision = 0 }) {
+  const overrideRouteId = asString(override?.route_id);
+  const selectedStep = asString(override?.step) ?? step ?? WORK_TYPE_TO_STEP[workType] ?? null;
   const row = Array.isArray(executionProfile?.routes)
     ? executionProfile.routes.find((candidate) => candidate?.step === selectedStep)
     : null;
-  const routeId = asString(row?.route_id);
+  const overrideOption = overrideRouteId ? row?.approved_routes?.find((candidate) => candidate?.route_id === overrideRouteId) : null;
+  const selected = overrideRouteId ? overrideOption : row;
+  const routeId = overrideRouteId ?? asString(row?.route_id);
   const approved = routeId && !/^route\.intake-normalize\./u.test(routeId) ? routeId : null;
-  const readiness = ["ready", "stale", "unavailable", "blocked"].includes(row?.readiness) ? row.readiness : "unknown";
+  const readinessStates = new Set(["ready", "stale", "unavailable", "blocked", "unconfigured", "runner-missing", "auth-missing", "model-unsupported", "capability-mismatch", "policy-denied"]);
+  const readinessRevision = Number.isInteger(selected?.readiness_revision) ? selected.readiness_revision : null;
+  const readinessCurrent = Number.isInteger(executionProfile?.revision) && readinessRevision === executionProfile.revision;
+  const readiness = overrideRouteId && !overrideOption
+    ? "policy-denied"
+    : selected?.readiness === "ready" && !readinessCurrent
+      ? "stale"
+      : readinessStates.has(selected?.readiness) ? selected.readiness : "unknown";
   return {
     schema_version: 1,
-    source: "project-default",
+    source: overrideRouteId ? "task-override" : "project-default",
+    selection_revision: Number.isInteger(selectionRevision) ? selectionRevision : 0,
     route_id: approved,
     step: selectedStep,
     readiness,
-    requested_model: asString(row?.requested_model),
-    effective_model: asString(row?.effective_model),
-    requested_reasoning_effort: asString(row?.requested_reasoning_effort),
-    effective_reasoning_effort: asString(row?.effective_reasoning_effort),
-    unavailable_reason: approved ? (readiness === "ready" ? null : `Execution route readiness is ${readiness}.`) : "No approved execution route is selected for this Task.",
-    recovery_action: approved ? "Refresh execution readiness before starting this Task." : "Select an approved project execution route before starting this Task.",
-    readiness_revision: Number.isInteger(executionProfile?.revision) ? executionProfile.revision : null,
+    requested_model: asString(selected?.requested_model),
+    effective_model: asString(selected?.effective_model),
+    requested_reasoning_effort: asString(selected?.requested_reasoning_effort),
+    effective_reasoning_effort: asString(selected?.effective_reasoning_effort),
+    unavailable_reason: overrideRouteId && !overrideOption
+      ? "The task override is no longer an approved route for this step."
+      : approved ? (readiness === "ready" ? null : `Execution route readiness is ${readiness}.`) : "No approved execution route is selected for this Task.",
+    recovery_action: overrideRouteId && !overrideOption
+      ? "Reset to the project default or select another approved route."
+      : approved ? "Check this exact execution route before starting this Task." : "Select an approved project execution route before starting this Task.",
+    readiness_revision: readinessRevision,
   };
 }
 
-function preparedContract({ normalization, executionProfile, workType, scope, deliveryMode, status, step }) {
-  const selection = approvedExecutionSelection({ executionProfile, workType, step });
+function preparedContract({ normalization, executionProfile, workType, scope, deliveryMode, status, step, override = null, selectionRevision = 0 }) {
+  const selection = approvedExecutionSelection({ executionProfile, workType, step, override, selectionRevision });
   const mode = deliveryMode ?? asString(normalization?.delivery_mode) ?? "no-write";
   const writeCapable = mode !== "no-write";
   return {
@@ -258,9 +273,18 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
     });
   }
   const intentRef = intentTaskRef(projectId, submissionId);
-  const selection = approvedExecutionSelection({ executionProfile, workType: asString(normalization.work_type) });
-  const prepared = preparedContract({ normalization, executionProfile, workType: asString(normalization.work_type), scope: normalization.scope, deliveryMode: asString(normalization.delivery_mode), status, });
-  const startAvailable = status === "prepared" && Boolean(selection.route_id) && selection.readiness === "ready";
+  const selection = approvedExecutionSelection({ executionProfile, workType: asString(normalization.work_type), override: submission.execution_route_override, selectionRevision: submission.runner_selection_revision });
+  const prepared = preparedContract({ normalization, executionProfile, workType: asString(normalization.work_type), scope: normalization.scope, deliveryMode: asString(normalization.delivery_mode), status, override: submission.execution_route_override, selectionRevision: submission.runner_selection_revision });
+  const staleMarkdownSources = (Array.isArray(submission.markdown_sources) ? submission.markdown_sources : []).filter((source) => source?.stale === true);
+  const sourceReadinessReason = staleMarkdownSources.length
+    ? `Repository Markdown source changed after preparation: ${staleMarkdownSources.map((source) => source.project_relative_path).join(", ")}. Edit the Task and add the current file before starting.`
+    : null;
+  const startAvailable = status === "prepared"
+    && staleMarkdownSources.length === 0
+    && Boolean(selection.route_id)
+    && selection.readiness === "ready"
+    && Number.isInteger(executionProfile?.revision)
+    && selection.readiness_revision === executionProfile.revision;
   const attentionItem = status === "attention" ? intentAttentionItem(submission, submissionId) : null;
   return {
     schema_version: 1,
@@ -301,13 +325,11 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
       action_id: status === "prepared" ? "start" : "intent.resume",
       operator_control: status === "prepared" ? "Start task" : "Resume task preparation",
       reason: status === "prepared"
-        ? (startAvailable ? "Prepared task is ready for revision-checked start." : selection.unavailable_reason)
+        ? (startAvailable ? "Prepared task is ready for revision-checked start." : sourceReadinessReason ?? selection.unavailable_reason)
         : status === "attention" ? attentionItem.message : "Continue the intent-first task flow.",
       available: status === "prepared" ? startAvailable : true,
     }, status),
     runner_selection: {
-      schema_version: 1,
-      source: "project-default",
       ...selection,
       readiness: status === "attention" ? "blocked" : selection.readiness,
       unavailable_reason: status === "attention" ? attentionItem.message : selection.unavailable_reason,
@@ -339,10 +361,21 @@ function taskSourceItems(flow) {
  * model. This module owns presentation identity only; lifecycle and mutations
  * remain owned by intent, Mission, Flow, and Runtime Harness services.
  */
-export function projectTaskFromFlow({ projectId, flow, executionProfile }) {
+export function projectTaskFromFlow({ projectId, flow, executionProfile, intentSubmission = null }) {
   const id = taskId(projectId, flow.flow_id);
   const status = taskStatus(flow);
-  const selection = approvedExecutionSelection({ executionProfile, workType: asString(flow.work_type), step: asString(flow.current_step) });
+  const latestNormalization = intentSubmission?.normalization;
+  const normalization = Number.isInteger(flow.normalization_revision)
+    && latestNormalization?.revision === flow.normalization_revision
+    ? latestNormalization
+    : null;
+  const selection = approvedExecutionSelection({
+    executionProfile,
+    workType: asString(flow.work_type),
+    step: asString(flow.current_step),
+    override: intentSubmission?.submission?.execution_route_override,
+    selectionRevision: intentSubmission?.submission?.runner_selection_revision,
+  });
   return {
     schema_version: 1,
     task_id: id,
@@ -379,12 +412,18 @@ export function projectTaskFromFlow({ projectId, flow, executionProfile }) {
       reason: null,
       available: false,
     }, status),
-    runner_selection: {
-      schema_version: 1,
-      source: "project-default",
-      ...selection,
-    },
-    prepared_contract: preparedContract({ normalization: null, executionProfile, workType: asString(flow.work_type), scope: [], deliveryMode: asString(flow.writeback_policy?.mode), status, step: asString(flow.current_step) }),
+    runner_selection: selection,
+    prepared_contract: preparedContract({
+      normalization,
+      executionProfile,
+      workType: asString(flow.work_type),
+      scope: normalization?.scope ?? [],
+      deliveryMode: asString(normalization?.delivery_mode) ?? asString(flow.writeback_policy?.mode),
+      status,
+      step: asString(flow.current_step),
+      override: intentSubmission?.submission?.execution_route_override,
+      selectionRevision: intentSubmission?.submission?.runner_selection_revision,
+    }),
     updated_at: flow.updated_at ?? null,
     completed_read_only: status === "completed",
     read_only: true,
@@ -401,9 +440,18 @@ export function listTaskProjections(options = {}) {
       executionProfile = null;
     }
   }
-  const flowTasks = flows.flows.map((flow) => projectTaskFromFlow({ projectId: flows.project_id, flow, executionProfile }));
-  const intentTasks = Array.isArray(options.intentSubmissions)
-    ? options.intentSubmissions.map((entry) => projectIntentTask({ projectId: flows.project_id, entry, executionProfile })).filter(Boolean)
+  const intentEntries = Array.isArray(options.intentSubmissions) ? options.intentSubmissions : [];
+  const intentByFlow = new Map(intentEntries
+    .filter((entry) => asString(entry?.submission?.confirmation?.flow_id))
+    .map((entry) => [entry.submission.confirmation.flow_id, entry]));
+  const flowTasks = flows.flows.map((flow) => projectTaskFromFlow({
+    projectId: flows.project_id,
+    flow,
+    executionProfile,
+    intentSubmission: intentByFlow.get(flow.flow_id) ?? null,
+  }));
+  const intentTasks = intentEntries.length
+    ? intentEntries.map((entry) => projectIntentTask({ projectId: flows.project_id, entry, executionProfile })).filter(Boolean)
     : [];
   const tasks = [...intentTasks, ...flowTasks];
   return {

@@ -51,7 +51,7 @@ export const TASK_CONTRACT_FAMILIES = Object.freeze([
     fieldTypes: { schema_version: "number", source: "string", readiness: "string", recovery_action: "string" },
     enumChecks: [
       { field: "source", allowedValues: ["project-default", "task-override"] },
-      { field: "readiness", allowedValues: ["ready", "unknown", "stale", "unavailable", "blocked"] },
+      { field: "readiness", allowedValues: ["ready", "unknown", "stale", "unavailable", "blocked", "unconfigured", "runner-missing", "auth-missing", "model-unsupported", "capability-mismatch", "policy-denied"] },
     ],
   },
   {

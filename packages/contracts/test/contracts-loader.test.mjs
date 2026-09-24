@@ -326,6 +326,17 @@ test("relative and evidence references require exactly one canonical base", () =
   assert.equal(validateReferenceBinding({ reference: "reports/result.json", base: "evidence-relative" }).ok, false);
 });
 
+test("canonical identifier validation accepts declarative action-field schemas and rejects invalid route values", () => {
+  const filePath = path.join(workspaceRoot, "examples/tasks/task-action-catalog.yaml");
+  const loaded = loadContractFile({ filePath, family: "task-action-catalog" });
+  assert.equal(loaded.ok, true);
+
+  const invalid = structuredClone(loaded.document);
+  invalid.actions[1].payload.route_id = "../route";
+  const validation = validateContractDocument({ family: "task-action-catalog", document: invalid, source: "test://task-action-catalog-invalid-route" });
+  assertValidationIssue(validation, "identifier_format_invalid", "actions[1].payload.route_id");
+});
+
 test("structured task plans load while legacy compact plans remain compatible", () => {
   for (const [fileName, family] of [
     ["wave-ticket-bootstrap.yaml", "wave-ticket"],
