@@ -25,7 +25,7 @@ function actionForTask(task) {
     fields,
     payload,
     unsupported: fields.some(([, rule]) => rule?.type !== "string" || (rule?.enum !== undefined && !Array.isArray(rule.enum))),
-    validRevision: (!Object.hasOwn(payload, "expected_revision") || Number.isInteger(payload.expected_revision)) && (!Object.hasOwn(payload, "expected_selection_revision") || Number.isInteger(payload.expected_selection_revision)),
+    validRevision: [payload.expected_revision, payload.expected_selection_revision].filter((revision) => revision !== undefined).every(Number.isInteger),
   };
 }
 
