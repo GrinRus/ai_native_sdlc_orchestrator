@@ -35,13 +35,20 @@ repository-local `.aor/` directory or modify tracked project files.
 2. Select **New task**.
 3. Describe the intended outcome in plain language. Optionally attach a UTF-8
    Markdown file or pin repository Markdown with a base revision.
-4. Select **Prepare task**. Preparation is read-only and creates a
+4. If the project has no runner profile, select **Set up runner profile**.
+   Choose an approved preparation runner and select **Check runner**; continue
+   when its status is **Ready**. An **Auth not confirmed** result means the
+   local AOR process has no positive readiness attestation, not that AOR
+   inspected the runner's credentials. After signing in, set the matching
+   `AOR_AUTH_READY_<ADAPTER>=true` in the environment that starts the app,
+   restart it, and check again.
+5. Select **Prepare task**. Preparation is read-only and creates a
    server-owned Task projection backed by immutable intent evidence.
-5. Review the normalized outcome, pinned sources, runner readiness, and safety
+6. Review the normalized outcome, pinned sources, runner readiness, and safety
    mode. Select **Start task** only when the displayed Task is correct.
-6. Follow the runtime-owned lifecycle path. Use Attention and Review surfaces
+7. Follow the runtime-owned lifecycle path. Use Attention and Review surfaces
    when the server publishes a blocker or review action.
-7. Treat a completed Task as read-only. Create a follow-up Task instead of
+8. Treat a completed Task as read-only. Create a follow-up Task instead of
    reopening or mutating completed evidence.
 
 `Flow` remains an internal lineage identifier in APIs and evidence. It is not

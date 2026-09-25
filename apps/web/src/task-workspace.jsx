@@ -69,7 +69,7 @@ function readinessLabel(readiness) {
     unknown: "Not checked",
     stale: "Check again",
     "runner-missing": "Runner missing",
-    "auth-missing": "Sign in required",
+    "auth-missing": "Auth not confirmed",
     "model-unsupported": "Model unavailable",
     "capability-mismatch": "Capability mismatch",
     "policy-denied": "Not approved",
@@ -134,8 +134,8 @@ function preparationRecovery(runner) {
   if (!readiness || readiness === "ready") return null;
   const adapterKey = String(runner?.adapter ?? "").replace(/[^a-z0-9]/giu, "_").toUpperCase();
   const recoveryByReadiness = {
-    "runner-missing": `Install ${preparationRunnerLabel(runner)} or set AOR_RUNNER_COMMAND_${adapterKey} for the local app, then check again.`,
-    "auth-missing": `Sign in to ${preparationRunnerLabel(runner)} and set AOR_AUTH_READY_${adapterKey}=true for the local app, then check again.`,
+    "runner-missing": `Install ${preparationRunnerLabel(runner)} or set AOR_RUNNER_COMMAND_${adapterKey} in the environment that starts the local AOR app. Restart the app, then check again.`,
+    "auth-missing": `AOR does not inspect ${preparationRunnerLabel(runner)}'s credential store. If you have signed in, set AOR_AUTH_READY_${adapterKey}=true in the environment that starts the local AOR app. Restart the app, then check again.`,
     stale: "Check this runner again before preparing the task.",
     unconfigured: "Check this runner before preparing the task.",
     unknown: "Check this runner before preparing the task.",
@@ -336,23 +336,23 @@ function RunSummary({ task, runnerSelection, projectDefaultSelection = null, tit
       <div className="task-runner-card"><span className="task-runner-card__icon"><Glyph name="terminal" /></span><div><strong>{runnerLabel}</strong><span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></div><span className="task-runner-card__check" aria-hidden="true">{readiness === "ready" ? "✓" : "!"}</span></div>
       <label className="task-change-runner">Change runner{runnerSelect}</label>
       {onCheckRunner ? <div className="task-preparation-runner__actions"><Button onClick={() => onCheckRunner(runnerStep, selectedRouteId)} disabled={actionBusy || !selectedRouteId} busy={actionBusy}>Check runner</Button></div> : null}
+      {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
       <p className="task-control-note">{selectionNote}</p>
       <RouteDetails route={selectedRoute} selection={runnerSelection} />
       <dl className="task-runner-details"><div><dt>Model</dt><dd>{model}</dd></div><div><dt>Reasoning</dt><dd>{reasoning}</dd></div><div><dt>Safety</dt><dd>{deliveryMode(task)}</dd></div></dl>
       <p className="task-safety"><Glyph name="evidence" />No upstream writes</p>
-      {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
     </section>;
   }
   return <section className="task-run-summary" aria-label="Runner readiness">
     <h2>{title}</h2>
     <div className="task-run-field task-run-field--runner"><span>Runner</span>{runnerSelect}<span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></div>
+    {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
     <p className="task-control-note">{selectionNote}</p>
     <RouteDetails route={selectedRoute} selection={runnerSelection} />
     <div className="task-run-field"><span>Model / effort</span><select aria-label="Model and reasoning effort" value={`${model} · ${reasoning}`} disabled onChange={() => {}}><option>{model} · {reasoning}</option></select></div>
     <div className="task-run-field"><span>Safety</span><select aria-label="Safety mode" value={deliveryMode(task)} disabled onChange={() => {}}><option>{deliveryMode(task)}</option></select></div>
     <p className="task-safety"><Glyph name="evidence" />No upstream writes</p>
     <small className="task-provider-note">Readiness checks do not start a runner. The selected route runs when the task reaches this step.</small>
-    {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
   </section>;
 }
 
@@ -362,18 +362,18 @@ function PreparationRunnerSummary({ executionProfile, runnerOptions = [], select
   const runner = runnerOptions.find((option) => option.route_id === selectedRouteId) ?? null;
   const readiness = runner?.readiness ?? "unknown";
   const ready = initialized && runner?.readiness === "ready";
-  return <section className="task-run-summary task-run-summary--preparation" aria-label="Task preparation runner">
+  return <section id="task-preparation-runner" className="task-run-summary task-run-summary--preparation" aria-label="Task preparation runner">
     <h2>Prepare with</h2>
     {initialized ? runnerOptions.length ? <>
       <label className="task-run-field task-run-field--runner"><span>AI runner</span><select aria-label="Task preparation runner" value={selectedRouteId} disabled={actionBusy} onChange={(event) => onSelect?.(event.target.value)}>
         {runnerOptions.map((option) => <option key={option.route_id} value={option.route_id}>{preparationRunnerLabel(option)} · {readinessLabel(option.readiness)}</option>)}
       </select><span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></label>
       <div className="task-preparation-runner__actions"><Button onClick={() => onCheck?.(selectedRouteId)} disabled={actionBusy || !selectedRouteId} busy={actionBusy}>Check runner</Button></div>
+      {!ready ? <p className="task-inline-alert" role="status">{preparationRecovery(runner) || "Select and check a task-preparation runner before creating the task."}</p> : null}
       <p className="task-control-note">This runner prepares the brief in read-only mode. The task's execution route is selected separately.</p>
       <RouteDetails route={runner} selection={{ source: "task-preparation", readiness, readiness_revision: runner?.readiness_revision }} />
       {runner?.requested_model ? <dl className="task-runner-details"><div><dt>Model</dt><dd>{runner.effective_model || runner.requested_model}</dd></div>{runner.effective_reasoning_effort || runner.requested_reasoning_effort ? <div><dt>Reasoning</dt><dd>{runner.effective_reasoning_effort || runner.requested_reasoning_effort}</dd></div> : null}<div><dt>Runner</dt><dd>{preparationRunnerLabel(runner)}</dd></div></dl> : null}
       <p className="task-safety"><Glyph name="evidence" />No repository writes during preparation</p>
-      {!ready ? <p className="task-inline-alert" role="status">{preparationRecovery(runner) || "Select and check a task-preparation runner before creating the task."}</p> : null}
     </> : <>
       <p className="task-control-note">No approved task-preparation routes are published for this project.</p>
       <p className="task-inline-alert" role="status">Review the project's route configuration before preparing a task.</p>
@@ -507,7 +507,7 @@ function NewTaskScreen({ outcome, setOutcome, selectedSources, onAddSources, onP
   const staleSources = selectedSources.filter((source) => source?.stale === true);
   return <div className="task-form-layout" hidden={hidden}>
     <div className="task-form-main">
-      <header className="task-form-intro"><span className="task-kicker">Task · Prepare</span><h2>Define the outcome</h2><p>AOR will turn this brief into a bounded, reviewable task before anything runs.</p></header>
+      <header className="task-form-intro"><span className="task-kicker">Task · Prepare</span><h2>Define the outcome</h2><p>AOR will turn this brief into a bounded, reviewable task before anything runs.</p><a className="task-link" href="#task-preparation-runner">Choose a preparation runner</a></header>
       {pendingPreparation ? <p className="task-control-note" role="status">The task request was accepted. Waiting for the server to publish its Task; this page will check again automatically.</p> : null}
       <section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">01</span><h2>Outcome</h2><button type="button" className="task-example-link" onClick={() => setOutcome("Make the requested behavior deterministic and covered by focused tests.")} disabled={pendingPreparation}>Use example brief</button></header><label className="task-form-field" htmlFor="task-outcome"><span>What should change?</span><textarea id="task-outcome" name="task-outcome" aria-label="Task outcome" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="Describe the result, not the implementation steps." rows="5" disabled={pendingPreparation} /></label></section>
       <section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">02</span><h2>Sources</h2></header>{selectedSources.length ? <div className="task-source-list">{selectedSources.map((source) => <SourceRow key={source.source_id} source={source} />)}</div> : <p className="task-muted">Add a Markdown brief or continue with inline text.</p>}{staleSources.length ? <p className="task-inline-alert" role="alert">Remove stale repository sources and add their current snapshots before preparing this Task.</p> : null}<div className="task-inline-actions"><Button onClick={(event) => onAddSources?.(event.currentTarget)} disabled={pendingPreparation}><Glyph name="plus" />Add Markdown</Button></div></section>
