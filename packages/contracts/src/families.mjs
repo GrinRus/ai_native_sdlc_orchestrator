@@ -1,7 +1,6 @@
 import { TOPOLOGY_CONTRACT_FAMILIES, TOPOLOGY_EXAMPLE_RULES } from "./topology-contract-families.mjs"; import { EXECUTION_READINESS_CONTRACT_FAMILIES, EXECUTION_READINESS_EXAMPLE_RULES } from "./execution-readiness-contract-families.mjs";
 import { INTEGRATION_CONTRACT_FAMILIES, INTEGRATION_EXAMPLE_RULES } from "./integration-contract-family.mjs"; import { EXTERNAL_RUN_PROJECTION_CONTRACT_FAMILIES, EXTERNAL_RUN_PROJECTION_EXAMPLE_RULES } from "./external-run-projection-contract-family.mjs";
-import { INTENT_CONTRACT_FAMILIES, INTENT_EXAMPLE_RULES } from "./intent-contract-families.mjs"; import { RUNNER_OUTPUT_CONTRACT_FAMILIES, RUNNER_OUTPUT_EXAMPLE_RULES } from "./runner-output-contract-families.mjs";
-import { STEP_CLASS_VALUES } from "./step-class-values.mjs"; import { TASK_CONTRACT_FAMILIES, TASK_EXAMPLE_RULES } from "./task-contract-families.mjs";
+import { INTENT_CONTRACT_FAMILIES, INTENT_EXAMPLE_RULES } from "./intent-contract-families.mjs"; import { RUNNER_OUTPUT_CONTRACT_FAMILIES, RUNNER_OUTPUT_EXAMPLE_RULES } from "./runner-output-contract-families.mjs"; import { STEP_CLASS_VALUES } from "./step-class-values.mjs"; import { TASK_CONTRACT_FAMILIES, TASK_EXAMPLE_RULES } from "./task-contract-families.mjs";
 
 const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
