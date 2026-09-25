@@ -93,7 +93,10 @@ must preserve the accepted submission for recovery without submitting it again.
 4. **Prepared Task** — review outcome, acceptance, scope, path, runner, and
    write effects; primary action `Start task`.
 5. **Active Task Workspace** — monitor current work, send a durable operator
-   request, inspect changes/checks/evidence, pause, or stop.
+   request, inspect changes/checks/evidence, pause, or stop. Show an available
+   server-published mutation as the primary action when its catalog contract
+   requires no additional payload or confirmation, then refresh the Task
+   projection after it runs.
 6. **Attention** — resolve one authoritative human decision with consequence,
    source evidence, and durable readback. When a blocked Task needs a review
    decision, open its current review evidence from Attention and record the
