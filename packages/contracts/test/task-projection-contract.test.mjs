@@ -39,6 +39,29 @@ test("legacy Task projection may omit new lineage values without inventing execu
   assert.equal(result.ok, true, result.issues?.map((entry) => entry.message).join("\n"));
 });
 
+test("Task run state is bounded to a listed run and a canonical run-job status", () => {
+  const loaded = loadContractFile({ filePath: fixturePath, family: "task-projection" });
+  const valid = structuredClone(loaded.document);
+  valid.run_ids = ["run.task-projection"];
+  valid.run_state = { run_id: "run.task-projection", status: "paused" };
+  assert.equal(validateContractDocument({ family: "task-projection", document: valid, source: "test://run-state" }).ok, true);
+
+  const unknownStatus = structuredClone(valid);
+  unknownStatus.run_state.status = "sleeping";
+  const statusResult = validateContractDocument({ family: "task-projection", document: unknownStatus, source: "test://run-state-status" });
+  assert.ok(statusResult.issues.some((entry) => entry.field === "run_state.status"));
+
+  const unlinkedRun = structuredClone(valid);
+  unlinkedRun.run_state.run_id = "run.other";
+  const runResult = validateContractDocument({ family: "task-projection", document: unlinkedRun, source: "test://run-state-run" });
+  assert.ok(runResult.issues.some((entry) => entry.field === "run_state.run_id"));
+
+  const nullState = structuredClone(valid);
+  nullState.run_state = null;
+  const nullResult = validateContractDocument({ family: "task-projection", document: nullState, source: "test://run-state-null" });
+  assert.ok(nullResult.issues.some((entry) => entry.field === "run_state"));
+});
+
 test("provider route step is a closed shared vocabulary", () => {
   const result = validateContractDocument({
     family: "provider-route-profile",

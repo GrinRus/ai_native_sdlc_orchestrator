@@ -9,8 +9,11 @@ import {
   buildRouteRegistry,
   resolveRouteForStep,
 } from "../../../provider-routing/src/route-resolution.mjs";
-import { resolveProjectRegistryRoots } from "../project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "../project-init.mjs";
 import { listFlowProjections } from "./flow-projections.mjs";
+import { asString, firstNonNullish } from "../shared/value-normalization.mjs";
+
+const PREPARATION_ROUTE_PREFIX = "route.intake-normalize.";
 
 const STATUS_PRIORITY = [
   "policy-denied",
@@ -22,6 +25,10 @@ const STATUS_PRIORITY = [
   "unconfigured",
   "ready",
 ];
+const KNOWN_ROUTE_READINESS = new Set([
+  "ready", "stale", "unavailable", "blocked", "unconfigured", "runner-missing",
+  "auth-missing", "model-unsupported", "capability-mismatch", "policy-denied",
+]);
 
 export class ExecutionProfileError extends Error {
   constructor(code, message, statusCode = 400) {
@@ -58,7 +65,7 @@ function executableAvailable(command, environment) {
       return false;
     }
   }
-  const pathValue = environment.PATH ?? environment.Path ?? "";
+  const pathValue = firstNonNullish(environment.PATH, environment.Path, "");
   const extensions = process.platform === "win32"
     ? String(environment.PATHEXT ?? ".EXE;.CMD;.BAT").split(";")
     : [""];
@@ -74,7 +81,7 @@ function executableAvailable(command, environment) {
 
 function adapterCommand(adapterId, profile, environment) {
   const key = `AOR_RUNNER_COMMAND_${adapterId.replace(/[^a-z0-9]/giu, "_").toUpperCase()}`;
-  return environment[key] ?? profile?.execution?.external_runtime?.command ?? null;
+  return firstNonNullish(environment[key], profile?.execution?.external_runtime?.command, null);
 }
 
 function authReady(adapterId, input, environment) {
@@ -101,7 +108,7 @@ function routeMode(route) {
 
 function approvedRoutesForStep(roots, step) {
   return [...buildRouteRegistry({ routesRoot: roots.routes }).routeById.values()]
-    .filter((route) => route.step === step)
+    .filter((route) => route.step === step && !route.route_id.startsWith(PREPARATION_ROUTE_PREFIX))
     .map((route) => ({
       route_id: route.route_id,
       mode: routeMode(route),
@@ -116,7 +123,7 @@ function approvedRoutesForStep(roots, step) {
     .sort((left, right) => left.route_id.localeCompare(right.route_id));
 }
 
-function resolveRouteRow({ context, registry, projectId, profile, step, environment, check }) {
+function resolveRouteRow({ context, registry, projectId, profile, step, environment, check, routeId }) {
   const roots = resolveProjectRegistryRoots(profile, { projectRoot: context.projectRoot }).roots;
   const approvedRoutes = approvedRoutesForStep(roots, step);
   try {
@@ -124,6 +131,7 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
       projectProfilePath: context.canonicalProfilePath,
       routesRoot: roots.routes,
       stepClass: step,
+      ...(routeId ? { stepOverrides: { [step]: routeId } } : {}),
     });
     const adapter = resolveAdapterForRoute({ routeResolution: route, adaptersRoot: roots.adapters });
     const adapterId = adapter.adapter.adapter_id;
@@ -185,7 +193,7 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
     const classified = classifyResolutionError(error);
     return {
       step,
-      route_id: profile.default_route_profiles?.[step] ?? null,
+      route_id: firstNonNullish(routeId, profile.default_route_profiles?.[step], null),
       adapter: null,
       runner: null,
       provider: null,
@@ -206,6 +214,66 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
   }
 }
 
+function assertPreparationRoute({ roots, routeId }) {
+  const route = typeof routeId === "string" ? buildRouteRegistry({ routesRoot: roots.routes }).routeById.get(routeId) : null;
+  if (!route || route.step !== "discovery" || !routeId.startsWith(PREPARATION_ROUTE_PREFIX)
+    || !["codex-cli", "claude-code", "qwen-code"].includes(route.primary?.adapter)) {
+    throw new ExecutionProfileError("execution-profile.preparation-route-invalid", `Route '${routeId}' is not an approved task-preparation route.`, 409);
+  }
+  return route;
+}
+
+export function resolvePreparationRunner({ registry, projectId, routeId, environment = process.env, check = true }) {
+  const context = registry.getContext(projectId);
+  if (!context) throw new ExecutionProfileError("project.not-found", `Project '${projectId}' is not registered.`, 404);
+  const loaded = readProfile(context);
+  if (!loaded) throw new ExecutionProfileError("execution-profile.unconfigured", "Project profile is not configured.", 409);
+  const roots = resolveProjectRegistryRoots(loaded.profile, { projectRoot: context.projectRoot }).roots;
+  assertPreparationRoute({ roots, routeId });
+  return resolveRouteRow({
+    context,
+    registry,
+    projectId,
+    profile: loaded.profile,
+    step: "discovery",
+    environment,
+    check,
+    routeId,
+  });
+}
+
+/**
+ * Resolve a Task's effective route consistently for its projection and start guard.
+ * @param {{ executionProfile: Record<string, any> | null | undefined, step: string | null | undefined, overrideRouteId?: string | null }} options
+ */
+export function resolveTaskExecutionRoute({ executionProfile, step, overrideRouteId = null }) {
+  const row = Array.isArray(executionProfile?.routes)
+    ? executionProfile.routes.find((candidate) => candidate?.step === step)
+    : null;
+  const hasOverride = overrideRouteId !== null && overrideRouteId !== undefined;
+  const override = hasOverride ? row?.approved_routes?.find((candidate) => candidate?.route_id === overrideRouteId) : null;
+  const selected = hasOverride ? override : row;
+  const routeId = hasOverride ? overrideRouteId : asString(row?.route_id);
+  const isApproved = Boolean(routeId && typeof routeId === "string" && selected && !routeId.startsWith(PREPARATION_ROUTE_PREFIX));
+  const readinessRevision = Number.isInteger(selected?.readiness_revision) ? selected.readiness_revision : null;
+  const readinessCurrent = Number.isInteger(executionProfile?.revision) && readinessRevision === executionProfile.revision;
+  const readiness = hasOverride && !override
+    ? "policy-denied"
+    : selected?.readiness === "ready" && !readinessCurrent
+      ? "stale"
+      : KNOWN_ROUTE_READINESS.has(selected?.readiness) ? selected.readiness : "unknown";
+  return {
+    source: hasOverride ? "task-override" : "project-default",
+    route_id: isApproved ? routeId : null,
+    requested_route_id: routeId,
+    selected: selected ?? null,
+    step: step ?? null,
+    readiness,
+    readiness_revision: readinessRevision,
+    approved: isApproved,
+  };
+}
+
 function overallStatus(rows) {
   return [...rows].sort((left, right) => STATUS_PRIORITY.indexOf(left.readiness) - STATUS_PRIORITY.indexOf(right.readiness))[0]?.readiness ?? "unconfigured";
 }
@@ -221,30 +289,71 @@ export function readExecutionProfile({ registry, projectId, environment = proces
       revision: registry.revision,
       initialized: false,
       routes: [],
+      preparation_runners: [],
       latest_readiness_ref: null,
       read_only: true,
     };
   }
   const input = registry.getProjectInput(projectId) ?? {};
   const report = input.latestExecutionReadiness ?? null;
-  const latestByStep = new Map((report?.step_results ?? []).map((entry) => [entry.step, entry]));
+  const latestByRoute = new Map((report?.step_results ?? []).map((entry) => [`${entry.step}:${entry.route_id}`, entry]));
   const stale = report && report.revision !== registry.revision;
   const defaults = loaded.profile.default_route_profiles ?? {};
+  const roots = resolveProjectRegistryRoots(loaded.profile, { projectRoot: context.projectRoot }).roots;
+  const approvedRouteReadiness = (step) => approvedRoutesForStep(roots, step).map((route) => {
+    const resolved = resolveRouteRow({ context, registry, projectId, profile: loaded.profile, step, environment, check: false, routeId: route.route_id });
+    const latest = latestByRoute.get(`${step}:${route.route_id}`);
+    return {
+      ...route,
+      adapter: resolved.adapter,
+      runner: resolved.runner,
+      effective_model: resolved.effective_model,
+      effective_reasoning_effort: resolved.effective_reasoning_effort,
+      readiness: stale ? "stale" : latest?.status ?? resolved.readiness,
+      readiness_revision: latest && !stale ? report.revision : null,
+      blocker_codes: stale ? ["execution.readiness-stale"] : latest?.blocker_codes ?? resolved.blocker_codes,
+    };
+  });
   const routes = Object.keys(defaults).sort().map((step) => {
     const row = resolveRouteRow({ context, registry, projectId, profile: loaded.profile, step, environment, check: false });
-    const latest = latestByStep.get(step);
+    const latest = latestByRoute.get(`${step}:${row.route_id}`);
     return {
       ...row,
+      approved_routes: approvedRouteReadiness(step),
       readiness: stale ? "stale" : latest?.status ?? row.readiness,
+      readiness_revision: latest && !stale ? report.revision : null,
+      runner_available: stale ? null : latest?.runner_available ?? row.runner_available,
+      auth_ready: stale ? null : latest?.auth_ready ?? row.auth_ready,
       blocker_codes: stale ? ["execution.readiness-stale"] : latest?.blocker_codes ?? row.blocker_codes,
     };
   });
+  const preparationRunners = [...buildRouteRegistry({ routesRoot: roots.routes }).routeById.values()]
+    .filter((route) => route.step === "discovery"
+      && route.route_id.startsWith(PREPARATION_ROUTE_PREFIX)
+      && ["codex-cli", "claude-code", "qwen-code"].includes(route.primary?.adapter))
+    .map((route) => {
+      const row = resolveRouteRow({ context, registry, projectId, profile: loaded.profile, step: "discovery", environment, check: false, routeId: route.route_id });
+      const latest = latestByRoute.get(`discovery:${row.route_id}`);
+      return {
+        ...row,
+        readiness: stale ? "stale" : latest?.status ?? row.readiness,
+        runner_available: stale ? null : latest?.runner_available ?? row.runner_available,
+        auth_ready: stale ? null : latest?.auth_ready ?? row.auth_ready,
+        blocker_codes: stale ? ["execution.readiness-stale"] : latest?.blocker_codes ?? row.blocker_codes,
+      };
+    })
+    .sort((left, right) => {
+      if (left.route_id.endsWith(".default")) return -1;
+      if (right.route_id.endsWith(".default")) return 1;
+      return left.route_id.localeCompare(right.route_id);
+    });
   return {
     profile_id: `execution-profile.${projectId}`,
     project_id: projectId,
     revision: registry.revision,
     initialized: true,
     routes,
+    preparation_runners: preparationRunners,
     latest_readiness_ref: report?.evidence_refs?.[0] ?? null,
     read_only: true,
   };
@@ -277,12 +386,40 @@ export function applyExecutionProfileAction({
 }) {
   const context = registry.getContext(projectId);
   if (!context) throw new ExecutionProfileError("project.not-found", `Project '${projectId}' is not registered.`, 404);
+  if (action === "initialize") {
+    assertMutable(registry, projectId, expectedRevision);
+    if (!readProfile(context)) {
+      try {
+        initializeProjectRuntime(context.runtimeOptions);
+      } catch (error) {
+        throw new ExecutionProfileError("execution-profile.initialize-failed", error instanceof Error ? error.message : String(error), 409);
+      }
+      registry.updateProject(projectId, registry.revision, (current) => ({
+        ...current,
+        latestExecutionReadiness: null,
+        runnerReadiness: {},
+        routeHistory: [...(current.routeHistory ?? []), { action: "initialize", occurred_at: new Date().toISOString() }].slice(-100),
+      }));
+    }
+    return { execution_profile: readExecutionProfile({ registry, projectId, environment }), readiness_report: null };
+  }
   if (action === "check") {
     const loaded = readProfile(context);
     if (!loaded) throw new ExecutionProfileError("execution-profile.unconfigured", "Project profile is not configured.", 409);
+    if (expectedRevision !== undefined && expectedRevision !== registry.revision) {
+      throw new ExecutionProfileError("execution-profile.stale-revision", `Expected revision ${expectedRevision}, current ${registry.revision}.`, 409);
+    }
     const selectedSteps = step ? [step] : Object.keys(loaded.profile.default_route_profiles ?? {}).sort();
     for (const selected of selectedSteps) {
       if (!SUPPORTED_STEP_CLASSES.includes(selected)) throw new ExecutionProfileError("execution-profile.unknown-step", `Unsupported step '${selected}'.`);
+    }
+    if (routeId) {
+      if (!step) throw new ExecutionProfileError("execution-profile.step-required", "Route readiness check requires step.");
+      const roots = resolveProjectRegistryRoots(loaded.profile, { projectRoot: context.projectRoot }).roots;
+      const route = buildRouteRegistry({ routesRoot: roots.routes }).routeById.get(routeId);
+      if (!route || route.step !== step) {
+        throw new ExecutionProfileError("execution-profile.route-invalid", `Route '${routeId}' is not approved for step '${step}'.`, 409);
+      }
     }
     const rows = selectedSteps.map((selected) => resolveRouteRow({
       context,
@@ -292,6 +429,7 @@ export function applyExecutionProfileAction({
       step: selected,
       environment,
       check: true,
+      ...(routeId ? { routeId } : {}),
     }));
     const nextRevision = registry.revision + 1;
     const report = {
@@ -322,11 +460,14 @@ export function applyExecutionProfileAction({
     registry.updateProject(projectId, registry.revision, (current) => ({
       ...current,
       latestExecutionReadiness: report,
-      runnerReadiness: Object.fromEntries(rows.filter((row) => row.adapter).map((row) => [row.adapter, {
-        runner_available: row.runner_available,
-        auth_ready: row.auth_ready,
-        checked_at: report.checked_at,
-      }])),
+      runnerReadiness: {
+        ...(current.runnerReadiness ?? {}),
+        ...Object.fromEntries(rows.filter((row) => row.adapter).map((row) => [row.adapter, {
+          runner_available: row.runner_available,
+          auth_ready: row.auth_ready,
+          checked_at: report.checked_at,
+        }])),
+      },
     }));
     return { execution_profile: readExecutionProfile({ registry, projectId, environment }), readiness_report: report };
   }

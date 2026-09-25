@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
+import { asRecord, asString, asStringArray, uniqueNonBlankStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
 
 const INTERACTION_POLICIES = new Set(["fail-closed", "ask-all", "orchestrator-mediated"]);
 const AUTO_APPROVAL_PROFILES = new Set(["none", "conservative", "auto-edit", "trusted-run"]);
@@ -21,30 +22,8 @@ const RUNNER_AUTH_PATH_PATTERN = /(^|\/)(?:\.codex|\.claude|\.qwen|\.opencode)(?
 const GIT_INTERNAL_PATH_PATTERN = /(^|\/)\.git(?:\/|$)/u;
 const SHELL_CONTROL_OPERATORS = /(?:^|[^\\])(?:&&|\|\||;|\||>>?|<<?)|[`$]\(|\n|\r/u;
 
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim())
-    : [];
-}
-
-function uniqueStrings(values) {
-  return [...new Set(values.filter((value) => typeof value === "string" && value.trim()))];
-}
-
 function normalizeId(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "runtime-permission";
-}
-
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 function commandDigest(command) {
@@ -190,7 +169,7 @@ export function normalizeRuntimePermissionRequest(requestValue, contextValue = {
   const request = asRecord(requestValue);
   const context = asRecord(contextValue);
   const operationType = asString(request.operation_type) ?? "unknown";
-  const target = asString(request.relative_resource) ?? asString(request.target) ?? asString(request.target_path) ?? asString(request.canonical_resource);
+  const target = firstNonNullish(asString(request.relative_resource), asString(request.target), asString(request.target_path), asString(request.canonical_resource));
   const command = asString(request.command);
   const executionRoot = asString(context.execution_root) ?? process.cwd();
   let resourceType = asString(request.resource_type) ?? "unknown";

@@ -51,9 +51,13 @@ Event payloads should use `run_id + interaction_id` when an interaction id is av
 - `interaction.status` in `requested|answered|resumed|blocked`;
 - `interaction.step_result_ref` or another evidence ref to the run-linked `step-result`;
 - `interaction.question_summary`, sanitized for query subscribers;
+- `interaction.interaction_type` in `permission_request|clarification_question|auth_required` when known;
+- `interaction.permission_request` for permission questions, containing only `operation_type`, `resource_type`, a bounded safe `resource_label`, enabled `capabilities[]`, and `allowed_decisions[]`;
 - `interaction.answer_required` while the run is waiting for an operator answer;
 - `interaction.answer_audit_refs` after an answer is accepted.
 - `interaction.continuation.next_action` when the event is reporting a deterministic resume/block decision.
+
+Permission summaries must be built from normalized request evidence. `resource_label` may show a project-relative resource, a credential-free network host, or a parsed executable and subcommand. It must not contain a canonical local path, raw command or arguments, URL credentials or query values, prompts, or answer text. `capabilities[]` lists only enabled capability names. `allowed_decisions[]` is limited to `approve_once`, `deny`, and `approve_for_run`; consumers still submit decisions to the control plane, which revalidates the current interaction.
 
 Recommended event use:
 - `step.updated` when the interaction is requested, answered, resumed, or remains blocked;
@@ -66,6 +70,8 @@ Live streams must never include raw answer text. Subscribers should replay from 
 The shared contract loader validates the query-safe nested event surface:
 - `payload.sequence` is required and must be numeric;
 - `payload.interaction.status` must use `requested|answered|resumed|blocked` when an interaction payload is present;
+- `payload.interaction.interaction_type`, when present, must use `permission_request|clarification_question|auth_required`;
+- permission summaries may contain only safe request labels and capability/decision summaries; canonical resources, commands, arguments, and raw answers are not event fields;
 - `payload.interaction.answer_audit_refs[]` must contain strings when present;
 - `payload.interaction.continuation.next_action` must be a string when continuation metadata is present;
 - raw answer fields such as `answer`, `answer_text`, and `raw_answer` are rejected in `payload` and `payload.interaction`.

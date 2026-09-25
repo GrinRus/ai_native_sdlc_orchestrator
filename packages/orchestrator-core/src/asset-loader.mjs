@@ -11,14 +11,7 @@ import {
   effectiveAssetView,
   requireEffectiveAsset,
 } from "./effective-asset-registry.mjs";
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
+import { asObject as asRecord } from "./shared/value-normalization.mjs";
 
 /**
  * @param {string} reference

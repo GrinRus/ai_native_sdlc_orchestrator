@@ -13,6 +13,17 @@ payload:
     status: answered
     step_result_ref: evidence://contracts/w23-s01/step-result
     question_summary: Operator confirmed the safe continuation boundary.
+    interaction_type: permission_request
+    permission_request:
+      operation_type: file_write
+      resource_type: filesystem
+      resource_label: src/index.ts
+      capabilities:
+        - filesystem_write
+      allowed_decisions:
+        - approve_once
+        - deny
+        - approve_for_run
     answer_required: false
     answer_audit_refs:
       - evidence://contracts/w23-s01/interaction-answer-audit

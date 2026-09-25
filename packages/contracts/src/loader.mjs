@@ -9,9 +9,24 @@ import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; impor
 import { RUNNER_OUTPUT_MODE_VALUES, validateExecutionOutcome, validateProviderWorkPacket, validateRunnerFinalReport, validateRunnerOutputEnvelope } from "./runner-output-validation.mjs";
 import { validateDeliveryManifestContract, validateDeliveryPlanContract, validateIntegrationReportContract, validateReleasePacketContract } from "./delivery-contract-validation.mjs";
 import { validateContextBudgetEstimate, validateContextSizeSources } from "./context-size-validation.mjs"; import { validateTaskProjection } from "./task-projection-validation.mjs";
+import { createLiveRunEventValidator } from "./live-run-event-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"], WORK_TYPE_VALUES = ["analyze", "explain", "review", "document-change", "code-change"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
+const validateLiveRunEvent = createLiveRunEventValidator({
+  isPlainObject,
+  validateNestedNumberField,
+  validateUnsupportedNestedFields,
+  validateOptionalObjectField,
+  validateNestedEnumStringField,
+  validateNestedStringField,
+  validateOptionalStringArrayField,
+  validateOptionalArrayField,
+  validateEnumString,
+  validateNestedBooleanField,
+  interactionStatusValues: INTERACTION_STATUS_VALUES,
+  interactionTypeValues: INTERACTION_TYPE_VALUES,
+});
 const LEARNING_LOOP_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LEARNING_LOOP_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary", "qwen-primary"];
 const COMPILED_CONTEXT_BUDGET_STATUS_VALUES = ["pass", "warn", "fail", "not_configured"];
@@ -3127,109 +3142,6 @@ function validateVerificationFailureDetails(options) {
       );
     }
   });
-}
-
-/**
- * @param {Record<string, unknown>} document
- * @param {string} source
- * @returns {import("./index.d.ts").ContractValidationIssue[]}
- */
-function validateLiveRunEvent(document, source) {
-  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
-  const issues = [];
-  if (!isPlainObject(document.payload)) {
-    return issues;
-  }
-
-  validateNestedNumberField({
-    record: document.payload,
-    source,
-    field: "payload.sequence",
-    issues,
-    required: true,
-  });
-  validateUnsupportedNestedFields({
-    record: document.payload,
-    source,
-    parentField: "payload",
-    fields: ["answer", "answer_text", "raw_answer"],
-    issues,
-  });
-
-  const interaction = validateOptionalObjectField({
-    record: document.payload,
-    source,
-    field: "payload.interaction",
-    issues,
-  });
-  if (interaction) {
-    validateNestedEnumStringField({
-      record: interaction,
-      source,
-      field: "payload.interaction.status",
-      allowedValues: INTERACTION_STATUS_VALUES,
-      issues,
-      required: true,
-    });
-    validateNestedStringField({
-      record: interaction,
-      source,
-      field: "payload.interaction.step_result_ref",
-      issues,
-      required: false,
-    });
-    validateNestedStringField({
-      record: interaction,
-      source,
-      field: "payload.interaction.question_summary",
-      issues,
-      required: false,
-    });
-    validateNestedBooleanField({
-      record: interaction,
-      source,
-      field: "payload.interaction.answer_required",
-      issues,
-      required: false,
-    });
-    validateOptionalStringArrayField({
-      record: interaction,
-      source,
-      field: "payload.interaction.answer_audit_refs",
-      issues,
-    });
-    const continuation = validateOptionalObjectField({
-      record: interaction,
-      source,
-      field: "payload.interaction.continuation",
-      issues,
-    });
-    if (continuation) {
-      validateNestedStringField({
-        record: continuation,
-        source,
-        field: "payload.interaction.continuation.next_action",
-        issues,
-        required: true,
-      });
-      validateNestedStringField({
-        record: continuation,
-        source,
-        field: "payload.interaction.continuation.reason_code",
-        issues,
-        required: false,
-      });
-    }
-    validateUnsupportedNestedFields({
-      record: interaction,
-      source,
-      parentField: "payload.interaction",
-      fields: ["answer", "answer_text", "raw_answer"],
-      issues,
-    });
-  }
-
-  return issues;
 }
 
 /**

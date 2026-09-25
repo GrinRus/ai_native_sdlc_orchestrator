@@ -15,6 +15,7 @@ import {
   readJson,
   resolveOptionalBooleanFlag,
   resolveOptionalStringFlag,
+  runCliEntrypoint,
 } from "./lib/common.mjs";
 import { prepareOperatorDecisionArtifact } from "./lib/decision-helper.mjs";
 import { prepareManualStepQualityAssessmentArtifact } from "./lib/step-quality-assessment.mjs";
@@ -430,15 +431,4 @@ function runCli(rawArgs) {
   return 0;
 }
 
-try {
-  process.exitCode = runCli(process.argv.slice(2));
-} catch (error) {
-  if (error instanceof UsageError) {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  } else {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
-  }
-}
+runCliEntrypoint(runCli);

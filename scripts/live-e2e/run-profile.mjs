@@ -3,15 +3,15 @@ import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
-
 import {
   UsageError,
   asNonEmptyString,
   asRecord,
   asStringArray,
+  firstNonNullish,
   fileExists,
   normalizeId,
+  normalizeObservationStatus as toObservationStatus,
   nowIso,
   parseFlags,
   readJson,
@@ -22,6 +22,7 @@ import {
   resolveRuntimeAgentInteractionPolicy,
   resolveRunnerAuthMode,
   resolveRuntimeAgentPermissionMode,
+  runCliEntrypointIfMain,
   uniqueStrings,
   writeJson,
 } from "./lib/common.mjs";
@@ -135,22 +136,6 @@ function classifyEarlyFlowFailure(error) {
     phase: "project_bootstrap",
     class: "bootstrap_failed",
   };
-}
-
-/**
- * @param {string} status
- * @returns {"pass" | "warn" | "not_pass" | "blocked" | "interaction_required" | "resumed"}
- */
-function toObservationStatus(status) {
-  const normalized = asNonEmptyString(status).toLowerCase();
-  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
-  if (normalized === "warn" || normalized === "warning" || normalized === "skipped") return "warn";
-  if (normalized === "blocked" || normalized === "block") return "blocked";
-  if (normalized === "interaction_required" || normalized === "interactive" || normalized === "requested") {
-    return "interaction_required";
-  }
-  if (normalized === "resumed") return "resumed";
-  return "not_pass";
 }
 
 /**
@@ -817,9 +802,7 @@ function cleanupGuidedBrowserTaskAppSurface(artifacts, runHealthReport) {
   if (asNonEmptyString(lifecycle.continuation_status) !== "complete") return null;
   const webSmoke = asRecord(artifacts.guided_web_smoke);
   const rawPid =
-    artifacts.guided_browser_task_app_server_pid ??
-    webSmoke.browser_task_app_server_pid ??
-    webSmoke.app_server_pid;
+    firstNonNullish(artifacts.guided_browser_task_app_server_pid, webSmoke.browser_task_app_server_pid, webSmoke.app_server_pid);
   const pid = typeof rawPid === "number" ? rawPid : Number(rawPid);
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const terminated = terminateDetachedProcessGroup(pid);
@@ -1091,7 +1074,7 @@ function collectRuntimePermissionEvidence(reportFiles) {
   }
   const summaryReport = reports.find(({ report }) => Object.keys(asRecord(report.runtime_permission_summary)).length > 0);
   return {
-    report_file: summaryReport?.filePath ?? reports[0]?.filePath ?? null,
+    report_file: firstNonNullish(summaryReport?.filePath, reports[0]?.filePath, null),
     summary: summaryReport ? asRecord(summaryReport.report.runtime_permission_summary) : null,
     decisions: [],
   };
@@ -1125,7 +1108,7 @@ function buildScorecard(options) {
     scenario_id: options.profile.scenario_id ?? null,
     scenario_family: options.profile.scenario_family ?? null,
     target_catalog_id: options.profile.target_catalog_id ?? null,
-    feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
+    feature_mission_id: firstNonNullish(options.flowResult.artifacts.feature_mission_id, options.profile.feature_mission_id, null),
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
     mission_class: options.flowResult.artifacts.mission_class ?? null,
@@ -3757,7 +3740,7 @@ function writeProofRunnerArtifactsImplementation(options) {
     scenario_id: options.profile.scenario_id ?? null,
     scenario_family: options.profile.scenario_family ?? null,
     target_catalog_id: options.profile.target_catalog_id ?? null,
-    feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
+    feature_mission_id: firstNonNullish(options.flowResult.artifacts.feature_mission_id, options.profile.feature_mission_id, null),
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
     mission_class: options.flowResult.artifacts.mission_class ?? null,
@@ -4480,17 +4463,4 @@ function runCli(rawArgs) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try {
-    process.exitCode = runCli(process.argv.slice(2));
-  } catch (error) {
-    if (error instanceof UsageError) {
-      process.stderr.write(`${error.message}\n`);
-      process.exitCode = 1;
-    } else {
-      const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`${message}\n`);
-      process.exitCode = 1;
-    }
-  }
-}
+runCliEntrypointIfMain(import.meta.url, runCli);

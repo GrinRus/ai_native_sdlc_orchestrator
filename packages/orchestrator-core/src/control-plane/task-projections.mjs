@@ -1,17 +1,19 @@
 import crypto from "node:crypto";
+import { WORK_TYPE_TO_STEP } from "../../../contracts/src/task-work-type.mjs";
 import { listFlowProjections } from "./flow-projections.mjs";
-import { readExecutionProfile } from "./execution-profile.mjs";
+import { readExecutionProfile, resolveTaskExecutionRoute } from "./execution-profile.mjs";
 import { getTaskActionDefinition } from "./task-action-catalog.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
+import { readRunJobStatus } from "../run-job.mjs";
+import { asString, asStringArray, firstNonNullish } from "../shared/value-normalization.mjs";
 
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim())
-    : [];
-}
+const TASK_STATUS_BY_FLOW_STATUS = new Map([["completed", "completed"], ["blocked", "attention"]]);
+const INTENT_TASK_STATUS_BY_SUBMISSION_STATUS = new Map([["blocked", "attention"], ["prepared", "prepared"]]);
+const INTENT_TASK_PRESENTATION = new Map([
+  ["draft", { reviewStatus: "not-ready", stepState: "current", currentStep: "prepare", currentStepLabel: "Draft", attentionCount: 0, blockerCount: 0, actionId: "intent.resume", operatorControl: "Resume task preparation", draft: true }],
+  ["prepared", { reviewStatus: "pending", stepState: "completed", currentStep: "confirm", currentStepLabel: "Ready for review", attentionCount: 0, blockerCount: 0, actionId: "start", operatorControl: "Start task", draft: false }],
+  ["attention", { reviewStatus: "not-ready", stepState: "current", currentStep: "prepare", currentStepLabel: "Draft", attentionCount: 1, blockerCount: 1, actionId: "intent.resume", operatorControl: "Resume task preparation", draft: true, runnerReadiness: "blocked" }],
+]);
 
 function normalizeId(value) {
   return String(value ?? "")
@@ -38,41 +40,38 @@ function publicAction(action, status) {
   };
 }
 
-const WORK_TYPE_TO_STEP = Object.freeze({
-  analyze: "discovery",
-  explain: "research",
-  review: "review",
-  "document-change": "implement",
-  "code-change": "implement",
-});
-
-function approvedExecutionSelection({ executionProfile, workType, step }) {
-  const selectedStep = step ?? WORK_TYPE_TO_STEP[workType] ?? null;
-  const row = Array.isArray(executionProfile?.routes)
-    ? executionProfile.routes.find((candidate) => candidate?.step === selectedStep)
-    : null;
-  const routeId = asString(row?.route_id);
-  const approved = routeId && !/^route\.intake-normalize\./u.test(routeId) ? routeId : null;
-  const readiness = ["ready", "stale", "unavailable", "blocked"].includes(row?.readiness) ? row.readiness : "unknown";
+function approvedExecutionSelection({ executionProfile, workType, step, override = null, selectionRevision = 0 }) {
+  const overrideRouteId = asString(override?.route_id);
+  const selectedStep = firstNonNullish(asString(override?.step), step, WORK_TYPE_TO_STEP[workType], null);
+  const resolved = resolveTaskExecutionRoute({ executionProfile, step: selectedStep, overrideRouteId });
+  const selected = resolved.selected;
+  const approved = resolved.route_id;
+  const readiness = resolved.readiness;
+  const invalidOverride = Boolean(overrideRouteId && !resolved.approved);
   return {
     schema_version: 1,
-    source: "project-default",
+    source: resolved.source,
+    selection_revision: Number.isInteger(selectionRevision) ? selectionRevision : 0,
     route_id: approved,
     step: selectedStep,
     readiness,
-    requested_model: asString(row?.requested_model),
-    effective_model: asString(row?.effective_model),
-    requested_reasoning_effort: asString(row?.requested_reasoning_effort),
-    effective_reasoning_effort: asString(row?.effective_reasoning_effort),
-    unavailable_reason: approved ? (readiness === "ready" ? null : `Execution route readiness is ${readiness}.`) : "No approved execution route is selected for this Task.",
-    recovery_action: approved ? "Refresh execution readiness before starting this Task." : "Select an approved project execution route before starting this Task.",
-    readiness_revision: Number.isInteger(executionProfile?.revision) ? executionProfile.revision : null,
+    requested_model: asString(selected?.requested_model),
+    effective_model: asString(selected?.effective_model),
+    requested_reasoning_effort: asString(selected?.requested_reasoning_effort),
+    effective_reasoning_effort: asString(selected?.effective_reasoning_effort),
+    unavailable_reason: invalidOverride
+      ? "The task override is no longer an approved route for this step."
+      : approved ? (readiness === "ready" ? null : `Execution route readiness is ${readiness}.`) : "No approved execution route is selected for this Task.",
+    recovery_action: invalidOverride
+      ? "Reset to the project default or select another approved route."
+      : approved ? "Check this exact execution route before starting this Task." : "Select an approved project execution route before starting this Task.",
+    readiness_revision: resolved.readiness_revision,
   };
 }
 
-function preparedContract({ normalization, executionProfile, workType, scope, deliveryMode, status, step }) {
-  const selection = approvedExecutionSelection({ executionProfile, workType, step });
-  const mode = deliveryMode ?? asString(normalization?.delivery_mode) ?? "no-write";
+function preparedContract({ normalization, executionProfile, workType, scope, deliveryMode, status, step, override = null, selectionRevision = 0 }) {
+  const selection = approvedExecutionSelection({ executionProfile, workType, step, override, selectionRevision });
+  const mode = firstNonNullish(deliveryMode, asString(normalization?.delivery_mode), "no-write");
   const writeCapable = mode !== "no-write";
   return {
     schema_version: 1,
@@ -102,9 +101,7 @@ function taskId(projectId, flowId) {
 }
 
 function taskStatus(flow) {
-  if (flow.status === "completed") return "completed";
-  if (flow.status === "blocked") return "attention";
-  return "active";
+  return TASK_STATUS_BY_FLOW_STATUS.get(flow.status) ?? "active";
 }
 
 function flowRunIds(flow) {
@@ -171,7 +168,7 @@ function taskCompletionProjection(flow) {
   const patchRef = asString(closure.patch_ref);
   const digest = asString(closure.digest);
   const pass = new Set(["pass", "passed", "approved", "complete", "completed", "ready"]);
-  const evidenceComplete = flow.status === "completed" && pass.has(reviewStatus) && pass.has(verificationStatus) && pass.has(deliveryStatus);
+  const evidenceComplete = flow.status === "completed" && [reviewStatus, verificationStatus, deliveryStatus].every((status) => pass.has(status));
   return {
     status: flow.status === "completed" ? (evidenceComplete ? "complete" : "blocked") : "incomplete",
     immutable: flow.status === "completed",
@@ -198,12 +195,9 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
   if (submission.confirmation?.flow_id) return null;
   const submissionId = asString(submission.submission_id);
   if (!submissionId) return null;
-  const status = submission.status === "blocked"
-    ? "attention"
-    : submission.status === "prepared"
-      ? "prepared"
-      : "draft";
-  const title = asString(normalization.title) ?? asString(submission.request_text) ?? "Untitled task";
+  const status = INTENT_TASK_STATUS_BY_SUBMISSION_STATUS.get(submission.status) ?? "draft";
+  const presentation = INTENT_TASK_PRESENTATION.get(status);
+  const title = firstNonNullish(asString(normalization.title), asString(submission.request_text), "Untitled task");
   const sourceItems = asStringArray(submission.attachments?.map((attachment) => attachment?.sha256)).map((digest, index) => {
     const attachment = submission.attachments[index] ?? {};
     return {
@@ -258,10 +252,23 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
     });
   }
   const intentRef = intentTaskRef(projectId, submissionId);
-  const selection = approvedExecutionSelection({ executionProfile, workType: asString(normalization.work_type) });
-  const prepared = preparedContract({ normalization, executionProfile, workType: asString(normalization.work_type), scope: normalization.scope, deliveryMode: asString(normalization.delivery_mode), status, });
-  const startAvailable = status === "prepared" && Boolean(selection.route_id) && selection.readiness === "ready";
-  const attentionItem = status === "attention" ? intentAttentionItem(submission, submissionId) : null;
+  const selection = approvedExecutionSelection({ executionProfile, workType: asString(normalization.work_type), override: submission.execution_route_override, selectionRevision: submission.runner_selection_revision });
+  const prepared = preparedContract({ normalization, executionProfile, workType: asString(normalization.work_type), scope: normalization.scope, deliveryMode: asString(normalization.delivery_mode), status, override: submission.execution_route_override, selectionRevision: submission.runner_selection_revision });
+  const staleMarkdownSources = (Array.isArray(submission.markdown_sources) ? submission.markdown_sources : []).filter((source) => source?.stale === true);
+  const sourceReadinessReason = staleMarkdownSources.length
+    ? `Repository Markdown source changed after preparation: ${staleMarkdownSources.map((source) => source.project_relative_path).join(", ")}. Edit the Task and add the current file before starting.`
+    : null;
+  const startAvailable = status === "prepared"
+    && staleMarkdownSources.length === 0
+    && Boolean(selection.route_id)
+    && selection.readiness === "ready"
+    && Number.isInteger(executionProfile?.revision)
+    && selection.readiness_revision === executionProfile.revision;
+  const attentionItem = presentation.runnerReadiness ? intentAttentionItem(submission, submissionId) : null;
+  const preparedStartReason = new Map([[true, "Prepared task is ready for revision-checked start."], [false, sourceReadinessReason ?? selection.unavailable_reason]]).get(startAvailable);
+  const primaryActionReason = new Map([["draft", "Continue the intent-first task flow."], ["prepared", preparedStartReason], ["attention", attentionItem?.message]]).get(status);
+  const actionAvailable = new Map([["draft", true], ["prepared", startAvailable], ["attention", true]]).get(status);
+  const runnerSelectionOverride = presentation.runnerReadiness ? { readiness: presentation.runnerReadiness, unavailable_reason: attentionItem?.message, recovery_action: attentionItem?.recovery_action } : {};
   return {
     schema_version: 1,
     task_id: taskId(projectId, `intent.${submissionId}`),
@@ -284,40 +291,34 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
     },
     source_items: sourceItems,
     attention_items: attentionItem ? [attentionItem] : [],
-    review: { status: status === "prepared" ? "pending" : "not-ready", verification_status: "unknown", delivery_status: "unknown", changed_paths: [], evidence_refs: asStringArray(submission.normalization_refs), read_only: true },
+    review: { status: presentation.reviewStatus, verification_status: "unknown", delivery_status: "unknown", changed_paths: [], evidence_refs: asStringArray(submission.normalization_refs), read_only: true },
     completion: { status: "incomplete", immutable: false, verification_status: "unknown", delivery_status: "unknown", evidence_refs: asStringArray(submission.normalization_refs), follow_up_eligible: false },
     revision: Number.isInteger(normalization.revision) ? normalization.revision : null,
     lifecycle_path: {
       path_id: "intent",
       owner: "runtime",
-      steps: [{ id: "prepare", label: "Prepare", state: status === "prepared" ? "completed" : "current" }],
+      steps: [{ id: "prepare", label: "Prepare", state: presentation.stepState }],
     },
-    current_step: status === "prepared" ? "confirm" : "prepare",
-    current_step_label: status === "prepared" ? "Ready for review" : "Draft",
-    attention_count: status === "attention" ? 1 : 0,
-    blocker_count: status === "attention" ? 1 : 0,
+    current_step: presentation.currentStep,
+    current_step_label: presentation.currentStepLabel,
+    attention_count: presentation.attentionCount,
+    blocker_count: presentation.blockerCount,
     evidence_refs: asStringArray(submission.normalization_refs),
     primary_action: publicAction({
-      action_id: status === "prepared" ? "start" : "intent.resume",
-      operator_control: status === "prepared" ? "Start task" : "Resume task preparation",
-      reason: status === "prepared"
-        ? (startAvailable ? "Prepared task is ready for revision-checked start." : selection.unavailable_reason)
-        : status === "attention" ? attentionItem.message : "Continue the intent-first task flow.",
-      available: status === "prepared" ? startAvailable : true,
+      action_id: presentation.actionId,
+      operator_control: presentation.operatorControl,
+      reason: primaryActionReason,
+      available: actionAvailable,
     }, status),
     runner_selection: {
-      schema_version: 1,
-      source: "project-default",
       ...selection,
-      readiness: status === "attention" ? "blocked" : selection.readiness,
-      unavailable_reason: status === "attention" ? attentionItem.message : selection.unavailable_reason,
-      recovery_action: status === "attention" ? attentionItem.recovery_action : selection.recovery_action,
+      ...runnerSelectionOverride,
     },
     prepared_contract: prepared,
     updated_at: asString(submission.updated_at) ?? asString(submission.created_at),
     completed_read_only: false,
     read_only: true,
-    draft: status !== "prepared",
+    draft: presentation.draft,
   };
 }
 
@@ -339,10 +340,21 @@ function taskSourceItems(flow) {
  * model. This module owns presentation identity only; lifecycle and mutations
  * remain owned by intent, Mission, Flow, and Runtime Harness services.
  */
-export function projectTaskFromFlow({ projectId, flow, executionProfile }) {
+export function projectTaskFromFlow({ projectId, flow, executionProfile, intentSubmission = null, runState = null }) {
   const id = taskId(projectId, flow.flow_id);
   const status = taskStatus(flow);
-  const selection = approvedExecutionSelection({ executionProfile, workType: asString(flow.work_type), step: asString(flow.current_step) });
+  const latestNormalization = intentSubmission?.normalization;
+  const normalization = Number.isInteger(flow.normalization_revision)
+    && latestNormalization?.revision === flow.normalization_revision
+    ? latestNormalization
+    : null;
+  const selection = approvedExecutionSelection({
+    executionProfile,
+    workType: asString(flow.work_type),
+    step: asString(flow.current_step),
+    override: intentSubmission?.submission?.execution_route_override,
+    selectionRevision: intentSubmission?.submission?.runner_selection_revision,
+  });
   return {
     schema_version: 1,
     task_id: id,
@@ -379,12 +391,19 @@ export function projectTaskFromFlow({ projectId, flow, executionProfile }) {
       reason: null,
       available: false,
     }, status),
-    runner_selection: {
-      schema_version: 1,
-      source: "project-default",
-      ...selection,
-    },
-    prepared_contract: preparedContract({ normalization: null, executionProfile, workType: asString(flow.work_type), scope: [], deliveryMode: asString(flow.writeback_policy?.mode), status, step: asString(flow.current_step) }),
+    ...(runState ? { run_state: runState } : {}),
+    runner_selection: selection,
+    prepared_contract: preparedContract({
+      normalization,
+      executionProfile,
+      workType: asString(flow.work_type),
+      scope: normalization?.scope ?? [],
+      deliveryMode: asString(normalization?.delivery_mode) ?? asString(flow.writeback_policy?.mode),
+      status,
+      step: asString(flow.current_step),
+      override: intentSubmission?.submission?.execution_route_override,
+      selectionRevision: intentSubmission?.submission?.runner_selection_revision,
+    }),
     updated_at: flow.updated_at ?? null,
     completed_read_only: status === "completed",
     read_only: true,
@@ -393,6 +412,7 @@ export function projectTaskFromFlow({ projectId, flow, executionProfile }) {
 
 export function listTaskProjections(options = {}) {
   const flows = listFlowProjections(options);
+  const runtimeLayout = flows.flows.length ? createProjectReadContext(options).runtimeLayout : null;
   let executionProfile = options.executionProfile ?? null;
   if (!executionProfile && options.registry && options.projectId) {
     try {
@@ -401,9 +421,19 @@ export function listTaskProjections(options = {}) {
       executionProfile = null;
     }
   }
-  const flowTasks = flows.flows.map((flow) => projectTaskFromFlow({ projectId: flows.project_id, flow, executionProfile }));
-  const intentTasks = Array.isArray(options.intentSubmissions)
-    ? options.intentSubmissions.map((entry) => projectIntentTask({ projectId: flows.project_id, entry, executionProfile })).filter(Boolean)
+  const intentEntries = Array.isArray(options.intentSubmissions) ? options.intentSubmissions : [];
+  const intentByFlow = new Map(intentEntries
+    .filter((entry) => asString(entry?.submission?.confirmation?.flow_id))
+    .map((entry) => [entry.submission.confirmation.flow_id, entry]));
+  const flowTasks = flows.flows.map((flow) => projectTaskFromFlow({
+    projectId: flows.project_id,
+    flow,
+    executionProfile,
+    intentSubmission: intentByFlow.get(flow.flow_id) ?? null,
+    runState: flowRunIds(flow)[0] ? readRunJobStatus({ runtimeLayout, runId: flowRunIds(flow)[0] }) : null,
+  }));
+  const intentTasks = intentEntries.length
+    ? intentEntries.map((entry) => projectIntentTask({ projectId: flows.project_id, entry, executionProfile })).filter(Boolean)
     : [];
   const tasks = [...intentTasks, ...flowTasks];
   return {

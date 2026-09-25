@@ -1,8 +1,5 @@
 import { buildCorrectionGuidance, extractStructuredCandidate } from "./structured-candidate.mjs";
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
+import { asRecord } from "./shared/value-normalization.mjs";
 
 function classifyPlanningRef(ref) {
   const value = String(ref);

@@ -91,8 +91,12 @@ function seedPermissionInteraction(projectRoot, runId, interactionId) {
     runner_family: "claude",
     permission_mode: "restricted",
     operation_type: "file_write",
+    resource_type: "filesystem",
     tool_name: "Edit",
     target: "src/index.js",
+    relative_resource: "src/index.js",
+    canonical_resource: path.join(projectRoot, "src/index.js"),
+    capabilities: { filesystem_write: true },
     confidence: "high",
     evidence_refs: ["evidence://reports/runner-permission.json"],
   };
@@ -115,6 +119,7 @@ function seedPermissionInteraction(projectRoot, runId, interactionId) {
           interaction_type: "permission_request",
           status: "requested",
           prompt_summary: "Approve file edit?",
+          allowed_decisions: ["approve_once", "deny", "approve_for_run"],
           question_evidence_refs: ["evidence://reports/runner-permission.json"],
           answer_audit_refs: [],
           runtime_permission_request: runtimePermissionRequest,
@@ -228,6 +233,14 @@ test("permission interaction answer records structured decision without claiming
     assert.equal(updatedStepResult.requested_interaction.runtime_permission_decision.approval_resume_mode, null);
     assert.ok(Date.parse(updatedStepResult.requested_interaction.runtime_permission_decision.expires_at) > Date.now());
     assert.equal(JSON.stringify(updatedStepResult).includes("operator approved one file edit"), false);
+
+    const history = readRunEventHistory({ cwd: projectRoot, projectRef: projectRoot, runId, limit: 10 });
+    const blockedInteraction = history.events.map((event) => event.interaction).find((interaction) => interaction?.status === "blocked");
+    assert.equal(blockedInteraction.interaction_type, "permission_request");
+    assert.equal(blockedInteraction.permission_request.resource_label, "src/index.js");
+    assert.deepEqual(blockedInteraction.permission_request.capabilities, ["filesystem_write"]);
+    assert.deepEqual(blockedInteraction.permission_request.allowed_decisions, ["approve_once", "deny", "approve_for_run"]);
+    assert.equal(JSON.stringify(history).includes(path.join(projectRoot, "src/index.js")), false);
   });
 });
 

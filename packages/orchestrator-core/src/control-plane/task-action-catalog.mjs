@@ -8,7 +8,9 @@
 
 const entries = [
   { action_id: "confirm", category: "mutation", permission: "mutate", dispatch: "intent.confirm", payload: { expected_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
-  { action_id: "start", category: "mutation", permission: "mutate", dispatch: "intent.start", payload: { expected_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
+  { action_id: "start", category: "mutation", permission: "mutate", dispatch: "intent.start", payload: { expected_revision: { type: "integer", required: false, ui_required: true }, expected_selection_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
+  { action_id: "select-runner", category: "mutation", permission: "mutate", dispatch: "intent.select-runner", payload: { route_id: { type: "string", required: true }, expected_revision: { type: "integer", required: false, ui_required: true }, expected_selection_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
+  { action_id: "reset-runner", category: "mutation", permission: "mutate", dispatch: "intent.reset-runner", payload: { expected_revision: { type: "integer", required: false, ui_required: true }, expected_selection_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
   { action_id: "pause", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { expected_revision: { type: "integer", required: false }, reason: { type: "string", required: false } }, requires_confirmation: false },
   { action_id: "resume", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { expected_revision: { type: "integer", required: false }, reason: { type: "string", required: false } }, requires_confirmation: false },
   { action_id: "steer", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { expected_revision: { type: "integer", required: false }, reason: { type: "string", required: true } }, requires_confirmation: false },

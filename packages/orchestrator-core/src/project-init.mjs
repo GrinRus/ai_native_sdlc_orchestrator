@@ -10,6 +10,7 @@ import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 import { deriveWorkspaceProjectId, resolveAorHome, toLogicalEvidenceRef } from "./aor-home.mjs";
 import { copyCanonicalContainedPath, readCanonicalContainedFile, removeCanonicalContainedPath } from "./shared/canonical-paths.mjs";
+import { asRecord } from "./shared/value-normalization.mjs";
 
 const DEFAULT_BOOTSTRAP_TEMPLATE_ID = "github-default";
 const DEFAULT_PROFILE_CANDIDATES = [
@@ -38,16 +39,6 @@ function deriveGeneratedProjectId(projectRoot) {
   const canonicalRoot = fs.realpathSync.native(projectRoot);
   const digest = crypto.createHash("sha256").update(canonicalRoot).digest("hex").slice(0, 16);
   return `project-${digest}`;
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
 }
 
 /**

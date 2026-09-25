@@ -240,8 +240,10 @@ Compiler revisions are tracked through `compiler-revision-status`: one report re
 Operator requests do not introduce a separate prompt system. `aor request run`
 and the operator-request run API use the normal route, wrapper, prompt bundle,
 policy, adapter, and context compiler path for the selected target step. The
-Task Workspace Ask AOR composer currently creates a bounded `no-write` request;
-creation alone does not execute the step or compile its context. The
+Task Workspace Ask AOR composer persists a bounded `no-write` request as
+`run-pending`, then invokes that same runtime path. Interrupted requests remain
+visible in the sanitized request list and can be resumed from the Task UI or
+the public API/CLI. The
 only additive context asset is `context-bundle://context.bundle.operator-intervention@v1`,
 which expands the always-on `context-rule://context.rule.operator-intervention@v1`.
 

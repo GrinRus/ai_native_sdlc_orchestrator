@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { derivePublicId, normalizeIdentifierFragment, validateContractDocument } from "../../contracts/src/index.mjs";
+import { asString, asStringArray, asRecordArray, firstNonNullish } from "../../contracts/src/value-normalization.mjs";
 import { materializeQualityRepairRequest } from "./quality-repair-request.mjs";
 
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
@@ -21,24 +22,6 @@ function nowIso() {
  */
 function normalizeId(value) {
   return normalizeIdentifierFragment(value);
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
 }
 
 /**
@@ -272,7 +255,7 @@ function normalizeRepairContext(options) {
               "Address this repair finding in the next public execution iteration or provide fresh evidence that it is stale.",
           })),
     meaningful_changed_paths: asStringArray(context.meaningful_changed_paths),
-    verification_status: asString(context.verification_status) ?? options.defaultVerificationStatus ?? "unknown",
+    verification_status: firstNonNullish(asString(context.verification_status), options.defaultVerificationStatus, "unknown"),
     verification_refs: asStringArray(context.verification_refs).length > 0
       ? asStringArray(context.verification_refs)
       : fallbackVerificationRefs,
@@ -564,16 +547,6 @@ export function materializeReviewDecision(options) {
         }
       : {}),
   };
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
-    : [];
 }
 
 /**

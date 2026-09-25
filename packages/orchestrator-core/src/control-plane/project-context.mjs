@@ -83,7 +83,6 @@ export function createProjectContext(input) {
   });
 }
 
-
 /**
  * Resolve an immutable, initialization-compatible view of an existing project
  * runtime. This function never creates directories, profiles, reports, or

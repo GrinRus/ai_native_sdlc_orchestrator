@@ -288,7 +288,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intent-first",
     status: "implemented",
     summary: "Persist text and text-file intent, then start read-only AI normalization.",
-    inputs: ["--project-id <id>", "--request <text> (optional)", "--file <path> (repeatable)", "--help"],
+    inputs: ["--project-id <id>", "--request <text> (optional)", "--file <path> (repeatable)", "--source-submission-id <id> (optional)", "--source-id <id> (optional, repeatable, must belong to --source-submission-id)", "--preparation-route <route_id> (optional, requires a current ready route check)", "--help"],
     outputs: ["intent_submission", "status_ref", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-id"],
     contractFamilies: ["intent-submission", "intent-normalization-report"],
@@ -298,8 +298,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intent-first",
     status: "implemented",
     summary: "Confirm a prepared intent submission and idempotently start its Flow.",
-    inputs: ["--submission-id <id>", "--project-id <id> (optional)", "--expected-revision <n> (optional)", "--help"],
-    outputs: ["task_start", "contract_families", "command_catalog_alignment"],
+    inputs: ["--submission-id <id>", "--project-id <id> (optional)", "--expected-revision <n> (optional)", "--route <route_id> (optional, approved route for the Task execution step)", "--use-project-default <true|false> (optional, clears a saved Task override when true)", "--help"],
+    outputs: ["task_start", "runner_selection", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["submission-id"],
     contractFamilies: ["intent-submission", "intake-request-body", "task-projection"],
   },
@@ -376,7 +376,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     outputs: ["execution_profile", "contract_families", "command_catalog_alignment"], requiredFlags: ["project-id", "step", "expected-revision"], contractFamilies: ["execution-profile", "project-profile"],
   },
   {
-    command: "route check", category: "execution-routes", status: "implemented", summary: "Check runner, auth, model, capability, and policy readiness without provider spawn.", inputs: ["--project-id <id>", "--step <step> (optional)", "--help"],
+    command: "route check", category: "execution-routes", status: "implemented", summary: "Check runner, auth, model, capability, and policy readiness without provider spawn.", inputs: ["--project-id <id>", "--step <step> (optional)", "--route <route_id> (optional, requires --step and checks that exact approved route)", "--help"],
     outputs: ["execution_profile", "execution_readiness_report", "contract_families", "command_catalog_alignment"], requiredFlags: ["project-id"], contractFamilies: ["execution-profile", "execution-readiness-report"],
   },
   {

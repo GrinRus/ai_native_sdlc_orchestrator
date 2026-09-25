@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { listTaskProjections, projectTaskFromFlow } from "../src/control-plane/task-projections.mjs";
+import { derivePublicId } from "../../contracts/src/index.mjs";
+import { readRunJobStatus } from "../src/run-job.mjs";
 
 const baseFlow = {
   flow_id: "flow.project-alpha.mission-1",
@@ -39,6 +44,25 @@ test("Task projection has stable lineage identity and delegates lifecycle to Flo
   assert.equal(task.read_only, true);
 });
 
+test("Task projection publishes only the selected durable run-job status", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-task-run-state-"));
+  const runId = "run.task-projection.v1";
+  const runtimeLayout = { stateRoot: path.join(root, "state") };
+  const jobId = derivePublicId([runId, "job"], "job");
+  const jobDirectory = path.join(runtimeLayout.stateRoot, "run-jobs");
+  const jobFile = path.join(jobDirectory, `run-job-${jobId}.json`);
+  fs.mkdirSync(jobDirectory, { recursive: true });
+  fs.writeFileSync(jobFile, JSON.stringify({ run_id: runId, status: "paused", revision: 3 }));
+  try {
+    const runState = readRunJobStatus({ runtimeLayout, runId });
+    assert.deepEqual(runState, { run_id: runId, status: "paused" });
+    assert.deepEqual(projectTaskFromFlow({ projectId: "project-alpha", flow: baseFlow, runState }).run_state, runState);
+    assert.equal(readRunJobStatus({ runtimeLayout, runId: "run.unrelated" }), null);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("completed Flow projects to immutable completed Task without inventing a next action", () => {
   const task = projectTaskFromFlow({ projectId: "project-alpha", flow: {
     ...baseFlow,
@@ -54,6 +78,35 @@ test("completed Flow projects to immutable completed Task without inventing a ne
   assert.equal(task.completion.patch_ref, "evidence://closure/pass.patch");
   assert.equal(task.completion.digest, "a".repeat(64));
   assert.equal(task.completion.delivery_manifest_ref, "evidence://closure/pass.manifest");
+});
+
+test("Flow-backed Tasks retain the exact confirmed prepared contract for review and completion", () => {
+  const task = projectTaskFromFlow({
+    projectId: "project-alpha",
+    flow: { ...baseFlow, normalization_revision: 4, writeback_policy: { mode: "patch-only" } },
+    intentSubmission: {
+      submission: { execution_route_override: null, runner_selection_revision: 0 },
+      normalization: {
+        revision: 4,
+        outcome: "Preserve the approved Task outcome through completion.",
+        acceptance: ["The exact outcome remains visible."],
+        scope: ["apps/web/**"],
+        delivery_mode: "patch-only",
+      },
+    },
+  });
+  assert.equal(task.prepared_contract.outcome, "Preserve the approved Task outcome through completion.");
+  assert.deepEqual(task.prepared_contract.acceptance_criteria, ["The exact outcome remains visible."]);
+  assert.deepEqual(task.prepared_contract.scope.allowed_paths, ["apps/web/**"]);
+  assert.equal(task.prepared_contract.normalization_revision, 4);
+  assert.equal(task.prepared_contract.delivery_mode, "patch-only");
+
+  const stale = projectTaskFromFlow({
+    projectId: "project-alpha",
+    flow: { ...baseFlow, normalization_revision: 5 },
+    intentSubmission: { normalization: { revision: 4, outcome: "Do not surface stale outcome." } },
+  });
+  assert.equal(stale.prepared_contract.outcome, null);
 });
 
 test("partial completion evidence remains blocked instead of rendering success", () => {
@@ -134,15 +187,17 @@ test("intent submissions project into draft, prepared, and attention Task states
   assert.equal(projection.tasks[2].runner_selection.unavailable_reason, "Configure and authenticate an approved runner before preparing this task.");
   const repositorySource = projection.tasks[1].source_items.find((source) => source.kind === "repository-markdown");
   assert.equal(repositorySource.stale, true);
+  assert.equal(projection.tasks[1].primary_action.available, false);
+  assert.match(projection.tasks[1].primary_action.reason, /source changed after preparation/u);
 });
 
 test("prepared Task uses the approved execution profile and never exposes intake provenance as route", () => {
-  const projection = listTaskProjections({
+  const projectionInput = {
     projectId: "project-alpha",
     projectRef: ".",
     executionProfile: {
       revision: 9,
-      routes: [{ step: "implement", route_id: "route.implement.default", readiness: "ready", requested_model: "coding-primary", effective_model: "coding-primary" }],
+      routes: [{ step: "implement", route_id: "route.implement.default", readiness: "ready", readiness_revision: 9, requested_model: "coding-primary", effective_model: "coding-primary" }],
     },
     intentSubmissions: [{
       submission: {
@@ -165,7 +220,8 @@ test("prepared Task uses the approved execution profile and never exposes intake
         provider: { route_id: "route.intake-normalize.default", adapter_id: "codex-cli" },
       },
     }],
-  });
+  };
+  const projection = listTaskProjections(projectionInput);
   const task = projection.tasks[0];
   assert.equal(task.prepared_contract.approved_execution_route.route_id, "route.implement.default");
   assert.equal(task.runner_selection.route_id, "route.implement.default");
@@ -173,4 +229,21 @@ test("prepared Task uses the approved execution profile and never exposes intake
   assert.equal(task.prepared_contract.write_effects.upstream_writes_allowed, false);
   assert.equal(task.primary_action.action_id, "start");
   assert.equal(task.primary_action.available, true);
+
+  const unversionedProjection = listTaskProjections({
+    ...projectionInput,
+    executionProfile: {
+      ...projectionInput.executionProfile,
+      routes: projectionInput.executionProfile.routes.map((route) => ({
+        step: route.step,
+        route_id: route.route_id,
+        readiness: route.readiness,
+        requested_model: route.requested_model,
+        effective_model: route.effective_model,
+      })),
+    },
+  });
+  assert.equal(unversionedProjection.tasks[0].runner_selection.readiness, "stale");
+  assert.equal(unversionedProjection.tasks[0].runner_selection.readiness_revision, null);
+  assert.equal(unversionedProjection.tasks[0].primary_action.available, false);
 });

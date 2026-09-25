@@ -79,6 +79,9 @@ materialization may write `.aor/project.yaml`; explicit evidence export may
 write `.aor/exports/**`. Raw intent is first persisted as an immutable
 `intent-submission`, normalized through a read-only runner-agnostic route, and
 only then confirmed into the existing intake-request and Flow lifecycle.
+Read-only preparation may start the selected runner to normalize intent, but
+it cannot write to the connected repository; `Start task` remains the boundary
+for execution that can produce source changes.
 
 Query ingress derives an immutable `ProjectReadContext` from that project
 context and a non-materializing runtime preview. It resolves the same canonical

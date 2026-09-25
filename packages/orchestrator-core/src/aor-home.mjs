@@ -101,6 +101,11 @@ export function toLogicalEvidenceRef({ projectRoot, filePath, workspaceProjectId
   return `evidence://${path.relative(projectRoot, absolute).replace(/\\/g, "/")}`;
 }
 
+/** @param {string} projectRoot @param {string} filePath @returns {string} */
+export function toProjectEvidenceRef(projectRoot, filePath) {
+  return toLogicalEvidenceRef({ projectRoot, filePath });
+}
+
 export function resolveLogicalEvidenceRef({ projectRoot, projectRuntimeRoot, workspaceProjectId, reference }) {
   const prefix = `evidence://projects/${workspaceProjectId}/`;
   if (reference.startsWith(prefix)) return path.resolve(projectRuntimeRoot, reference.slice(prefix.length));

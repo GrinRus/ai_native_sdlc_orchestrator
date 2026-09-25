@@ -5,25 +5,18 @@ import { applyRunControlAction as applyRunControlActionCore, readRunControlState
 
 import { appendRunEvent } from "./live-event-stream.mjs";
 
+const LIVE_EVENT_BY_ACTION = new Map([
+  ["start", "run.started"],
+  ["cancel", "run.terminal"],
+]);
+
 /**
  * @param {string} action
  * @param {boolean} blocked
  * @returns {"run.started" | "run.terminal" | "step.updated" | "warning.raised"}
  */
 function resolveLiveEventType(action, blocked) {
-  if (blocked) {
-    return "warning.raised";
-  }
-
-  if (action === "start") {
-    return "run.started";
-  }
-
-  if (action === "cancel") {
-    return "run.terminal";
-  }
-
-  return "step.updated";
+  return blocked ? "warning.raised" : LIVE_EVENT_BY_ACTION.get(action) ?? "step.updated";
 }
 
 /**

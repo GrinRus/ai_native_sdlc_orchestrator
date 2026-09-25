@@ -35,10 +35,17 @@ An operator request is not a direct chat transcript. The request is stored as a 
 
 Creation and execution are serialized by the runtime request transaction. A
 duplicate submission with the same `idempotency_key` returns the existing
-request and never creates a second request file. A request left in
-`run-pending` or `running` after interruption is resumed under the same
-`request_id`; retries increment `attempt` and may create new run evidence, but
-must not duplicate a completed result.
+request and never creates a second request file. Task Workspace Ask AOR actions
+persist the request as `run-pending` before invoking the shared runtime, so a
+process interruption between persistence and execution leaves an explicit
+recovery state. A request left in `run-pending` or `running` after interruption
+is resumed under the same `request_id`; retries increment `attempt` and may
+create new run evidence, but must not duplicate a completed result.
+
+Task Workspace reads the sanitized operator-request list for the selected Task
+and offers a resume action for `created`, `run-pending`, or interrupted
+`running` requests. Resume uses the same `POST /operator-requests/{requestId}/actions`
+run action exposed to other API clients and the CLI `aor request run` command.
 
 ## Runtime Semantics
 

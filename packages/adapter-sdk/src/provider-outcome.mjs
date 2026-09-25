@@ -1,16 +1,9 @@
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
+import { asRecord, firstNonNullish } from "../../contracts/src/value-normalization.mjs";
 
 function rawProviderStatus(runnerPayload) {
   const payload = asRecord(runnerPayload);
   return String(
-    payload.semantic_outcome ??
-    payload.completion_status ??
-    asRecord(payload.terminal_outcome).status ??
-    asRecord(payload.outcome).status ??
-    payload.status ??
-    "",
+    firstNonNullish(payload.semantic_outcome, payload.completion_status, asRecord(payload.terminal_outcome).status, asRecord(payload.outcome).status, payload.status, ""),
   ).toLowerCase();
 }
 
@@ -32,10 +25,7 @@ export function buildExternalExecutionOutcome(options) {
         ? "failed"
         : "unknown";
   const rawVerificationStatus = String(
-    runnerPayload.verification_status ??
-    asRecord(runnerPayload.verification).status ??
-    asRecord(runnerPayload.terminal_outcome).verification_status ??
-    "",
+    firstNonNullish(runnerPayload.verification_status, asRecord(runnerPayload.verification).status, asRecord(runnerPayload.terminal_outcome).verification_status, ""),
   ).toLowerCase();
   const verificationStatus = ["pass", "passed", "success"].includes(rawVerificationStatus)
     ? "pass"

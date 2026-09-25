@@ -9,27 +9,13 @@ import { createProjectReadContext } from "./project-context.mjs";
 import { attachParentRunProjections } from "./parent-run-read-model.mjs";
 import { listExternalRunHealthProjectionsForRuntime } from "./external-run-health-read-model.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
+import { toInteractionHistorySummary } from "./interaction-projection.mjs";
 import { runProjectionCoordinator } from "../operator-projection-services.mjs";
 import { applyReadModelLimit, listPacketArtifacts, listQualityArtifacts, listRunControlAudits, listRunControlStateFiles, listStepResults } from "./read-artifact-readers.mjs";
+import { asFiniteNumber as asNumber, asRecord, asString, asStringArray, firstNonNullish } from "../shared/value-normalization.mjs";
+import { resolveDurationSeconds } from "../shared/timing.mjs";
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
 const CONTEXT_ASSET_REF_REGEX = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
 
 /**
  * @param {unknown} value
@@ -37,22 +23,6 @@ function asRecord(value) {
  */
 function asBoolean(value) {
   return value === true;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 /**
@@ -108,23 +78,6 @@ function parseContextAssetRef(value) {
     version,
     normalized_ref: `${match[1]}://${match[2]}@v${version}`,
   };
-}
-
-/**
- * @param {unknown} startedAt
- * @param {unknown} finishedAt
- * @returns {number | null}
- */
-function resolveDurationSeconds(startedAt, finishedAt) {
-  if (typeof startedAt !== "string" || typeof finishedAt !== "string") {
-    return null;
-  }
-  const startMs = Date.parse(startedAt);
-  const finishMs = Date.parse(finishedAt);
-  if (!Number.isFinite(startMs) || !Number.isFinite(finishMs) || finishMs < startMs) {
-    return null;
-  }
-  return Math.round(((finishMs - startMs) / 1000) * 1000) / 1000;
 }
 
 /**
@@ -979,7 +932,6 @@ export function readRunEventHistory(options) {
     const payload = asRecord(event.payload);
     const policyContext = asRecord(payload.policy_context);
     const interaction = asRecord(payload.interaction);
-    const continuation = asRecord(interaction.continuation);
     const providerStepStatus = normalizeProviderStepStatus(asRecord(payload.provider_step_status), {
       nowMs: toTimestampMs(event.timestamp) ?? undefined,
     });
@@ -996,24 +948,7 @@ export function readRunEventHistory(options) {
       step_result_ref: asString(payload.step_result_ref),
       answer_audit_ref: asString(payload.answer_audit_ref),
       provider_step_status: providerStepStatus,
-      interaction:
-        Object.keys(interaction).length > 0
-          ? {
-              interaction_id: asString(interaction.interaction_id),
-              status: asString(interaction.status),
-              step_result_ref: asString(interaction.step_result_ref),
-              question_summary: asString(interaction.question_summary),
-              answer_required: asBoolean(interaction.answer_required),
-              answer_audit_refs: asStringArray(interaction.answer_audit_refs),
-              continuation:
-                Object.keys(continuation).length > 0
-                  ? {
-                      next_action: asString(continuation.next_action),
-                      reason_code: asString(continuation.reason_code),
-                    }
-                  : null,
-            }
-          : null,
+      interaction: Object.keys(interaction).length > 0 ? toInteractionHistorySummary(interaction) : null,
       policy_context:
         Object.keys(policyContext).length > 0
           ? {
@@ -1070,7 +1005,7 @@ export function readRunPolicyHistory(options) {
     const governance = asRecord(policyResolution.governance_decision);
     const governanceReasons = toGovernanceReasons(governance.reasons);
     const timelineAt =
-      asString(routedExecution.finished_at) ?? asString(routedExecution.started_at) ?? asString(stepResult.document.created_at);
+      firstNonNullish(asString(routedExecution.finished_at), asString(routedExecution.started_at), asString(stepResult.document.created_at));
 
     timelineEntries.push({
       timeline_ms: toTimelineMs(timelineAt),

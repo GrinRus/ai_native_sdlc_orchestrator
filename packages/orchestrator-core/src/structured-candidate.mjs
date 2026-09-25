@@ -1,3 +1,4 @@
+import { asRecord } from "./shared/value-normalization.mjs";
 /**
  * Runner-neutral extraction for model-authored structured candidates.
  *
@@ -11,10 +12,6 @@ const PARSE_STATUSES = Object.freeze(["valid", "missing", "malformed", "ambiguou
 const REPAIR_KINDS = Object.freeze(["output-contract", "evidence-reconciliation", "work-product"]);
 const MAX_CANDIDATE_BYTES = 65_536;
 const MAX_ISSUES = 64;
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
 
 function isNonEmptyRecord(value) {
   return Object.keys(asRecord(value)).length > 0;

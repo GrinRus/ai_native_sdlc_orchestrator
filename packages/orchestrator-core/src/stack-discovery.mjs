@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { asRecord, uniqueTrimmedStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 const IGNORED_DIR_NAMES = new Set([
   ".aor",
@@ -198,28 +199,6 @@ function normalizeIdPart(value) {
     return "root";
   }
   return trimHyphens(collapsePathSeparators(normalized)) || "root";
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [
-    ...new Set(
-      values.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim()),
-    ),
-  ];
 }
 
 /**

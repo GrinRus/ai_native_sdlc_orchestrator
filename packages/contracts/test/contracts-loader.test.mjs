@@ -326,6 +326,17 @@ test("relative and evidence references require exactly one canonical base", () =
   assert.equal(validateReferenceBinding({ reference: "reports/result.json", base: "evidence-relative" }).ok, false);
 });
 
+test("canonical identifier validation accepts declarative action-field schemas and rejects invalid route values", () => {
+  const filePath = path.join(workspaceRoot, "examples/tasks/task-action-catalog.yaml");
+  const loaded = loadContractFile({ filePath, family: "task-action-catalog" });
+  assert.equal(loaded.ok, true);
+
+  const invalid = structuredClone(loaded.document);
+  invalid.actions[1].payload.route_id = "../route";
+  const validation = validateContractDocument({ family: "task-action-catalog", document: invalid, source: "test://task-action-catalog-invalid-route" });
+  assertValidationIssue(validation, "identifier_format_invalid", "actions[1].payload.route_id");
+});
+
 test("structured task plans load while legacy compact plans remain compatible", () => {
   for (const [fileName, family] of [
     ["wave-ticket-bootstrap.yaml", "wave-ticket"],
@@ -2012,6 +2023,28 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     }),
     "required_field_missing",
     "payload.interaction.continuation.next_action",
+  );
+  const invalidLiveRunEventInteractionType = structuredClone(liveRunEvent.document);
+  invalidLiveRunEventInteractionType.payload.interaction.interaction_type = "shell_command";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-run-event",
+      document: invalidLiveRunEventInteractionType,
+      source: "test://w24-live-run-event-invalid-interaction-type",
+    }),
+    "enum_value_invalid",
+    "payload.interaction.interaction_type",
+  );
+  const unsafeLiveRunEventPermission = structuredClone(liveRunEvent.document);
+  unsafeLiveRunEventPermission.payload.interaction.permission_request.command = "git push https://user:token@example.test";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-run-event",
+      document: unsafeLiveRunEventPermission,
+      source: "test://w24-live-run-event-unsafe-permission-summary",
+    }),
+    "unsupported_field_present",
+    "payload.interaction.permission_request.command",
   );
 
   const incidentReport = loadContractFile({

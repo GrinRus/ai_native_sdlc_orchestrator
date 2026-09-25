@@ -9,12 +9,28 @@ import { invokeCli } from "../../../apps/cli/src/index.mjs";
 import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { createControlPlaneHttpServer } from "../src/control-plane/http/http-transport.mjs";
 import { createLocalProjectRegistry } from "../src/control-plane/local-project-registry.mjs";
+import { readIntentSubmission, reviseIntentSubmission } from "../src/intent-service.mjs";
 import {
   applyExecutionProfileAction,
   readExecutionProfile,
+  resolveTaskExecutionRoute,
 } from "../src/control-plane/execution-profile.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+
+test("Task route resolution fails closed for empty overrides and blank project defaults", () => {
+  const row = { step: "implement", route_id: "", readiness: "ready", readiness_revision: 7, approved_routes: [] };
+  const executionProfile = { revision: 7, routes: [row] };
+  const projectDefault = resolveTaskExecutionRoute({ executionProfile, step: "implement" });
+  assert.equal(projectDefault.route_id, null);
+  assert.equal(projectDefault.approved, false);
+
+  const emptyOverride = resolveTaskExecutionRoute({ executionProfile, step: "implement", overrideRouteId: "" });
+  assert.equal(emptyOverride.source, "task-override");
+  assert.equal(emptyOverride.route_id, null);
+  assert.equal(emptyOverride.readiness, "policy-denied");
+  assert.equal(emptyOverride.approved, false);
+});
 
 function fakeRunnerEnvironment(root) {
   const bin = path.join(root, "bin");
@@ -195,11 +211,12 @@ test("execution profile GET is non-materializing and HTTP check is durable", asy
       const checkedResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/execution-profile/actions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "check", step: "implement" }),
+        body: JSON.stringify({ action: "check", step: "implement", route_id: "route.implement.default" }),
       });
       assert.equal(checkedResponse.status, 202);
       const checked = await checkedResponse.json();
       assert.ok(["runner-missing", "auth-missing", "ready"].includes(checked.readiness_report.status));
+      assert.equal(checked.readiness_report.step_results[0].route_id, "route.implement.default");
       assert.equal(fs.existsSync(runtimeRoot), false);
     } finally {
       await transport.close();
@@ -212,6 +229,8 @@ test("route CLI reads the same persistent execution profile", async () => {
   await withTempRepo({ prefix: "aor-execution-cli-", workspaceRoot }, (projectRoot) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "aor-execution-cli-home-"));
     const previous = process.env.AOR_HOME;
+    const previousPath = process.env.PATH;
+    const previousAuth = process.env.AOR_AUTH_READY_CODEX_CLI;
     process.env.AOR_HOME = home;
     try {
       const added = invokeCli([
@@ -228,9 +247,97 @@ test("route CLI reads the same persistent execution profile", async () => {
       assert.equal(output.execution_profile.project_id, projectId);
       assert.equal(output.execution_profile.read_only, true);
       assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
+
+      const runnerEnvironment = fakeRunnerEnvironment(home);
+      process.env.PATH = runnerEnvironment.PATH;
+      process.env.AOR_AUTH_READY_CODEX_CLI = "true";
+      const preparationCheck = invokeCli([
+        "route", "check",
+        "--project-id", projectId,
+        "--step", "discovery",
+        "--route", "route.intake-normalize.default",
+        "--json",
+      ], { cwd: projectRoot });
+      assert.equal(preparationCheck.exitCode, 0, preparationCheck.stderr);
+      assert.equal(JSON.parse(preparationCheck.stdout).execution_readiness_report.step_results[0].route_id, "route.intake-normalize.default");
+
+      fs.writeFileSync(path.join(projectRoot, "cli-source.md"), "CLI source snapshot.\n", "utf8");
+      const prepared = invokeCli([
+        "task", "prepare",
+        "--project-id", projectId,
+        "--preparation-route", "route.intake-normalize.default",
+        "--request", "Prepare a CLI-selected task.",
+        "--file", "cli-source.md",
+        "--json",
+      ], { cwd: projectRoot });
+      assert.equal(prepared.exitCode, 0, prepared.stderr);
+      const preparedOutput = JSON.parse(prepared.stdout);
+      const originalSubmissionId = preparedOutput.intent_submission.submission_id;
+      assert.equal(preparedOutput.intent_submission.preparation_route_id, "route.intake-normalize.default");
+      const continued = invokeCli([
+        "task", "prepare",
+        "--project-id", projectId,
+        "--preparation-route", "route.intake-normalize.default",
+        "--request", "Continue the CLI-selected task.",
+        "--source-submission-id", originalSubmissionId,
+        "--source-id", `${originalSubmissionId}.source.1`,
+        "--json",
+      ], { cwd: projectRoot });
+      assert.equal(continued.exitCode, 0, continued.stderr);
+      const continuedOutput = JSON.parse(continued.stdout);
+      const submissionId = continuedOutput.intent_submission.submission_id;
+      assert.deepEqual(continuedOutput.intent_submission.source_lineage, {
+        source_submission_id: originalSubmissionId,
+        source_ids: [`${originalSubmissionId}.source.1`],
+      });
+      assert.equal(continuedOutput.intent_submission.attachments[0].sha256, preparedOutput.intent_submission.attachments[0].sha256);
+
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [], persistence: { mode: "persistent", root: home } });
+      reviseIntentSubmission({
+        registry,
+        projectId,
+        submissionId,
+        normalization: {
+          title: "Prepare CLI-selected task",
+          outcome: "Keep the chosen execution route with this Task.",
+          constraints: [],
+          acceptance: ["The execution route is durable."],
+          scope: ["src/**"],
+          work_type: "code-change",
+          assumptions: [],
+          open_questions: [],
+          confidence: 0.9,
+        },
+      });
+      const executionCheck = invokeCli([
+        "route", "check",
+        "--project-id", projectId,
+        "--step", "implement",
+        "--route", "route.implement.default",
+        "--json",
+      ], { cwd: projectRoot });
+      assert.equal(executionCheck.exitCode, 0, executionCheck.stderr);
+      assert.equal(JSON.parse(executionCheck.stdout).execution_readiness_report.step_results[0].route_id, "route.implement.default");
+
+      const started = invokeCli([
+        "task", "start",
+        "--project-id", projectId,
+        "--submission-id", submissionId,
+        "--route", "route.implement.default",
+        "--json",
+      ], { cwd: projectRoot });
+      assert.equal(started.exitCode, 0, started.stderr);
+      const durable = readIntentSubmission({ registry, projectId, submissionId }).submission;
+      assert.deepEqual(durable.execution_route_override, { route_id: "route.implement.default", step: "implement" });
+      assert.equal(durable.runner_selection_revision, 1);
+      assert.equal(durable.confirmation.start_transaction.status, "completed");
     } finally {
       if (previous === undefined) delete process.env.AOR_HOME;
       else process.env.AOR_HOME = previous;
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      if (previousAuth === undefined) delete process.env.AOR_AUTH_READY_CODEX_CLI;
+      else process.env.AOR_AUTH_READY_CODEX_CLI = previousAuth;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });

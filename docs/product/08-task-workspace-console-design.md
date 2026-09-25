@@ -24,8 +24,9 @@ The default journey is:
   ready, and completed tasks.
 - **Attention** is a durable work queue for questions, approvals, failed gates,
   and recovery. It is not activity history.
-- **Evidence** is a searchable project index; task-scoped evidence remains
-  available inside the selected Task.
+- **Evidence** opens a searchable project index of durable references published
+  by Tasks; selecting a reference returns to its owning Task. Task-scoped
+  evidence remains available inside the selected Task.
 - **Project** contains repositories, runner defaults, readiness, topology,
   export, and destructive project-data actions.
 - A selected Task opens one workspace with `Activity`, `Changes`, `Checks`, and
@@ -41,9 +42,9 @@ The default journey is:
 | Flow Cockpit | Active Task Workspace | Keep activity, controls, freshness, budget, and current safe action in one Task context. |
 | Attention mode and Interactions | Attention | Merge only the queue presentation; preserve distinct durable action contracts. |
 | Journey workbench | Task lifecycle and Activity | Use the compact lifecycle for orientation and disclose topology only when it affects work. |
-| Evidence mode | Task Evidence plus project Evidence index | Prefer task-scoped lineage; retain cross-task search as a secondary destination. |
+| Evidence mode | Task Evidence panels plus cross-Task Evidence reference index | Prefer task-scoped lineage; retain cross-task search as a secondary destination. The project index only lists refs published by Task projections and never resolves arbitrary filesystem paths. |
 | Review, QA, and Delivery workbenches | Review Changes and Completion | Present change, check, approval, delivery, and closure effects as one review-to-complete path. |
-| Ask AOR | Task guidance composer | Create the existing durable bounded operator request; never imply direct runner chat. |
+| Ask AOR | Task guidance composer | Persist, run, and resume the existing durable bounded operator request; never imply direct runner chat. |
 
 The migration removes duplicate navigation and presentation concepts. It does
 not merge runtime mutations, discard evidence types, or move lifecycle state
@@ -70,8 +71,17 @@ presentation change.
 ## Screen inventory
 
 1. **Tasks Home** — scan and resume work; primary action `New task`.
-2. **New Task** — describe the outcome, add source material, choose repository,
-   runner, and safety; primary action `Prepare task`.
+2. **New Task** — describe the outcome, add source material, choose the
+   read-only preparation runner, and check readiness before creating the
+   submission; primary action `Prepare task` remains disabled until the
+   selected runner is ready. Preparation may start that runner to normalize
+   the brief, but it cannot write to the repository. The project execution
+   route stays a separate choice on Prepared Task. If the API accepts the
+   submission before normalization finishes, keep the accepted request visible
+   and follow its Task projection until it becomes prepared or needs attention;
+   do not submit the request again. Show preparation progress and keep runner
+   selection and Start unavailable until the server publishes the prepared
+   Task. Returning to the task queue leaves server preparation running.
 3. **Markdown Sources** — add an uploaded snapshot or a repository Markdown
    reference, inspect metadata, and preview safely.
 4. **Prepared Task** — review outcome, acceptance, scope, path, runner, and
@@ -79,7 +89,12 @@ presentation change.
 5. **Active Task Workspace** — monitor current work, send a durable operator
    request, inspect changes/checks/evidence, pause, or stop.
 6. **Attention** — resolve one authoritative human decision with consequence,
-   source evidence, and durable readback.
+   source evidence, and durable readback. When a blocked Task needs a review
+   decision, open its current review evidence from Attention and record the
+   decision through the shared review action. A blocked intent preparation can
+   resume through its published action or open a linked edit where the operator
+   can check a different preparation runner while carrying selected sources
+   forward.
 7. **Review Changes** — review file tree, Markdown/code diff, checks, and
    delivery effects before accepting or requesting revision.
 8. **Completion and Evidence** — inspect outcome, verification, delivery, and
@@ -156,8 +171,14 @@ editor.
   loads are disabled. Links show their destination before opening.
 - Input snapshots are immutable. Replacing or removing a source creates a new
   submission/revision; it never rewrites the original attachment.
+- Editing a prepared Task creates a fresh submission with explicit source
+  lineage. The operator can carry selected uploads or current repository
+  snapshots forward from the prior submission, or remove individual sources.
+  Stale repository references must be removed and added again from the current
+  checkout before the new Task can be prepared.
 - Repository references become stale when the base revision or digest changes.
-  The user must refresh the snapshot or explicitly keep the pinned revision.
+  The user must remove the stale reference and add the current snapshot before
+  confirmation; AOR does not silently keep an out-of-date repository file.
 - A document-change Task shows the resulting `.md` file in Review Changes with
   rendered before/after and source diff views. Accepting a prepared task does
   not itself edit the repository document.
@@ -167,12 +188,21 @@ editor.
 ## Runner interaction
 
 - The New Task and Prepared Task screens show a human-readable Runner control.
-- Each option exposes readiness, location, capabilities, model/effort summary,
-  and recovery. Disallowed routes are omitted; approved but unavailable routes
-  remain visible and disabled with a recovery action.
-- `Project default` and `Task override` are distinct. Route IDs, adapter IDs,
-  qualification, fallback, and policy remain under `Route details`.
-- Changing Runner re-runs readiness and does not start a provider.
+- Each option shows its readiness; the selected route exposes runner and
+  adapter, provider, execution mode, capabilities, model/effort summary, and
+  recovery. Route metadata stays behind the expandable `Route details` panel.
+  The server omits disallowed routes; approved routes remain selectable so an
+  operator can check readiness and see the route-specific recovery action.
+- `Project default` and `Task override` are distinct. A Task override is saved
+  with that Task's intent and never changes the project default. Resetting the
+  selection returns the Task to the current project choice. Route IDs, adapter
+  IDs, qualification, fallback, and policy remain under `Route details`.
+- Selecting the preparation runner does not start a provider; checking it
+  records readiness. Preparing the brief may start that runner in read-only
+  mode. Selecting a Task execution route does not start it; `Start task` is the
+  execution boundary. The Prepared Task screen checks the exact selected
+  execution route after a route change so stale readiness does not leave Start
+  blocked without a recovery action.
 - Start remains disabled until the selected runner, source material, task
   revision, and write-back policy are current.
 
@@ -198,6 +228,8 @@ offline/reconnect, disabled, success, and keyboard focus. Active Task additional
 covers queued, running, interaction-required, paused, canceling, failed,
 repairing, and completed. Narrow layouts replace the right inspector with a
 drawer and keep state, safety, and the primary action visible.
+Pause is available for a running job and Resume for a paused job; the visible
+run state comes from durable run-job evidence.
 
 ## Acceptance criteria
 

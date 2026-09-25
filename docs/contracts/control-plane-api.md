@@ -40,7 +40,14 @@ W67 adds intent-first onboarding:
 
 - `POST /api/projects/:projectId/intent-submissions` stores text, bounded text
   attachments, and optional pinned repository-Markdown sources, then queues
-  read-only AI preparation;
+  read-only AI preparation using optional canonical `preparation_route_id`;
+  when auto-preparing, runner readiness is checked before the submission is
+  persisted, so an unready runner returns `409` without creating a blocked
+  Task;
+- the same create request can continue immutable sources from a prior
+  same-project `source_submission_id` by naming selected `source_ids[]`;
+  server-side upload snapshots are copied, and stale repository sources return
+  `409` until they are removed or re-added from the current checkout;
 - `GET /api/projects/:projectId/intent-submissions` lists durable submissions
   for resume after reload without initializing runtime state;
 - `GET /api/projects/:projectId/intent-submissions/:submissionId` reads the
@@ -69,21 +76,32 @@ Execution setup uses the same boundary. `GET
 provider, requested/effective model, capability, fallback, revision, and latest
 readiness state from `project-profile.default_route_profiles`; it does not
 initialize runtime state. `POST
-/api/projects/:projectId/execution-profile/actions` accepts only `select`,
-`reset`, or `check`. Select/reset mutate the portable project profile under
-revision and active-run guards. Check writes a credential-free readiness
+/api/projects/:projectId/execution-profile/actions` accepts `initialize`,
+`select`, `reset`, or `check`. Select/reset mutate the portable project profile
+under revision and active-run guards. Initialize creates missing runtime/profile
+state under AOR Home, never in the connected repository. Check can target a
+canonical `route_id` with its `step`; it writes a credential-free readiness
 summary to the Local Workspace registry and never spawns a provider.
+Task-preparation routes appear as a separate `preparation_runners[]` list and
+do not change the project execution route. The Prepared Task screen can check
+the exact selected execution route with its step after changing the project
+default; the readiness check does not start a provider.
 
 W70 adds a server-owned Task Workspace projection over existing intent and
 Flow lineage:
 
 - `GET /api/projects/:projectId/tasks` returns stable public `task_id` values,
   draft/prepared/active/attention/completed status projections, source refs, runtime lifecycle path, attention/blocker counts,
-  runner-readiness metadata, and one server-owned primary action;
+  runner-readiness metadata, an optional bounded `run_state` from the durable
+  run-job, and one server-owned primary action;
 - Every Task response is the versioned `task-projection` read model. Its
   `prepared_contract` carries the exact normalized outcome, acceptance,
   bounded scope, delivery mode, normalization revision, approved execution
   route, readiness revision, and explicit write effects used by `start`.
+  `select-runner` and `reset-runner` Task actions save or clear a task-scoped
+  route override under the intent submission CAS boundary; they never mutate
+  the project default. The selected route is readiness-checked again before
+  `start`;
   `route.intake-normalize.*` remains preparation provenance and is never an
   approved execution route;
 - `GET /api/projects/:projectId/tasks/:taskId` returns one projection or a
@@ -98,7 +116,12 @@ Flow lineage:
 - `POST /api/projects/:projectId/tasks/:taskId/actions` is the Task Workspace
   mutation facade. It delegates `confirm`/`start` to the existing intent
   CAS/idempotency boundary, `pause`/`resume`/`cancel` to server-owned
-  run-control, and `retry`/`request` to durable bounded operator requests.
+  run-control, and `retry`/`request` to idempotent bounded operator requests
+  that are persisted as `run-pending` before execution through the shared
+  runtime. An interrupted request remains visible in the sanitized operator
+  request list and can be resumed through its existing request-run action.
+  The Task action returns `200` with completed run evidence or `202` with the
+  durable pending status and recovery action.
   The accepted action ids, permissions, payload requirements, and lifecycle
   dispatch are published by the canonical [Task action catalog](task-action-catalog.md)
   rather than a transport-local allowlist. Every response includes a
@@ -107,13 +130,23 @@ Flow lineage:
   provider flags;
 - New Task preparation uses the existing intent boundary: the browser submits
   the outcome and validated source records to `POST
-  /api/projects/:projectId/intent-submissions`, then refreshes the Task
-  projection and keeps the returned `intent_submission_id` as lineage. A
-  local draft preview must never expose a runnable Start action;
+  /api/projects/:projectId/intent-submissions` and keeps the returned
+  `intent_submission_id` as lineage. Because API preparation can continue after
+  the accepted response, the browser follows the matching Task projection
+  through `submitted` and `preparing` until the server publishes `prepared` or
+  `attention`. If Task reads fail, it keeps the accepted request visible for
+  recovery and never resubmits it automatically. Runner selection and Start
+  stay unavailable while the projection is a pending draft. Returning to the
+  task queue leaves server preparation running. A local draft preview must
+  never expose a runnable Start action;
 - `confirm` and `start` Task actions carry the displayed non-negative Task
   `revision` as `expected_revision`. The server forwards that guard to the
   intent confirmation boundary and rejects a stale prepared projection before
   creating or starting a Flow;
+- `select-runner`, `reset-runner`, and `start` also carry the displayed
+  `runner_selection.selection_revision` as `expected_selection_revision`.
+  Runner changes compare both revisions; start rechecks the selected route's
+  exact latest readiness before creating or running the Task;
 - `start` is the only Task start action. The legacy `confirm-and-start` action
   remains available only on the intent-submission compatibility route;
 - Task reads are strictly read-only. Create, prepare, revise, confirm, start,
@@ -580,7 +613,7 @@ Lifecycle command mutations must:
 - return existing command response fields and durable artifact refs where available;
 - preserve policy, approval, validation, and blocked-next-step evidence in stable response shapes;
 - support the interactive continuation flow described by `step-result.requested_interaction`;
-- include an answer-submission command mutation for unresolved runner-requested interactions before web full-flow claims answer support.
+- let Task Workspace read the run-scoped event history, show unresolved runner questions, and submit answers through the existing interaction-answer route.
 
 HTTP lifecycle command mutation baseline:
 - route: `POST /api/projects/:projectId/lifecycle-command/actions`;
@@ -604,6 +637,7 @@ HTTP interactive answer mutation baseline:
 - non-resumable boundaries return HTTP `409` with `error.code=interaction.continuation_blocked` and keep the run blocked with evidence refs;
 - live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
 - CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
+- Task Workspace renders clarification questions as text-answer forms and permission requests from the live-event allowlist; it renders resumed or blocked continuation status from the latest event and never owns resume logic.
 - for runtime permission requests, `decision` is required; legacy free-text `answer` is only compatible with ordinary clarification questions.
 - for runtime permission requests, answer submission records the structured decision but must not claim a pass unless an actual continuation or reinvocation has run. Current coarse external-process adapters report `continuation.reinvoke_required` after user approval so the next runtime action is explicit.
 - `approve_once` applies only to the recorded operation. `approve_for_run` creates an expiring grant, but reuse still requires the same project, run, step, operation identity, canonical resource, and capability set after hard-deny checks pass; it cannot broaden resources or cross a step boundary and is not persisted globally.

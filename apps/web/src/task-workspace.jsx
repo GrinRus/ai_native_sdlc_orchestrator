@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "./dialog.jsx";
+import { AskAorPanel } from "./task-ask-aor-panel.jsx";
+import { TaskInteractionPanel } from "./task-interaction-panel.jsx";
+import { MarkdownSourceDialog } from "./task-markdown-source-dialog.jsx";
+import { taskAcceptanceCriteria, taskOutcome, taskScopeIsPublished, taskScopeLabel, taskScopePaths } from "./task-projection-content.js";
 import { Button, EmptyState, Icon, useRovingTabs } from "./ui/components.jsx";
+import { WORK_TYPE_TO_STEP } from "../../../packages/contracts/src/task-work-type.mjs";
+import { firstNonNullish } from "../../../packages/contracts/src/value-normalization.mjs";
 
 const SCREENS = [
   ["home", "Tasks Home"],
@@ -21,18 +27,19 @@ const SIDE_NAV = [
 ];
 
 const NEW_TASK_DRAFT_ID = "__new-task-draft__";
-
-const WORK_TYPE_TO_STEP = Object.freeze({
-  analyze: "discovery",
-  explain: "research",
-  review: "review",
-  "document-change": "implement",
-  "code-change": "implement",
-});
+const PROJECT_DEFAULT_ROUTE_OPTION = "__project_default__";
 
 function executionStepFor(task) {
   const publishedStep = String(task?.runner_selection?.step ?? "").trim();
   return publishedStep || WORK_TYPE_TO_STEP[String(task?.work_type ?? "").trim()] || "implement";
+}
+
+function interactionsForTask(task, interactionsByRun) {
+  const interactions = new Map();
+  for (const runId of task?.run_ids ?? []) {
+    for (const interaction of interactionsByRun?.[runId] ?? []) interactions.set(interaction.interaction_id, interaction);
+  }
+  return [...interactions.values()];
 }
 
 function routeDisplayLabel(route) {
@@ -41,6 +48,98 @@ function routeDisplayLabel(route) {
   const name = routeId.replace(/^route\.[^.]+\./u, "").replaceAll("-", " ");
   const provider = String(route?.provider ?? "").trim();
   return provider && provider !== "none" ? `${name} · ${provider}` : name;
+}
+
+function executionRouteOptionLabel(route) {
+  const label = routeDisplayLabel(route);
+  return route?.readiness ? `${label} · ${readinessLabel(route.readiness)}` : label;
+}
+
+function preparationRunnerLabel(route) {
+  const labels = { "codex-cli": "Codex CLI", "claude-code": "Claude Code", "qwen-code": "Qwen Code" };
+  return labels[route?.adapter] || route?.adapter || routeDisplayLabel(route);
+}
+
+function readinessLabel(readiness) {
+  return {
+    ready: "Ready",
+    unconfigured: "Check required",
+    unknown: "Not checked",
+    stale: "Check again",
+    "runner-missing": "Runner missing",
+    "auth-missing": "Sign in required",
+    "model-unsupported": "Model unavailable",
+    "capability-mismatch": "Capability mismatch",
+    "policy-denied": "Not approved",
+    unavailable: "Unavailable",
+    blocked: "Blocked",
+  }[readiness] || "Status unavailable";
+}
+
+function taskDeliveryModeValue(task) {
+  return String(firstNonNullish(task?.prepared_contract?.delivery_mode, task?.normalization?.delivery_mode, task?.writeback_policy?.mode, "")).trim();
+}
+
+function deliveryMode(task) {
+  const value = taskDeliveryModeValue(task);
+  return {
+    "no-write": "No-write",
+    "patch-only": "Patch only",
+    "local-branch": "Local branch",
+    "fork-first-pr": "Fork-first PR",
+    "fork-first": "Fork-first PR",
+  }[value] || "Policy pending";
+}
+
+function deliveryModeDescription(task) {
+  const value = taskDeliveryModeValue(task);
+  return {
+    "no-write": "This Task produces analysis and evidence without writing repository changes.",
+    "patch-only": "Changes are captured as patch evidence; upstream writes remain off.",
+    "local-branch": "Changes are delivered to a local branch after explicit approval.",
+    "fork-first-pr": "Delivery uses a fork-first pull request after explicit approval.",
+    "fork-first": "Delivery uses a fork-first pull request after explicit approval.",
+  }[value] || "The server has not published this Task's delivery policy.";
+}
+
+function RouteDetails({ route, selection }) {
+  if (!route && !selection) return null;
+  const capabilities = Array.isArray(route?.required_capabilities) ? route.required_capabilities : [];
+  const source = { "task-override": "Task override", "project-default": "Project default" }[selection?.source] ?? "Task preparation";
+  const readiness = selection?.readiness ?? route?.readiness;
+  const rows = [
+    ["Selection", source],
+    ["Readiness", readiness ? readinessLabel(readiness) : null],
+    ["Readiness revision", selection?.readiness_revision ?? route?.readiness_revision],
+    ["Runner", route?.runner || route?.adapter],
+    ["Adapter", route?.adapter],
+    ["Provider", route?.provider],
+    ["Execution mode", route?.mode],
+    ["Requested model", route?.requested_model],
+    ["Effective model", route?.effective_model],
+    ["Requested reasoning", route?.requested_reasoning_effort],
+    ["Effective reasoning", route?.effective_reasoning_effort],
+    ["Route class", route?.route_class],
+    ["Risk tier", route?.risk_tier],
+    ["Required capabilities", capabilities.length ? capabilities.join(", ") : "None published"],
+    ["Qualification", route?.qualification],
+  ];
+  return <details className="task-route-details"><summary>Route details</summary><dl>{rows.filter(([, value]) => value !== undefined && value !== null && value !== "").map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>;
+}
+
+function preparationRecovery(runner) {
+  const readiness = runner?.readiness;
+  if (!readiness || readiness === "ready") return null;
+  const adapterKey = String(runner?.adapter ?? "").replace(/[^a-z0-9]/giu, "_").toUpperCase();
+  const recoveryByReadiness = {
+    "runner-missing": `Install ${preparationRunnerLabel(runner)} or set AOR_RUNNER_COMMAND_${adapterKey} for the local app, then check again.`,
+    "auth-missing": `Sign in to ${preparationRunnerLabel(runner)} and set AOR_AUTH_READY_${adapterKey}=true for the local app, then check again.`,
+    stale: "Check this runner again before preparing the task.",
+    unconfigured: "Check this runner before preparing the task.",
+    unknown: "Check this runner before preparing the task.",
+  };
+  return recoveryByReadiness[readiness]
+    ?? `Resolve ${readinessLabel(readiness).toLowerCase()} for this route before preparing the task.`;
 }
 
 function approvedRunnerOptions(executionProfile, step, runnerSelection) {
@@ -63,9 +162,20 @@ function approvedRunnerOptions(executionProfile, step, runnerSelection) {
   return options;
 }
 
-function taskStatusLabel(task) { return { draft: "Draft", prepared: "Ready", completed: "Completed", attention: "Needs attention", failed: "Failed", blocked: "Blocked", active: "Running", running: "Running" }[task?.status] || "Status unavailable"; }
+function taskStatusLabel(task) { return { queued: "Queued", running: "Running", paused: "Paused", "waiting-input": "Waiting for input", canceling: "Stopping", succeeded: "Run succeeded", failed: "Run failed", canceled: "Canceled" }[task?.run_state?.status] || { draft: "Draft", prepared: "Ready", completed: "Completed", attention: "Needs attention", failed: "Failed", blocked: "Blocked", active: "Running", running: "Running" }[task?.status] || "Status unavailable"; }
 
-function taskStatusTone(task) { return { completed: "neutral", draft: "neutral", prepared: "success", attention: "warning", failed: "warning", blocked: "warning", active: "success", running: "success" }[task?.status] || "warning"; }
+function taskStatusTone(task) { return { paused: "warning", canceling: "warning", failed: "warning", canceled: "warning" }[task?.run_state?.status] || { completed: "neutral", draft: "neutral", prepared: "success", attention: "warning", failed: "warning", blocked: "warning", active: "success", running: "success" }[task?.status] || "warning"; }
+
+function taskRuntimeControls(task) {
+  const status = task?.run_state?.status;
+  const control = { paused: { action: "resume", canStop: true }, running: { action: "pause", canStop: true } }[status];
+  return control ?? { action: status ? null : "pause", canStop: !status };
+}
+
+function taskCanOpenReview(task) {
+  return (Array.isArray(task?.review?.changed_paths) && task.review.changed_paths.length > 0)
+    || ["decision-required", "held", "repair-requested", "blocked"].includes(task?.review?.status);
+}
 
 function taskTitle(task) {
   return task?.display_title || "Untitled task";
@@ -94,7 +204,7 @@ function taskHasCompletionProof(task) {
     && task?.completion?.status === "complete"
     && task?.completion?.verification_status === "pass"
     && task?.completion?.delivery_status === "pass"
-    && Boolean(String(task?.completion?.patch_ref ?? task?.completion?.delivery_manifest_ref ?? "").trim())
+    && Boolean(String(firstNonNullish(task?.completion?.patch_ref, task?.completion?.delivery_manifest_ref, "")).trim())
     && completionEvidenceRefs(task).length > 0;
 }
 
@@ -119,7 +229,7 @@ function taskDestination(task) {
   if (["review", "request_review", "task.review"].includes(actionId)) return "review";
   if (task.status === "prepared" || task.status === "draft") return "prepared";
   if (task.status === "active" || task.status === "running") {
-    const step = String(task.current_step ?? task.current_step_label ?? "").toLowerCase();
+    const step = String(firstNonNullish(task.current_step, task.current_step_label, "")).toLowerCase();
     if (step.includes("review")) return "review";
     return "active";
   }
@@ -135,31 +245,6 @@ function taskAge(timestamp) {
   return `${Math.max(1, Math.round(elapsed / 86_400_000))}d`;
 }
 
-function sanitizeMarkdown(value) {
-  const input = String(value ?? "");
-  let output = "";
-  let index = 0;
-  while (index < input.length) {
-    if (input[index] !== "<") {
-      output += input[index];
-      index += 1;
-      continue;
-    }
-    const remainder = input.slice(index).toLowerCase();
-    if (remainder.startsWith("<script")) {
-      const closingStart = remainder.indexOf("</script");
-      if (closingStart < 0) break;
-      const closingEnd = input.indexOf(">", index + closingStart + 2);
-      index = closingEnd < 0 ? input.length : closingEnd + 1;
-      continue;
-    }
-    const tagEnd = input.indexOf(">", index + 1);
-    if (tagEnd < 0) break;
-    index = tagEnd + 1;
-  }
-  return output;
-}
-
 function sourceKindLabel(kind) {
   return kind === "upload-snapshot" ? "Uploaded snapshot" : kind === "repository-markdown" ? "Repository reference" : "Inline text";
 }
@@ -171,11 +256,6 @@ function TaskTabList({ label, tabs, selected, onSelect, className = "" }) {
     const tabId = tab.tabId || `task-tab-${idPrefix}-${tab.id}`;
     return <button {...getTabProps(tab, index)} id={tabId} key={tab.id} type="button" role="tab" aria-selected={selected === tab.id} aria-controls={selected === tab.id ? tab.controls : undefined} className={selected === tab.id ? "is-selected" : ""} onClick={() => onSelect(tab.id)}>{tab.label}{tab.count === undefined ? null : <span>{tab.count}</span>}</button>;
   })}</div>;
-}
-
-function safeProjectRelativePath(value) {
-  const path = String(value ?? "").trim();
-  return path.length > 0 && !path.startsWith("/") && !path.includes("\\") && !path.split("/").includes("..") ? path : null;
 }
 
 function digestLabel(value) {
@@ -197,7 +277,7 @@ function LifecyclePath({ task, variant = "default" }) {
   return <ol className={`task-lifecycle task-lifecycle--${variant}`} aria-label="Lifecycle progress">
     {steps.map((step, index) => {
       const id = String(step?.id ?? `step-${index + 1}`);
-      const label = String(step?.label ?? step?.title ?? id);
+      const label = String(firstNonNullish(step?.label, step?.title, id));
       const rawState = String(step?.state ?? "upcoming").toLowerCase();
       const state = ["complete", "completed", "done", "passed"].includes(rawState) ? "complete" : rawState === "current" ? "current" : "upcoming";
       return <li key={id} data-state={state} aria-current={state === "current" ? "step" : undefined}>
@@ -225,41 +305,78 @@ function SourceRow({ source, onRemove, detailed = false }) {
   </div>;
 }
 
-function RunSummary({ runnerSelection, title = "Run with", runnerOptions = [], runnerStep = "implement", runnerSelectionEnabled = false, onSelectRunner, actionBusy = false }) {
+function RunSummary({ task, runnerSelection, projectDefaultSelection = null, title = "Run with", runnerOptions = [], runnerStep = "implement", runnerSelectionEnabled = false, selectionNoteOverride = null, onSelectRunner, onCheckRunner, actionBusy = false }) {
   const runner = runnerSelection?.route_id || "Runner not selected";
   const readiness = runnerSelection?.readiness || "unknown";
   const model = runnerSelection?.effective_model || runnerSelection?.requested_model || "Not published";
   const reasoning = runnerSelection?.effective_reasoning_effort || runnerSelection?.requested_reasoning_effort || "Not published";
   const runnerLabel = routeDisplayLabel({ route_id: runner, provider: runnerSelection?.provider });
   const selectedRouteId = String(runnerSelection?.route_id ?? "");
+  const projectDefaultLabel = projectDefaultSelection?.route_id
+    ? routeDisplayLabel(projectDefaultSelection)
+    : "not configured";
+  const selectedRoute = runnerOptions.find((option) => option.route_id === selectedRouteId) ?? projectDefaultSelection;
+  const selectedValue = runnerSelection?.source === "task-override" ? selectedRouteId : PROJECT_DEFAULT_ROUTE_OPTION;
   const canSelectRunner = Boolean(onSelectRunner) && runnerSelectionEnabled && runnerOptions.length > 0 && !actionBusy;
-  const runnerSelect = <select aria-label="Runner" value={selectedRouteId} disabled={!canSelectRunner} onChange={(event) => onSelectRunner?.(runnerStep, event.target.value)}>
-    {!selectedRouteId ? <option value="">Runner not selected</option> : null}
-    {runnerOptions.map((option) => <option key={option.route_id} value={option.route_id}>{routeDisplayLabel(option)}</option>)}
+  const runnerSelect = <select aria-label="Runner" value={selectedValue} disabled={!canSelectRunner} onChange={(event) => onSelectRunner?.(task, runnerStep, event.target.value === PROJECT_DEFAULT_ROUTE_OPTION ? null : event.target.value)}>
+    <option value={PROJECT_DEFAULT_ROUTE_OPTION}>Project default · {projectDefaultLabel}</option>
+    {runnerOptions.map((option) => <option key={option.route_id} value={option.route_id}>{executionRouteOptionLabel(option)}</option>)}
   </select>;
-  const selectionNote = runnerSelectionEnabled && runnerOptions.length
-    ? "Selection updates the project default after a revision-checked server mutation."
-    : "No approved execution route is published for this project yet.";
+  const selectionNote = selectionNoteOverride || (runnerSelectionEnabled && runnerOptions.length
+    ? "Choose a Task override or follow the project default. Check the selected route before starting."
+    : "No approved execution route is published for this project yet.");
   if (title === "Runner & safety") {
     return <section className="task-run-summary task-run-summary--prepared" aria-label="Runner readiness">
       <h2>{title}</h2>
-      <div className="task-runner-card"><span className="task-runner-card__icon"><Glyph name="terminal" /></span><div><strong>{runnerLabel}</strong><span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readiness === "unavailable" ? "Unavailable" : readiness === "unknown" ? "Checking" : "Ready now"}</span></div><span className="task-runner-card__check" aria-hidden="true">{readiness === "ready" ? "✓" : "!"}</span></div>
+      <div className="task-runner-card"><span className="task-runner-card__icon"><Glyph name="terminal" /></span><div><strong>{runnerLabel}</strong><span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></div><span className="task-runner-card__check" aria-hidden="true">{readiness === "ready" ? "✓" : "!"}</span></div>
       <label className="task-change-runner">Change runner{runnerSelect}</label>
+      {onCheckRunner ? <div className="task-preparation-runner__actions"><Button onClick={() => onCheckRunner(runnerStep, selectedRouteId)} disabled={actionBusy || !selectedRouteId} busy={actionBusy}>Check runner</Button></div> : null}
       <p className="task-control-note">{selectionNote}</p>
-      <dl className="task-runner-details"><div><dt>Model</dt><dd>{model}</dd></div><div><dt>Reasoning</dt><dd>{reasoning}</dd></div><div><dt>Safety</dt><dd>Patch only</dd></div></dl>
+      <RouteDetails route={selectedRoute} selection={runnerSelection} />
+      <dl className="task-runner-details"><div><dt>Model</dt><dd>{model}</dd></div><div><dt>Reasoning</dt><dd>{reasoning}</dd></div><div><dt>Safety</dt><dd>{deliveryMode(task)}</dd></div></dl>
       <p className="task-safety"><Glyph name="evidence" />No upstream writes</p>
       {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
     </section>;
   }
   return <section className="task-run-summary" aria-label="Runner readiness">
     <h2>{title}</h2>
-    <div className="task-run-field task-run-field--runner"><span>Runner</span>{runnerSelect}<span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readiness === "unavailable" ? "Unavailable" : readiness === "unknown" ? "Checking" : "Ready"}</span></div>
+    <div className="task-run-field task-run-field--runner"><span>Runner</span>{runnerSelect}<span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></div>
     <p className="task-control-note">{selectionNote}</p>
+    <RouteDetails route={selectedRoute} selection={runnerSelection} />
     <div className="task-run-field"><span>Model / effort</span><select aria-label="Model and reasoning effort" value={`${model} · ${reasoning}`} disabled onChange={() => {}}><option>{model} · {reasoning}</option></select></div>
-    <div className="task-run-field"><span>Safety</span><select aria-label="Safety mode" value="Patch only" disabled onChange={() => {}}><option>Patch only</option></select></div>
+    <div className="task-run-field"><span>Safety</span><select aria-label="Safety mode" value={deliveryMode(task)} disabled onChange={() => {}}><option>{deliveryMode(task)}</option></select></div>
     <p className="task-safety"><Glyph name="evidence" />No upstream writes</p>
-    <small className="task-provider-note">No provider process is started during local preparation.</small>
+    <small className="task-provider-note">Readiness checks do not start a runner. The selected route runs when the task reaches this step.</small>
     {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
+  </section>;
+}
+
+function PreparationRunnerSummary({ executionProfile, runnerOptions = [], selectedRouteId = "", onSelect, onCheck, onInitialize, actionBusy = false }) {
+  const initialized = executionProfile?.initialized === true;
+  const canInitialize = Number.isInteger(executionProfile?.revision);
+  const runner = runnerOptions.find((option) => option.route_id === selectedRouteId) ?? null;
+  const readiness = runner?.readiness ?? "unknown";
+  const ready = initialized && runner?.readiness === "ready";
+  return <section className="task-run-summary task-run-summary--preparation" aria-label="Task preparation runner">
+    <h2>Prepare with</h2>
+    {initialized ? runnerOptions.length ? <>
+      <label className="task-run-field task-run-field--runner"><span>AI runner</span><select aria-label="Task preparation runner" value={selectedRouteId} disabled={actionBusy} onChange={(event) => onSelect?.(event.target.value)}>
+        {runnerOptions.map((option) => <option key={option.route_id} value={option.route_id}>{preparationRunnerLabel(option)} · {readinessLabel(option.readiness)}</option>)}
+      </select><span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></label>
+      <div className="task-preparation-runner__actions"><Button onClick={() => onCheck?.(selectedRouteId)} disabled={actionBusy || !selectedRouteId} busy={actionBusy}>Check runner</Button></div>
+      <p className="task-control-note">This runner prepares the brief in read-only mode. The task's execution route is selected separately.</p>
+      <RouteDetails route={runner} selection={{ source: "task-preparation", readiness, readiness_revision: runner?.readiness_revision }} />
+      {runner?.requested_model ? <dl className="task-runner-details"><div><dt>Model</dt><dd>{runner.effective_model || runner.requested_model}</dd></div>{runner.effective_reasoning_effort || runner.requested_reasoning_effort ? <div><dt>Reasoning</dt><dd>{runner.effective_reasoning_effort || runner.requested_reasoning_effort}</dd></div> : null}<div><dt>Runner</dt><dd>{preparationRunnerLabel(runner)}</dd></div></dl> : null}
+      <p className="task-safety"><Glyph name="evidence" />No repository writes during preparation</p>
+      {!ready ? <p className="task-inline-alert" role="status">{preparationRecovery(runner) || "Select and check a task-preparation runner before creating the task."}</p> : null}
+    </> : <>
+      <p className="task-control-note">No approved task-preparation routes are published for this project.</p>
+      <p className="task-inline-alert" role="status">Review the project's route configuration before preparing a task.</p>
+    </> : <>
+      <p className="task-control-note">Set up the project's local AOR runner profile to choose a task-preparation runner.</p>
+      <p className="task-safety"><Glyph name="evidence" />Profile data is stored under AOR Home</p>
+      <div className="task-preparation-runner__actions"><Button variant="primary" onClick={onInitialize} disabled={!canInitialize || actionBusy} busy={actionBusy}>Set up runner profile</Button></div>
+    </>}
   </section>;
 }
 
@@ -268,7 +385,7 @@ function TaskMeta({ task, project }) {
   return <dl className="task-meta">
     <div><dt>Repository</dt><dd>{project?.display_name || project?.label || "Project"}</dd></div>
     <div><dt>Runner</dt><dd>{runner.replace(/^route\.[^.]+\./u, "")}</dd></div>
-    <div><dt>Safety mode</dt><dd>Patch only</dd></div>
+    <div><dt>Safety mode</dt><dd>{deliveryMode(task)}</dd></div>
   </dl>;
 }
 
@@ -340,99 +457,100 @@ function TaskHomeDetail({ task, project, onOpen }) {
   </article>;
 }
 
+function taskEvidenceRecords(tasks) {
+  return tasks.flatMap((task) => {
+    const refs = [
+      ...(Array.isArray(task?.evidence_refs) ? task.evidence_refs : []),
+      ...(Array.isArray(task?.review?.evidence_refs) ? task.review.evidence_refs : []),
+      ...(Array.isArray(task?.completion?.evidence_refs) ? task.completion.evidence_refs : []),
+    ];
+    return [...new Set(refs.filter((ref) => typeof ref === "string" && ref.trim()))]
+      .map((ref) => ({ ref, task }));
+  });
+}
+
+function EvidenceIndexDialog({ open, tasks, onClose, onOpenTask }) {
+  const [query, setQuery] = useState("");
+  const entries = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return taskEvidenceRecords(tasks)
+      .filter(({ ref, task }) => !term || `${ref} ${taskTitle(task)} ${task?.task_id ?? ""}`.toLowerCase().includes(term))
+      .sort((left, right) => String(right.task?.updated_at ?? "").localeCompare(String(left.task?.updated_at ?? "")));
+  }, [tasks, query]);
+  const taskCount = new Set(entries.map(({ task }) => task?.task_id).filter(Boolean)).size;
+
+  return <Dialog open={open} onClose={onClose} labelledBy="task-evidence-index-title" className="task-evidence-dialog">
+    <header className="task-evidence-dialog__header">
+      <div><span>Project Evidence</span><h2 id="task-evidence-index-title">Evidence index</h2><p>Search durable evidence references published by Tasks.</p></div>
+      <Button size="compact" onClick={onClose}>Close</Button>
+    </header>
+    <label className="task-evidence-dialog__search" htmlFor="task-evidence-search">Search references<input id="task-evidence-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Task, ID, or evidence reference" /></label>
+    <p className="task-evidence-dialog__count" role="status">{entries.length} {entries.length === 1 ? "reference" : "references"} across {taskCount} {taskCount === 1 ? "Task" : "Tasks"}</p>
+    {entries.length ? <ul className="task-evidence-dialog__list">{entries.map(({ ref, task }) => <li key={`${task.task_id}:${ref}`}>
+      <div><strong>{taskTitle(task)}</strong><span>{taskStatusLabel(task)} · {task.task_id}</span><code title={ref}>{ref}</code></div>
+      <Button size="compact" aria-label={`Open task ${taskTitle(task)}`} onClick={() => { onClose(); onOpenTask(task); }}>Open task</Button>
+    </li>)}</ul> : <EmptyState title={query.trim() ? "No matching evidence" : "No Task evidence yet"}>{query.trim() ? "Try a task title, task ID, or another part of the reference." : "Durable references appear here when the server publishes them on a Task."}</EmptyState>}
+    <p className="task-evidence-dialog__note">The index uses Task projections only. It does not resolve arbitrary files or change runtime state.</p>
+  </Dialog>;
+}
+
 function ActiveTabPanel({ id, children, hidden = false }) {
   return <div id={`task-active-panel-${id}`} role="tabpanel" aria-labelledby={`task-active-tab-${id}`} tabIndex="0" hidden={hidden} className="task-activity-panel">{children}</div>;
 }
 
-function NewTaskScreen({ outcome, setOutcome, selectedSources, onAddSources, onPrepare, onCancel, runnerSelection, runnerOptions, runnerStep, runnerSelectionEnabled, onSelectRunner, actionBusy = false }) {
-  return <div className="task-form-layout"><div className="task-form-main"><header className="task-form-intro"><span className="task-kicker">Task · Prepare</span><h2>Define the outcome</h2><p>AOR will turn this brief into a bounded, reviewable task before anything runs.</p></header><section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">01</span><h2>Outcome</h2><button type="button" className="task-example-link" onClick={() => setOutcome("Make the requested behavior deterministic and covered by focused tests.")}>Use example brief</button></header><label className="task-form-field" htmlFor="task-outcome"><span>What should change?</span><textarea id="task-outcome" name="task-outcome" aria-label="Task outcome" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="Describe the result, not the implementation steps." rows="5" /></label></section><section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">02</span><h2>Sources</h2></header>{selectedSources.length ? <div className="task-source-list">{selectedSources.map((source) => <SourceRow key={source.source_id} source={source} />)}</div> : <p className="task-muted">Add a Markdown brief or continue with inline text.</p>}<div className="task-inline-actions"><Button onClick={(event) => onAddSources?.(event.currentTarget)}><Glyph name="plus" />Add Markdown</Button></div></section><section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">03</span><h2>Repository</h2></header><div className="task-repository-fields"><label><span>Repository</span><select aria-label="Repository" value="Project default" disabled onChange={() => {}}><option>Project default</option></select></label><label><span>Branch</span><select aria-label="Branch" value="main" disabled onChange={() => {}}><option>main</option></select></label></div><p className="task-muted">Repository and branch follow the active project. Change them from project settings.</p></section></div><RunSummary runnerSelection={runnerSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} actionBusy={actionBusy} /><footer className="task-screen-footer"><Button variant="secondary" onClick={onCancel} disabled={actionBusy}>Cancel</Button><Button variant="primary" onClick={onPrepare} busy={actionBusy} disabled={!outcome.trim() || actionBusy}>{actionBusy ? "Preparing task…" : "Prepare task"}</Button></footer></div>;
+function NewTaskScreen({ outcome, setOutcome, selectedSources, onAddSources, onPrepare, onCancel, executionProfile, preparationRunnerOptions, preparationRouteId, onSelectPreparationRunner, onCheckPreparationRunner, onInitializeRunnerProfile, preparationRunnerReady, actionBusy = false, preparing = false, pendingPreparation = false, hidden = false }) {
+  const staleSources = selectedSources.filter((source) => source?.stale === true);
+  return <div className="task-form-layout" hidden={hidden}>
+    <div className="task-form-main">
+      <header className="task-form-intro"><span className="task-kicker">Task · Prepare</span><h2>Define the outcome</h2><p>AOR will turn this brief into a bounded, reviewable task before anything runs.</p></header>
+      {pendingPreparation ? <p className="task-control-note" role="status">The task request was accepted. Waiting for the server to publish its Task; this page will check again automatically.</p> : null}
+      <section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">01</span><h2>Outcome</h2><button type="button" className="task-example-link" onClick={() => setOutcome("Make the requested behavior deterministic and covered by focused tests.")} disabled={pendingPreparation}>Use example brief</button></header><label className="task-form-field" htmlFor="task-outcome"><span>What should change?</span><textarea id="task-outcome" name="task-outcome" aria-label="Task outcome" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="Describe the result, not the implementation steps." rows="5" disabled={pendingPreparation} /></label></section>
+      <section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">02</span><h2>Sources</h2></header>{selectedSources.length ? <div className="task-source-list">{selectedSources.map((source) => <SourceRow key={source.source_id} source={source} />)}</div> : <p className="task-muted">Add a Markdown brief or continue with inline text.</p>}{staleSources.length ? <p className="task-inline-alert" role="alert">Remove stale repository sources and add their current snapshots before preparing this Task.</p> : null}<div className="task-inline-actions"><Button onClick={(event) => onAddSources?.(event.currentTarget)} disabled={pendingPreparation}><Glyph name="plus" />Add Markdown</Button></div></section>
+      <section className="task-form-section"><header className="task-form-section__heading"><span className="task-form-step" aria-hidden="true">03</span><h2>Repository</h2></header><div className="task-repository-fields"><label><span>Repository</span><select aria-label="Repository" value="Project default" disabled onChange={() => {}}><option>Project default</option></select></label><label><span>Branch</span><select aria-label="Branch" value="main" disabled onChange={() => {}}><option>main</option></select></label></div><p className="task-muted">Repository and branch follow the active project. Change them from project settings.</p></section>
+    </div>
+    <PreparationRunnerSummary executionProfile={executionProfile} runnerOptions={preparationRunnerOptions} selectedRouteId={preparationRouteId} onSelect={onSelectPreparationRunner} onCheck={onCheckPreparationRunner} onInitialize={onInitializeRunnerProfile} actionBusy={actionBusy || pendingPreparation} />
+    <footer className="task-screen-footer"><Button variant="secondary" onClick={onCancel} disabled={actionBusy}>{pendingPreparation ? "Return to tasks" : "Cancel"}</Button><Button variant="primary" onClick={onPrepare} busy={preparing} disabled={!outcome.trim() || !preparationRunnerReady || staleSources.length > 0 || actionBusy || preparing || pendingPreparation}>{preparing ? "Preparing task…" : pendingPreparation ? "Waiting for server…" : "Prepare task"}</Button></footer>
+  </div>;
 }
 
-function SourcesScreen({ selectedSources, sourceMode, setSourceMode, markdown, setMarkdown, uploadName, sourceError, readUpload, repositoryPath, setRepositoryPath, repositoryRevision, setRepositoryRevision, sourcePreview, openerRef, onClose, onPrepare }) {
-  const [previewTab, setPreviewTab] = useState("preview");
-  const sourceCount = selectedSources.length || 1;
-  const preview = sourcePreview() || "Make the requested behavior deterministic.";
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-  useEffect(() => {
-    const dialog = document.querySelector(".task-source-overlay");
-    if (!dialog) return undefined;
-    const opener = openerRef?.current?.isConnected ? openerRef.current : document.activeElement;
-    const siblings = Array.from(dialog.parentElement?.children ?? []).filter((element) => element !== dialog);
-    siblings.forEach((element) => {
-      element.inert = true;
-      element.setAttribute("aria-hidden", "true");
-    });
-    const focusable = () => Array.from(dialog.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"));
-    const initialFocus = focusable()[0];
-    initialFocus?.focus();
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const items = focusable();
-      if (!items.length) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    dialog.addEventListener("keydown", onKeyDown);
-    return () => {
-      dialog.removeEventListener("keydown", onKeyDown);
-      siblings.forEach((element) => {
-        element.inert = false;
-        element.removeAttribute("aria-hidden");
-      });
-      if (opener?.isConnected && typeof opener.focus === "function") opener.focus();
-    };
-  }, []);
-  return <div className="task-source-overlay" role="dialog" aria-modal="true" aria-label="Add Markdown source"><div className="task-source-overlay__content"><header><h2>Add Markdown source</h2><button type="button" className="task-plain-icon" aria-label="Close Markdown Sources" onClick={onClose}><Glyph name="close" /></button></header><TaskTabList label="Markdown source type" className="task-source-tabs" tabs={[{ id: "upload", label: <><Glyph name="upload" />Upload snapshot</>, controls: "task-source-upload-panel" }, { id: "repository", label: <><Glyph name="code" />Repository file</>, controls: "task-source-repository-panel" }]} selected={sourceMode} onSelect={setSourceMode} /><div className="task-source-overlay__grid"><div className="task-source-input-pane">{sourceMode === "upload" ? <label className="task-dropzone" id="task-source-upload-panel"><span className="task-dropzone__icon"><Glyph name="upload" /></span><strong>Drop .md files here</strong><span><input aria-label="Upload Markdown" id="task-markdown-upload" type="file" accept=".md,.markdown,text/markdown" onChange={(event) => void readUpload(event.target.files?.[0])} />Choose files</span><small>Up to 10 files · 1 MiB each · UTF-8</small></label> : sourceMode === "repository" ? <div className="task-repository-form" id="task-source-repository-panel"><label htmlFor="repository-markdown-path">Project-relative Markdown path</label><input id="repository-markdown-path" value={repositoryPath} onChange={(event) => setRepositoryPath(event.target.value)} placeholder="docs/task.md" /><label htmlFor="repository-markdown-revision">Pinned base revision</label><input id="repository-markdown-revision" value={repositoryRevision} onChange={(event) => setRepositoryRevision(event.target.value)} placeholder="commit SHA" /><p className="task-muted">The reference stays pinned until you explicitly refresh it.</p></div> : <div className="task-inline-markdown"><label htmlFor="task-markdown">Paste Markdown</label><textarea id="task-markdown" aria-label="Paste Markdown" rows="10" value={markdown} onChange={(event) => setMarkdown(event.target.value)} placeholder="# Context" /></div>}{uploadName ? <p className="task-muted">Snapshot: {uploadName}</p> : null}{sourceError ? <p className="task-inline-alert" role="alert">{sourceError}</p> : null}<h3>Source list ({selectedSources.length})</h3><div className="task-source-list">{selectedSources.map((source) => <SourceRow key={source.source_id} source={source} detailed />)}</div></div><div className="task-markdown-preview"><h3>{selectedSources[0]?.preview?.filename || uploadName || "requirements.md"}</h3><TaskTabList label="Source presentation" className="task-preview-tabs" tabs={[{ id: "preview", label: "Preview", controls: "task-preview-panel" }, { id: "source", label: "Source", controls: "task-preview-panel" }]} selected={previewTab} onSelect={setPreviewTab} />{previewTab === "preview" ? <div id="task-preview-panel"><h4>Requirements</h4><h5>Goal</h5><p>{preview}</p><h5>Acceptance criteria</h5><ul><li><span className="task-check-circle">✓</span>Contract validation</li><li><span className="task-check-circle">✓</span>Focused tests</li></ul><p className="task-info-callout">Active HTML and remote images are disabled.</p></div> : <pre id="task-preview-panel" className="task-markdown-source" aria-label="Sanitized Markdown source">{preview}</pre>}</div></div><footer className="task-screen-footer"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={onPrepare} disabled={sourceMode === "repository" && !safeProjectRelativePath(repositoryPath)}>Add {sourceCount} source{sourceCount === 1 ? "" : "s"}</Button></footer></div></div>;
-}
-
-function PreparedScreen({ task, selectedSources, runnerSelection, runnerOptions, runnerStep, runnerSelectionEnabled, onSelectRunner, onEdit, onStart, actionBusy, actionError }) {
+function PreparedScreen({ task, selectedSources, runnerSelection, projectDefaultSelection, runnerOptions, runnerStep, runnerSelectionEnabled, operatorRequests, operatorRequestText, setOperatorRequestText, onTaskAction, onResumeOperatorRequest, onSelectRunner, onCheckRunner, onEdit, onStart, actionBusy, actionError }) {
   const serverOwned = Boolean(task?.task_id);
+  const preparationPending = task?.status === "draft" && ["submitted", "preparing"].includes(task?.status_detail);
+  const canSelectRunner = runnerSelectionEnabled && serverOwned && task?.status === "prepared";
   const primaryAction = task?.primary_action ?? {};
   const startAction = ["confirm", "start"].includes(String(primaryAction.action_id ?? "")) ? primaryAction.action_id : null;
   const startAvailable = serverOwned && Boolean(startAction) && primaryAction.available !== false && actionBusy !== true;
-  const acceptance = Array.isArray(task?.acceptance_criteria)
-    ? task.acceptance_criteria
-    : Array.isArray(task?.normalization?.acceptance)
-      ? task.normalization.acceptance
-      : [];
-  return <div className="task-prepared-layout"><div className="task-prepared-main"><section className="task-prepared-section"><h2>{taskTitle(task)}</h2><h3>Outcome</h3><p>{task?.normalization?.outcome || task?.intent?.outcome || "The server has not published the prepared outcome yet."}</p><h3>Acceptance</h3><ul className="task-check-list">{acceptance.length ? acceptance.map((item, index) => <li key={`${item}-${index}`}>{item}</li>) : <li className="task-muted">Acceptance criteria will appear after server preparation.</li>}</ul></section><section className="task-prepared-section"><h3>Scope</h3><p>{task?.scope || "Bounded scope has not been published yet."}</p></section><section className="task-prepared-section"><h3>Sources</h3>{selectedSources.length ? selectedSources.map((source) => <div className="task-prepared-source" key={source.source_id}><Glyph name="file" /><span>{source?.preview?.filename || source?.preview?.project_relative_path || sourceKindLabel(source?.kind)}</span><span>{sourceKindLabel(source?.kind)}</span></div>) : <p className="task-muted">No external sources attached.</p>}</section><LifecyclePath task={task} variant="wide" /></div><aside className="task-prepared-inspector"><RunSummary runnerSelection={runnerSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} actionBusy={actionBusy} title="Runner & safety" /><div className="task-readiness-checks"><p>{runnerSelection?.readiness === "ready" ? "✓" : "!"} Runner {runnerSelection?.readiness === "ready" ? "ready" : "status not confirmed"}</p><p>{selectedSources.length ? "✓" : "!"} Sources {selectedSources.length ? "current" : "not attached"}</p><p>{task?.scope ? "✓" : "!"} Scope {task?.scope ? "bounded" : "not published"}</p><p>✓ No upstream writes</p></div>{actionError ? <p className="task-inline-alert" role="alert">{actionError}</p> : null}<div className="task-inspector-actions"><Button onClick={onEdit} disabled={actionBusy}>Edit task</Button><Button variant="primary" onClick={() => onStart?.(startAction)} busy={actionBusy} disabled={!startAvailable}>{actionBusy ? "Starting task…" : startAction ? "Start task" : "Waiting for server action"}</Button></div>{!serverOwned ? <p className="task-control-note" role="status">This Task is not server-owned yet. Start is unavailable until the server publishes a prepared Task.</p> : null}{serverOwned && !startAction ? <p className="task-control-note" role="status">{primaryAction.reason || "The server has not published a runnable action for this Task."}</p> : null}</aside></div>;
+  const acceptance = taskAcceptanceCriteria(task);
+  const scopePublished = taskScopeIsPublished(task);
+  const scopePaths = taskScopePaths(task);
+  const staleSources = selectedSources.filter((source) => source?.stale === true);
+  return <div className="task-prepared-layout"><div className="task-prepared-main"><section className="task-prepared-section"><h2>{taskTitle(task)}</h2>{preparationPending ? <p className="task-control-note" role="status">Task preparation is running on the server. This view updates automatically.</p> : null}<h3>Outcome</h3><p>{taskOutcome(task) || "The server has not published the prepared outcome yet."}</p><h3>Acceptance</h3><ul className="task-check-list">{acceptance.length ? acceptance.map((item, index) => <li key={`${item}-${index}`}>{item}</li>) : <li className="task-muted">Acceptance criteria will appear after server preparation.</li>}</ul></section><section className="task-prepared-section"><h3>Scope</h3><p>{taskScopeLabel(task) || "Bounded scope has not been published yet."}</p></section><section className="task-prepared-section"><h3>Sources</h3>{selectedSources.length ? selectedSources.map((source) => <div className="task-prepared-source" key={source.source_id}><Glyph name="file" /><span>{source?.preview?.filename || source?.preview?.project_relative_path || sourceKindLabel(source?.kind)}</span><span>{sourceKindLabel(source?.kind)}</span><strong className={source?.stale ? "is-stale" : ""}>{source?.stale ? "Stale" : "Current"}</strong></div>) : <p className="task-muted">No external sources attached.</p>}</section>{staleSources.length ? <p className="task-inline-alert" role="alert">{task?.primary_action?.reason || "Remove stale repository sources and add their current snapshots before starting this Task."}</p> : null}<LifecyclePath task={task} variant="wide" /><AskAorPanel task={task} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></div><aside className="task-prepared-inspector"><RunSummary task={task} runnerSelection={runnerSelection} projectDefaultSelection={projectDefaultSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={canSelectRunner} selectionNoteOverride={preparationPending ? "Runner selection becomes available after task preparation." : null} onSelectRunner={onSelectRunner} onCheckRunner={preparationPending ? null : onCheckRunner} actionBusy={actionBusy} title="Runner & safety" /><div className="task-readiness-checks"><p>{runnerSelection?.readiness === "ready" ? "✓" : "!"} Runner {runnerSelection?.readiness === "ready" ? "ready" : "status not confirmed"}</p><p>{staleSources.length ? "! Sources stale" : selectedSources.length ? "✓ Sources current" : "! Sources not attached"}</p><p>{scopePublished ? "✓" : "!"} Scope {scopePaths.length ? "bounded" : scopePublished ? "published" : "not published"}</p><p>✓ No upstream writes</p></div>{actionError ? <p className="task-inline-alert" role="alert">{actionError}</p> : null}<div className="task-inspector-actions"><Button onClick={onEdit} disabled={actionBusy || preparationPending}>Edit task</Button><Button variant="primary" onClick={() => onStart?.(startAction)} busy={actionBusy} disabled={!startAvailable}>{actionBusy ? "Starting task…" : startAction ? "Start task" : preparationPending ? "Preparing task…" : "Waiting for server action"}</Button></div>{preparationPending ? <p className="task-control-note" role="status">The server has accepted this task and is still preparing it. Runner selection and Start will be available after preparation.</p> : !serverOwned ? <p className="task-control-note" role="status">This Task is not server-owned yet. Start is unavailable until the server publishes a prepared Task.</p> : serverOwned && !startAction ? <p className="task-control-note" role="status">{primaryAction.reason || "The server has not published a runnable action for this Task."}</p> : null}</aside></div>;
 }
 
 function RuntimeInspector({ task }) {
-  const acceptance = Array.isArray(task?.acceptance_criteria) ? `${task.acceptance_criteria.length} criteria` : "Not published";
-  return <div className="task-runtime-inspector__content"><h3>Task contract</h3><dl><div><dt>Outcome</dt><dd>{task?.normalization?.outcome || task?.intent?.outcome || "Not published"}</dd></div><div><dt>Scope</dt><dd>{task?.scope || "Not published"}</dd></div><div><dt>Acceptance</dt><dd>{acceptance}</dd></div><div><dt>Run health</dt><dd><TaskStatus task={task} compact /></dd></div><div><dt>Elapsed</dt><dd>{task?.metrics?.elapsed || "Not reported"}</dd></div><div><dt>Budget</dt><dd>{task?.budget?.remaining || "Not reported"}</dd></div><div><dt>Freshness</dt><dd className="task-freshness">{task?.updated_at ? `Updated ${taskAge(task.updated_at)} ago` : "Unknown"}</dd></div></dl></div>;
+  const acceptance = taskAcceptanceCriteria(task);
+  return <div className="task-runtime-inspector__content"><h3>Task contract</h3><dl><div><dt>Outcome</dt><dd>{taskOutcome(task) || "Not published"}</dd></div><div><dt>Scope</dt><dd>{taskScopeLabel(task) || "Not published"}</dd></div><div><dt>Acceptance</dt><dd>{acceptance.length ? `${acceptance.length} criteria` : "Not published"}</dd></div><div><dt>Run health</dt><dd><TaskStatus task={task} compact /></dd></div><div><dt>Elapsed</dt><dd>{task?.metrics?.elapsed || "Not reported"}</dd></div><div><dt>Budget</dt><dd>{task?.budget?.remaining || "Not reported"}</dd></div><div><dt>Freshness</dt><dd className="task-freshness">{task?.updated_at ? `Updated ${taskAge(task.updated_at)} ago` : "Unknown"}</dd></div></dl></div>;
 }
 
-function ActiveScreen({ task, project, operatorRequestText, setOperatorRequestText, onTaskAction, actionBusy, onReview, onOpenInspector }) {
+function ActiveScreen({ task, project, interactions, onAnswerInteraction, operatorRequests, operatorRequestText, setOperatorRequestText, onTaskAction, onResumeOperatorRequest, actionBusy, onReview, onOpenInspector }) {
   const [tab, setTab] = useState("activity");
   const [stopConfirm, setStopConfirm] = useState(false);
   const activity = Array.isArray(task?.activity) ? task.activity : [];
+  const runtimeControls = taskRuntimeControls(task);
   const request = (action, payload) => onTaskAction?.(task, action, payload);
-  return <div className="task-active-layout"><div className="task-active-main"><header className="task-active-heading"><div><h2>{taskTitle(task)}</h2><TaskStatus task={task} /></div><div className="task-inline-actions"><button type="button" className="task-inspector-trigger" onClick={onOpenInspector}><Glyph name="evidence" />Task details</button><Button onClick={() => request("pause")} disabled={actionBusy}><Glyph name="pause" />Pause</Button><Button variant="destructive" onClick={() => setStopConfirm(true)} disabled={actionBusy}><Glyph name="stop" />Stop</Button></div></header><TaskMeta task={task} project={project} /><LifecyclePath task={task} variant="wide" /><TaskTabList label="Task activity sections" className="task-detail-tabs" tabs={[{ id: "activity", tabId: "task-active-tab-activity", label: "Activity", controls: "task-active-panel-activity" }, { id: "changes", tabId: "task-active-tab-changes", label: "Changes", count: task?.review?.changed_paths?.length ?? 0, controls: "task-active-panel-changes" }, { id: "checks", tabId: "task-active-tab-checks", label: "Checks", controls: "task-active-panel-checks" }, { id: "evidence", tabId: "task-active-tab-evidence", label: "Evidence", count: task?.evidence_refs?.length ?? 0, controls: "task-active-panel-evidence" }]} selected={tab} onSelect={(nextTab) => { setTab(nextTab); if (nextTab === "changes") onReview?.(); }} /><ActiveTabPanel id="activity" hidden={tab !== "activity"}>{activity.length ? <ul>{activity.map((entry, index) => <li key={`${entry?.id ?? "activity"}-${index}`}><Glyph name="activity" /><span>{entry?.summary || entry?.label || "Recorded activity"}</span><time>{entry?.occurred_at ? taskAge(entry.occurred_at) : "—"}</time></li>)}</ul> : <p className="task-muted">No durable activity has been published for this Task yet.</p>}</ActiveTabPanel><ActiveTabPanel id="changes" hidden={tab !== "changes"}><p>{task?.review?.changed_paths?.length ? "Recorded changes are ready for review." : "No changed paths have been published yet."}</p><Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open changes</Button></ActiveTabPanel><ActiveTabPanel id="checks" hidden={tab !== "checks"}><ul><li><Glyph name="check" /><span>Verification</span><strong>{task?.review?.verification_status || "pending"}</strong></li><li><Glyph name="check" /><span>Delivery</span><strong>{task?.review?.delivery_status || "pending"}</strong></li></ul></ActiveTabPanel><ActiveTabPanel id="evidence" hidden={tab !== "evidence"}><p>{task?.evidence_refs?.length ? "Durable evidence is attached to this task." : "No evidence has been recorded yet."}</p>{task?.evidence_refs?.length ? <ul>{task.evidence_refs.map((ref) => <li key={ref}><Glyph name="file" /><code>{ref}</code></li>)}</ul> : null}<Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open review evidence</Button></ActiveTabPanel><section className="task-ask-panel"><h3>Ask AOR</h3><p>Creates a durable task request</p><textarea aria-label="Task guidance" rows="3" value={operatorRequestText} onChange={(event) => setOperatorRequestText(event.target.value)} placeholder="Add guidance for this task…" /><div className="task-ask-actions"><Button variant="primary" onClick={() => request("request", { request_text: operatorRequestText.trim() || "Inspect the recorded Task blocker." })} busy={actionBusy}><Glyph name="send" />{actionBusy ? "Sending…" : "Send request"}</Button>{["failed", "attention", "repairing"].includes(task?.status) ? <Button onClick={() => request("retry")} disabled={actionBusy}>Request retry</Button> : null}</div></section></div><aside className="task-runtime-inspector"><RuntimeInspector task={task} /></aside>{stopConfirm ? <div className="task-inline-alert" role="alert"><strong>Stop this task?</strong><p>This requests a durable cancellation and may discard in-flight work.</p><div className="task-inline-actions"><Button onClick={() => setStopConfirm(false)}>Keep running</Button><Button variant="destructive" onClick={() => { setStopConfirm(false); request("cancel"); }} disabled={actionBusy}>Stop task</Button></div></div> : null}</div>;
+  return <div className="task-active-layout"><div className="task-active-main"><header className="task-active-heading"><div><h2>{taskTitle(task)}</h2><TaskStatus task={task} /></div><div className="task-inline-actions"><button type="button" className="task-inspector-trigger" onClick={onOpenInspector}><Glyph name="evidence" />Task details</button>{runtimeControls.action ? <Button onClick={() => request(runtimeControls.action)} disabled={actionBusy}><Glyph name={runtimeControls.action === "resume" ? "play" : "pause"} />{runtimeControls.action === "resume" ? "Resume" : "Pause"}</Button> : null}{runtimeControls.canStop ? <Button variant="destructive" onClick={() => setStopConfirm(true)} disabled={actionBusy}><Glyph name="stop" />Stop</Button> : null}</div></header><TaskMeta task={task} project={project} /><TaskInteractionPanel interactions={interactions} onSubmit={onAnswerInteraction} busy={actionBusy} /><LifecyclePath task={task} variant="wide" /><TaskTabList label="Task activity sections" className="task-detail-tabs" tabs={[{ id: "activity", tabId: "task-active-tab-activity", label: "Activity", controls: "task-active-panel-activity" }, { id: "changes", tabId: "task-active-tab-changes", label: "Changes", count: task?.review?.changed_paths?.length ?? 0, controls: "task-active-panel-changes" }, { id: "checks", tabId: "task-active-tab-checks", label: "Checks", controls: "task-active-panel-checks" }, { id: "evidence", tabId: "task-active-tab-evidence", label: "Evidence", count: task?.evidence_refs?.length ?? 0, controls: "task-active-panel-evidence" }]} selected={tab} onSelect={(nextTab) => { setTab(nextTab); if (nextTab === "changes") onReview?.(); }} /><ActiveTabPanel id="activity" hidden={tab !== "activity"}>{activity.length ? <ul>{activity.map((entry, index) => <li key={`${entry?.id ?? "activity"}-${index}`}><Glyph name="activity" /><span>{entry?.summary || entry?.label || "Recorded activity"}</span><time>{entry?.occurred_at ? taskAge(entry.occurred_at) : "—"}</time></li>)}</ul> : <p className="task-muted">No durable activity has been published for this Task yet.</p>}</ActiveTabPanel><ActiveTabPanel id="changes" hidden={tab !== "changes"}><p>{task?.review?.changed_paths?.length ? "Recorded changes are ready for review." : "No changed paths have been published yet."}</p><Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open changes</Button></ActiveTabPanel><ActiveTabPanel id="checks" hidden={tab !== "checks"}><ul><li><Glyph name="check" /><span>Verification</span><strong>{task?.review?.verification_status || "pending"}</strong></li><li><Glyph name="check" /><span>Delivery</span><strong>{task?.review?.delivery_status || "pending"}</strong></li></ul></ActiveTabPanel><ActiveTabPanel id="evidence" hidden={tab !== "evidence"}><p>{task?.evidence_refs?.length ? "Durable evidence is attached to this task." : "No evidence has been recorded yet."}</p>{task?.evidence_refs?.length ? <ul>{task.evidence_refs.map((ref) => <li key={ref}><Glyph name="file" /><code>{ref}</code></li>)}</ul> : null}<Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open review evidence</Button></ActiveTabPanel><AskAorPanel task={task} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></div><aside className="task-runtime-inspector"><RuntimeInspector task={task} /></aside>{stopConfirm ? <div className="task-inline-alert" role="alert"><strong>Stop this task?</strong><p>This requests a durable cancellation and may discard in-flight work.</p><div className="task-inline-actions"><Button onClick={() => setStopConfirm(false)}>Keep running</Button><Button variant="destructive" onClick={() => { setStopConfirm(false); request("cancel"); }} disabled={actionBusy}>Stop task</Button></div></div> : null}</div>;
 }
 
-function AttentionScreen({ tasks, selectedTask, onSelect, onTaskAction, actionBusy }) {
+function AttentionScreen({ tasks, selectedTask, interactions, onAnswerInteraction, operatorRequests, operatorRequestText, setOperatorRequestText, onSelect, onTaskAction, onResumeOperatorRequest, onEditTask, onOpenReview, actionBusy }) {
   const [showEvidence, setShowEvidence] = useState(false);
   const attentionTasks = tasks.filter((task) => task.status === "attention");
   const waitingTasks = tasks.filter((task) => task.status === "active");
   const resolvedTasks = tasks.filter((task) => task.status === "completed");
   const attentionItems = Array.isArray(selectedTask?.attention_items) ? selectedTask.attention_items : [];
   const primaryAction = selectedTask?.primary_action ?? {};
-  const action = ["confirm", "request", "retry"].includes(String(primaryAction.action_id ?? "")) ? primaryAction.action_id : null;
-  return <div className="task-attention-layout"><div className="task-attention-list"><h2>Needs decision <span>{attentionTasks.length}</span></h2>{attentionTasks.map((task) => <TaskCard key={task.task_id} task={task} selected={task.task_id === selectedTask?.task_id} onSelect={onSelect} />)}<h2>Waiting <span>{waitingTasks.length}</span></h2>{waitingTasks.slice(0, 2).map((task) => <TaskCard key={task.task_id} task={task} selected={false} onSelect={onSelect} />)}<h2>Resolved <span>{resolvedTasks.length}</span></h2>{resolvedTasks.length ? resolvedTasks.slice(0, 2).map((task) => <TaskCard key={task.task_id} task={task} selected={false} onSelect={onSelect} />) : <p className="task-muted">No items</p>}</div><article className="task-attention-detail"><h2>{selectedTask ? primaryAction.operator_control || "Review Task decision" : "No attention item selected"}</h2>{selectedTask ? <><p className="task-attention-task"><Glyph name="warning" />{taskTitle(selectedTask)}</p><div className="task-warning-callout">{primaryAction.reason || selectedTask.status_detail || "Execution is waiting for a server-owned decision."}</div><h3>Recorded blockers</h3>{attentionItems.length ? <ul className="task-bullet-list">{attentionItems.map((item) => <li key={item.item_id || item.consequence}><strong>{item.message || item.consequence || item.summary || "Recorded blocker"}</strong>{item.code ? <code>{item.code}</code> : null}{item.recovery_action ? <span>{item.recovery_action}</span> : null}</li>)}</ul> : <p className="task-muted">No blocker details have been published.</p>}<h3>Safety checks</h3><ul className="task-check-list"><li>✓ No upstream writes</li><li>{selectedTask.scope ? "✓ Scope is bounded" : "! Scope is not published"}</li><li>{selectedTask.evidence_refs?.length ? "✓ Evidence is attached" : "! Evidence is not attached"}</li></ul><section className="task-attention-evidence"><span>Evidence / source</span><button type="button" className="task-link" onClick={() => setShowEvidence((value) => !value)}>{showEvidence ? "Hide evidence" : "View evidence"} <Glyph name="external" /></button>{showEvidence ? <div className="task-evidence-list"><p>Durable references</p>{(selectedTask.evidence_refs || []).map((ref) => <code key={ref}>{ref}</code>)}</div> : null}</section><div className="task-attention-actions"><Button variant="primary" onClick={() => action && onTaskAction?.(selectedTask, action, { expected_revision: selectedTask.revision })} busy={actionBusy} disabled={!action || primaryAction.available === false}>{actionBusy ? "Applying…" : primaryAction.operator_control || "Apply server action"}</Button><Button onClick={() => onTaskAction?.(selectedTask, "request", { request_text: "Request a bounded revision." })} disabled={actionBusy}>Request revision</Button><span className="task-control-note">Only server-published actions are executable from this view.</span></div></> : <EmptyState title="Select an attention item">Choose an item to review its consequence and evidence.</EmptyState>}</article><aside className="task-attention-inspector"><h3>Task details</h3><dl><div><dt>Revision</dt><dd>{selectedTask?.revision ?? "Not published"}</dd></div><div><dt>Scope</dt><dd>{selectedTask?.scope || "Not published"}</dd></div><div><dt>Tasks</dt><dd>{selectedTask?.attention_items?.length ?? 0}</dd></div><div><dt>Evidence</dt><dd>{selectedTask?.evidence_refs?.length ?? 0} refs</dd></div><div><dt>Updated</dt><dd>{selectedTask?.updated_at ? taskAge(selectedTask.updated_at) : "—"}</dd></div></dl><h3>Activity</h3>{Array.isArray(selectedTask?.activity) && selectedTask.activity.length ? <ol className="task-timeline">{selectedTask.activity.slice(0, 4).map((entry, index) => <li key={`${entry?.id ?? "activity"}-${index}`}>{entry?.summary || entry?.label || "Recorded activity"}<span>{entry?.occurred_at ? taskAge(entry.occurred_at) : "—"}</span></li>)}</ol> : <p className="task-muted">No durable activity has been published.</p>}</aside></div>;
+  const action = ["confirm", "request", "retry", "intent.resume"].includes(String(primaryAction.action_id ?? "")) ? primaryAction.action_id : null;
+  const resumePreparation = action === "intent.resume";
+  return <div className="task-attention-layout"><div className="task-attention-list"><h2>Needs decision <span>{attentionTasks.length}</span></h2>{attentionTasks.map((task) => <TaskCard key={task.task_id} task={task} selected={task.task_id === selectedTask?.task_id} onSelect={onSelect} />)}<h2>Waiting <span>{waitingTasks.length}</span></h2>{waitingTasks.slice(0, 2).map((task) => <TaskCard key={task.task_id} task={task} selected={false} onSelect={onSelect} />)}<h2>Resolved <span>{resolvedTasks.length}</span></h2>{resolvedTasks.length ? resolvedTasks.slice(0, 2).map((task) => <TaskCard key={task.task_id} task={task} selected={false} onSelect={onSelect} />) : <p className="task-muted">No items</p>}</div><article className="task-attention-detail"><h2>{selectedTask ? primaryAction.operator_control || "Review Task decision" : "No attention item selected"}</h2>{selectedTask ? <><p className="task-attention-task"><Glyph name="warning" />{taskTitle(selectedTask)}</p><div className="task-warning-callout">{primaryAction.reason || selectedTask.status_detail || "Execution is waiting for a server-owned decision."}</div><TaskInteractionPanel interactions={interactions} onSubmit={onAnswerInteraction} busy={actionBusy} /><h3>Recorded blockers</h3>{attentionItems.length ? <ul className="task-bullet-list">{attentionItems.map((item) => <li key={item.item_id || item.consequence}><strong>{item.message || item.consequence || item.summary || "Recorded blocker"}</strong>{item.code ? <code>{item.code}</code> : null}{item.recovery_action ? <span>{item.recovery_action}</span> : null}</li>)}</ul> : <p className="task-muted">No blocker details have been published.</p>}<h3>Safety checks</h3><ul className="task-check-list"><li>✓ No upstream writes</li><li>{selectedTask.scope ? "✓ Scope is bounded" : "! Scope is not published"}</li><li>{selectedTask.evidence_refs?.length ? "✓ Evidence is attached" : "! Evidence is not attached"}</li></ul><section className="task-attention-evidence"><span>Evidence / source</span><button type="button" className="task-link" onClick={() => setShowEvidence((value) => !value)}>{showEvidence ? "Hide evidence" : "View evidence"} <Glyph name="external" /></button>{showEvidence ? <div className="task-evidence-list"><p>Durable references</p>{(selectedTask.evidence_refs || []).map((ref) => <code key={ref}>{ref}</code>)}</div> : null}</section><div className="task-attention-actions">{action ? <Button variant="primary" onClick={() => onTaskAction?.(selectedTask, action, action === "request" ? { expected_revision: selectedTask.revision, request_text: operatorRequestText.trim() || "Request a bounded revision." } : action === "intent.resume" ? {} : { expected_revision: selectedTask.revision })} busy={actionBusy} disabled={actionBusy || primaryAction.available === false}>{actionBusy ? "Applying…" : primaryAction.operator_control || "Apply server action"}</Button> : taskCanOpenReview(selectedTask) ? <Button variant="primary" onClick={() => onOpenReview?.(selectedTask)} disabled={actionBusy}>Open review</Button> : <Button variant="primary" disabled>{primaryAction.operator_control || "Apply server action"}</Button>}{resumePreparation ? <Button variant="secondary" onClick={() => onEditTask?.(selectedTask)} disabled={actionBusy}>Change preparation runner</Button> : null}<span className="task-control-note">Only server-published actions are executable from this view.</span></div><AskAorPanel task={selectedTask} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></> : <EmptyState title="Select an attention item">Choose an item to review its consequence and evidence.</EmptyState>}</article><aside className="task-attention-inspector"><h3>Task details</h3><dl><div><dt>Revision</dt><dd>{selectedTask?.revision ?? "Not published"}</dd></div><div><dt>Scope</dt><dd>{selectedTask?.scope || "Not published"}</dd></div><div><dt>Tasks</dt><dd>{selectedTask?.attention_items?.length ?? 0}</dd></div><div><dt>Evidence</dt><dd>{selectedTask?.evidence_refs?.length ?? 0} refs</dd></div><div><dt>Updated</dt><dd>{selectedTask?.updated_at ? taskAge(selectedTask.updated_at) : "—"}</dd></div></dl><h3>Activity</h3>{Array.isArray(selectedTask?.activity) && selectedTask.activity.length ? <ol className="task-timeline">{selectedTask.activity.slice(0, 4).map((entry, index) => <li key={`${entry?.id ?? "activity"}-${index}`}>{entry?.summary || entry?.label || "Recorded activity"}<span>{entry?.occurred_at ? taskAge(entry.occurred_at) : "—"}</span></li>)}</ol> : <p className="task-muted">No durable activity has been published.</p>}</aside></div>;
 }
 
 function CheckRow({ label, status = "pending", onView }) {
@@ -446,9 +564,9 @@ function CheckRow({ label, status = "pending", onView }) {
   </li>;
 }
 
-function ReviewInspector({ review, reviewData, note = "", setNote = () => {} }) {
+function ReviewInspector({ task, review, reviewData, note = "", setNote = () => {} }) {
   const ready = reviewHasRequiredChecks(review, reviewData);
-  return <div className="task-review-inspector__content"><h3><span className={`task-check-circle${ready ? "" : " task-check-circle--pending"}`}>{ready ? <Glyph name="check" /> : "!"}</span>{ready ? "Ready for review" : "Review evidence incomplete"}</h3><p>{ready ? "All required checks passed." : "Approval is blocked until verification, reference integrity, and review evidence pass."}</p><ul className="task-check-rows"><CheckRow label="Contract validation" status={review?.verification_status} /><CheckRow label="Focused tests" status={review?.verification_status} /><CheckRow label="Reference integrity" status={review?.delivery_status} /></ul><h4>Delivery</h4><div className="task-delivery-note"><strong>Patch only</strong><span>No upstream writes</span><p>Changes will be delivered as a patch to the target repository only.</p></div><label className="task-review-note">Review note<textarea rows="4" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for approval or revision" /></label></div>;
+  return <div className="task-review-inspector__content"><h3><span className={`task-check-circle${ready ? "" : " task-check-circle--pending"}`}>{ready ? <Glyph name="check" /> : "!"}</span>{ready ? "Ready for review" : "Review evidence incomplete"}</h3><p>{ready ? "All required checks passed." : "Approval is blocked until verification, reference integrity, and review evidence pass."}</p><ul className="task-check-rows"><CheckRow label="Contract validation" status={review?.verification_status} /><CheckRow label="Focused tests" status={review?.verification_status} /><CheckRow label="Reference integrity" status={review?.delivery_status} /></ul><h4>Delivery</h4><div className="task-delivery-note"><strong>{deliveryMode(task)}</strong><span>No upstream writes</span><p>{deliveryModeDescription(task)}</p></div><label className="task-review-note">Review note<textarea rows="4" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for approval or revision" /></label></div>;
 }
 
 function CompletionInspector({ task, onFollowUp, onBackToTasks, actionBusy = false }) {
@@ -468,7 +586,7 @@ function ReviewDiff({ file, tab }) {
   return <div className="task-diff" aria-label={`Source diff for ${file.path}`}><div><span>Before</span><div className="task-diff__code">{rows.map((row, index) => <div className={`task-diff-row task-diff-row--${row.kind}`} key={`old-${index}`}><span>{row.old_line ?? ""}</span><code>{row.kind === "addition" ? "" : row.text}</code></div>)}</div></div><div><span>After</span><div className="task-diff__code">{rows.map((row, index) => <div className={`task-diff-row task-diff-row--${row.kind}`} key={`new-${index}`}><span>{row.new_line ?? ""}</span><code>{row.kind === "deletion" ? "" : row.text}</code></div>)}</div></div></div>;
 }
 
-function ReviewScreen({ task, reviewState, onSelectPath, onRetry, onReviewDecision, onOpenInspector, onBackToTasks, actionBusy }) {
+function ReviewScreen({ task, reviewState, operatorRequests, operatorRequestText, setOperatorRequestText, onTaskAction, onResumeOperatorRequest, onSelectPath, onRetry, onReviewDecision, onOpenInspector, onBackToTasks, actionBusy }) {
   const [section, setSection] = useState("changes");
   const [tab, setTab] = useState("source");
   const [note, setNote] = useState("");
@@ -493,7 +611,7 @@ function ReviewScreen({ task, reviewState, onSelectPath, onRetry, onReviewDecisi
     setDecisionState({ status: "recorded", message: completed ? "Decision recorded. Task closure is available." : "Decision recorded durably. Waiting for the server to publish closure evidence." });
   }
   const sectionContent = section === "activity" ? <div className="task-review-context-panel"><h3>Activity</h3>{activity.length ? <ul>{activity.map((entry, index) => <li key={`${entry?.id ?? "activity"}-${index}`}><Glyph name="activity" /><span>{entry?.summary || entry?.label || "Recorded activity"}</span><time>{entry?.occurred_at ? taskAge(entry.occurred_at) : "—"}</time></li>)}</ul> : <p className="task-muted">No durable activity has been published for this Task yet.</p>}</div> : section === "checks" ? <div className="task-review-context-panel"><h3>Checks</h3><ul className="task-check-rows"><CheckRow label="Verification" status={task?.review?.verification_status} /><CheckRow label="Delivery" status={task?.review?.delivery_status} /><CheckRow label="Source freshness" status={sourceFreshness} /></ul></div> : section === "evidence" ? <div className="task-review-context-panel"><h3>Evidence</h3><p>Only server-materialized references are shown.</p>{(task?.review?.evidence_refs || task?.evidence_refs || []).length ? <ul>{(task?.review?.evidence_refs || task?.evidence_refs || []).map((ref) => <li key={ref}><code>{ref}</code></li>)}</ul> : <p className="task-muted">No durable evidence has been published for this Task yet.</p>}</div> : null;
-  return <div className="task-review-screen"><header className="task-context-header"><div className="task-context-title"><button type="button" className="task-context-back" onClick={onBackToTasks}><Glyph name="back" />Tasks</button><span aria-hidden="true">/</span><span>{task?.task_id || "Task"}</span><h2 aria-label="Review Changes">{taskTitle(task)}</h2></div><div className="task-context-meta"><span className="task-context-status task-context-status--review">Review required</span><span className="task-context-runner">{runner}</span><button type="button" className="task-inspector-trigger" onClick={onOpenInspector}><Glyph name="evidence" />Review details</button></div></header><LifecyclePath task={task} variant="context" /><TaskTabList label="Review sections" className="task-context-tabs" tabs={[["activity", "Activity"], ["changes", "Changes"], ["checks", "Checks"], ["evidence", "Evidence"]].map(([id, label]) => ({ id, label, controls: id === "changes" ? "task-change-panel" : `task-review-panel-${id}` }))} selected={section} onSelect={setSection} /><div className="task-review-layout"><aside className="task-review-files"><h3>{files.length} changed files</h3>{files.map((file) => <button type="button" className={file.path === review?.selected_path ? "is-selected" : ""} aria-current={file.path === review?.selected_path ? "true" : undefined} key={file.path} onClick={() => { setSection("changes"); onSelectPath(file.path); }}><Glyph name="file" /><span>{file.path}</span><em>+{file.additions} <b>−{file.deletions}</b></em></button>)}</aside><article className="task-review-main">{staleSource ? <div className="task-review-warning">Documentation source changed after preparation <button type="button" className="task-link" onClick={() => setSection("evidence")}>Compare source revision <Glyph name="external" /></button></div> : null}{reviewState.status === "loading" ? <div className="task-review-state" role="status">Loading recorded patch evidence…</div> : null}{reviewState.status === "error" ? <div className="task-review-state task-review-state--error" role="alert"><strong>Review evidence could not be loaded.</strong><p>{reviewState.error}</p><Button onClick={onRetry}>Retry</Button></div> : null}{section !== "changes" ? <div id={`task-review-panel-${section}`} role="tabpanel" aria-label={`${section} review details`}>{sectionContent}</div> : null}{section === "changes" && reviewState.status === "ready" && files.length === 0 ? <EmptyState title="No recorded changes">This task has no changed paths to review.</EmptyState> : null}{section === "changes" && selectedFile ? <><header><h2>{selectedFile.path}</h2><TaskTabList label="Change presentation" className="task-detail-tabs" tabs={[{ id: "rendered", label: "Rendered", controls: "task-change-panel" }, { id: "source", label: "Source diff", controls: "task-change-panel" }]} selected={tab} onSelect={setTab} /></header>{review?.availability === "truncated" || selectedFile.truncated ? <p className="task-review-truncated" role="status">This diff is truncated to the bounded review limit.</p> : null}<div id="task-change-panel" role="tabpanel" aria-label="Change presentation"><ReviewDiff file={selectedFile} tab={tab} /></div></> : null}</article><aside className="task-review-inspector"><ReviewInspector review={task?.review} reviewData={review} note={note} setNote={setNote} /></aside><footer className={`task-screen-footer${!canApprove ? " task-screen-footer--gated" : ""}`}>{!canApprove ? <p className="task-review-gate-note" role="status">Approve changes is available after verification, reference integrity, and review evidence all pass.</p> : null}<Button onClick={() => void decide("request-repair")} disabled={actionBusy || reviewState.status !== "ready"}>{decisionState.status === "pending" ? "Recording…" : "Request revision"}</Button><Button variant="primary" onClick={() => void decide("approve")} busy={actionBusy || decisionState.status === "pending"} disabled={!canApprove || actionBusy || decisionState.status === "pending"}>{decisionState.status === "pending" ? "Recording…" : "Approve changes"}</Button>{decisionState.message ? <span className={`task-inline-status task-inline-status--${decisionState.status}`} role={decisionState.status === "error" ? "alert" : "status"}>{decisionState.message}</span> : null}</footer></div></div>;
+  return <div className="task-review-screen"><header className="task-context-header"><div className="task-context-title"><button type="button" className="task-context-back" onClick={onBackToTasks}><Glyph name="back" />Tasks</button><span aria-hidden="true">/</span><span>{task?.task_id || "Task"}</span><h2 aria-label="Review Changes">{taskTitle(task)}</h2></div><div className="task-context-meta"><span className="task-context-status task-context-status--review">Review required</span><span className="task-context-runner">{runner}</span><button type="button" className="task-inspector-trigger" onClick={onOpenInspector}><Glyph name="evidence" />Review details</button></div></header><LifecyclePath task={task} variant="context" /><TaskTabList label="Review sections" className="task-context-tabs" tabs={[["activity", "Activity"], ["changes", "Changes"], ["checks", "Checks"], ["evidence", "Evidence"]].map(([id, label]) => ({ id, label, controls: id === "changes" ? "task-change-panel" : `task-review-panel-${id}` }))} selected={section} onSelect={setSection} /><div className="task-review-layout"><aside className="task-review-files"><h3>{files.length} changed files</h3>{files.map((file) => <button type="button" className={file.path === review?.selected_path ? "is-selected" : ""} aria-current={file.path === review?.selected_path ? "true" : undefined} key={file.path} onClick={() => { setSection("changes"); onSelectPath(file.path); }}><Glyph name="file" /><span>{file.path}</span><em>+{file.additions} <b>−{file.deletions}</b></em></button>)}</aside><article className="task-review-main">{staleSource ? <div className="task-review-warning">Documentation source changed after preparation <button type="button" className="task-link" onClick={() => setSection("evidence")}>Compare source revision <Glyph name="external" /></button></div> : null}{reviewState.status === "loading" ? <div className="task-review-state" role="status">Loading recorded patch evidence…</div> : null}{reviewState.status === "error" ? <div className="task-review-state task-review-state--error" role="alert"><strong>Review evidence could not be loaded.</strong><p>{reviewState.error}</p><Button onClick={onRetry}>Retry</Button></div> : null}{section !== "changes" ? <div id={`task-review-panel-${section}`} role="tabpanel" aria-label={`${section} review details`}>{sectionContent}</div> : null}{section === "changes" && reviewState.status === "ready" && files.length === 0 ? <EmptyState title="No recorded changes">This task has no changed paths to review.</EmptyState> : null}{section === "changes" && selectedFile ? <><header><h2>{selectedFile.path}</h2><TaskTabList label="Change presentation" className="task-detail-tabs" tabs={[{ id: "rendered", label: "Rendered", controls: "task-change-panel" }, { id: "source", label: "Source diff", controls: "task-change-panel" }]} selected={tab} onSelect={setTab} /></header>{review?.availability === "truncated" || selectedFile.truncated ? <p className="task-review-truncated" role="status">This diff is truncated to the bounded review limit.</p> : null}<div id="task-change-panel" role="tabpanel" aria-label="Change presentation"><ReviewDiff file={selectedFile} tab={tab} /></div></> : null}</article><aside className="task-review-inspector"><ReviewInspector task={task} review={task?.review} reviewData={review} note={note} setNote={setNote} /></aside><footer className={`task-screen-footer${!canApprove ? " task-screen-footer--gated" : ""}`}>{!canApprove ? <p className="task-review-gate-note" role="status">Approve changes is available after verification, reference integrity, and review evidence all pass.</p> : null}<Button onClick={() => void decide("request-repair")} disabled={actionBusy || reviewState.status !== "ready"}>{decisionState.status === "pending" ? "Recording…" : "Request revision"}</Button><Button variant="primary" onClick={() => void decide("approve")} busy={actionBusy || decisionState.status === "pending"} disabled={!canApprove || actionBusy || decisionState.status === "pending"}>{decisionState.status === "pending" ? "Recording…" : "Approve changes"}</Button>{decisionState.message ? <span className={`task-inline-status task-inline-status--${decisionState.status}`} role={decisionState.status === "error" ? "alert" : "status"}>{decisionState.message}</span> : null}</footer><AskAorPanel task={task} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></div></div>;
 }
 
 function TruthfulCompletionScreen({ task, onFollowUp, onOpenInspector, onBackToTasks, actionBusy }) {
@@ -504,7 +622,7 @@ function TruthfulCompletionScreen({ task, onFollowUp, onOpenInspector, onBackToT
   const runner = task?.runner_selection?.route_id || "Runner not selected";
   const checks = [["Verification", task?.completion?.verification_status || "unknown"], ["Delivery", task?.completion?.delivery_status || "unknown"], ["Review", task?.review?.status || "unknown"]];
   const panel = section === "summary"
-    ? <section id="task-completion-panel-summary" className="task-completion-summary" role="tabpanel" aria-labelledby="task-completion-tab-summary"><header><span className="task-complete-icon"><Glyph name="check" /></span><div><h2>Task completed</h2><p>Closure is backed by server-owned verification and delivery evidence.</p></div></header><section className="task-complete-outcome"><h3>Outcome</h3><p>{task?.normalization?.outcome || task?.intent?.outcome || "The requested outcome was completed."}</p><div className="task-outcome-stats"><span><Glyph name="file" />{changedPaths.length} files changed</span><span><Glyph name="code" />{deliveryRef ? "Delivery evidence attached" : "Delivery reference pending"}</span></div></section></section>
+    ? <section id="task-completion-panel-summary" className="task-completion-summary" role="tabpanel" aria-labelledby="task-completion-tab-summary"><header><span className="task-complete-icon"><Glyph name="check" /></span><div><h2>Task completed</h2><p>Closure is backed by server-owned verification and delivery evidence.</p></div></header><section className="task-complete-outcome"><h3>Outcome</h3><p>{taskOutcome(task, "The requested outcome was completed.")}</p><div className="task-outcome-stats"><span><Glyph name="file" />{changedPaths.length} files changed</span><span><Glyph name="code" />{deliveryRef ? "Delivery evidence attached" : "Delivery reference pending"}</span></div></section></section>
     : section === "changes"
       ? <section id="task-completion-panel-changes" className="task-review-context-panel" role="tabpanel" aria-labelledby="task-completion-tab-changes"><h3>Changed paths</h3>{changedPaths.length ? <ul>{changedPaths.map((path) => <li key={path}><Glyph name="file" />{path}</li>)}</ul> : <EmptyState title="No changed paths">The server did not attach changed paths to this completion.</EmptyState>}</section>
       : section === "checks"
@@ -516,32 +634,52 @@ function TruthfulCompletionScreen({ task, onFollowUp, onOpenInspector, onBackToT
 function CompletionScreen({ task, onFollowUp, onOpenInspector, onBackToTasks, actionBusy }) {
   return <TruthfulCompletionScreen task={task} onFollowUp={onFollowUp} onOpenInspector={onOpenInspector} onBackToTasks={onBackToTasks} actionBusy={actionBusy} />;
 }
-export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSelectTask, onNewTask, onCreateTask, onTaskAction, onSelectRunner, executionProfile = null, onReviewDecision, loadTaskReview, actionBusy = false, actionError = null, onRefresh, onOpenProject, connectionState = "connected", resourceError = null }) {
+export function TaskWorkspace({ project, tasks = [], operatorRequests = [], interactionsByRun = {}, selectedTaskId = null, pendingPreparation = false, pendingSubmissionId = null, onStopFollowingPreparation, onSelectTask, onNewTask, onCreateTask, onTaskAction, onAnswerInteraction, onResumeOperatorRequest, onSelectRunner, onCheckPreparationRunner, onCheckExecutionRunner, onInitializeRunnerProfile, executionProfile = null, onReviewDecision, loadTaskReview, actionBusy = false, actionError = null, onRefresh, onOpenProject, connectionState = "connected", resourceError = null }) {
   const [screen, setScreen] = useState("home");
   const [navCollapsed, setNavCollapsed] = useState(false); const [helpOpen, setHelpOpen] = useState(false);
+  const [evidenceIndexOpen, setEvidenceIndexOpen] = useState(false);
   const [draftMode, setDraftMode] = useState(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [outcome, setOutcome] = useState("");
-  const [markdown, setMarkdown] = useState("");
   const [operatorRequestText, setOperatorRequestText] = useState("");
-  const [sourceMode, setSourceMode] = useState("upload");
-  const [uploadName, setUploadName] = useState("");
-  const [sourceError, setSourceError] = useState("");
-  const [repositoryPath, setRepositoryPath] = useState("");
-  const [repositoryRevision, setRepositoryRevision] = useState("");
-  const [pendingSource, setPendingSource] = useState(null);
+  const [pendingSources, setPendingSources] = useState([]);
+  const [sourceContinuation, setSourceContinuation] = useState({ submissionId: null, sourceIds: [] });
   const sourceOpenerRef = useRef(null);
   const [reviewState, setReviewState] = useState({ status: "idle", data: null, error: "" });
   const [inspectorOpen, setInspectorOpen] = useState(null);
   const [reviewNote, setReviewNote] = useState("");
   const [focusedTaskId, setFocusedTaskId] = useState(selectedTaskId || null);
+  const [preparationRunnerChoice, setPreparationRunnerChoice] = useState({ projectId: null, routeId: "" });
+  const [preparingTask, setPreparingTask] = useState(false);
   const selectedTask = useMemo(() => {
     if (focusedTaskId === NEW_TASK_DRAFT_ID) return null;
     return (focusedTaskId ? tasks.find((task) => task.task_id === focusedTaskId) : null) ?? tasks.find((task) => task.status === "active") ?? tasks[0] ?? null;
   }, [focusedTaskId, tasks]);
+  const selectedInteractions = useMemo(() => interactionsForTask(selectedTask, interactionsByRun), [selectedTask, interactionsByRun]);
+  const attentionTask = selectedTask?.status === "attention" ? selectedTask : tasks.find((task) => task.status === "attention");
+  const attentionInteractions = useMemo(() => interactionsForTask(attentionTask, interactionsByRun), [attentionTask, interactionsByRun]);
   const selectedSources = Array.isArray(selectedTask?.source_items) ? selectedTask.source_items : [];
-  const sourceItems = useMemo(() => pendingSource ? [...selectedSources.filter((source) => source.source_id !== pendingSource.source_id), pendingSource] : selectedSources, [pendingSource, selectedSources]);
+  const retainedTaskSources = useMemo(() => {
+    const selectedIds = new Set(sourceContinuation.sourceIds);
+    return sourceContinuation.submissionId
+      ? selectedSources.filter((source) => selectedIds.has(source.source_id) && ["upload-snapshot", "repository-markdown"].includes(source.kind))
+      : [];
+  }, [selectedSources, sourceContinuation]);
+  const sourceItems = useMemo(() => {
+    const existingIds = new Set(selectedSources.map((source) => source.source_id));
+    const draftItems = pendingSources.map(({ attachment, reference, ...source }) => source).filter((source) => !existingIds.has(source.source_id));
+    const taskSources = draftMode === "edit" ? retainedTaskSources : selectedSources;
+    return [...taskSources, ...draftItems];
+  }, [draftMode, pendingSources, retainedTaskSources, selectedSources]);
+  useEffect(() => {
+    if (!pendingSubmissionId || pendingSources.length === 0) return;
+    const acceptedTask = tasks.some((task) => task?.lineage?.intent_submission_id === pendingSubmissionId);
+    if (acceptedTask) {
+      setPendingSources([]);
+      setSourceContinuation({ submissionId: null, sourceIds: [] });
+    }
+  }, [pendingSubmissionId, pendingSources.length, tasks]);
   const runnerStep = executionStepFor(selectedTask);
   const profileSelection = Array.isArray(executionProfile?.routes)
     ? executionProfile.routes.find((route) => route?.step === runnerStep)
@@ -549,6 +687,23 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
   const runnerSelection = selectedTask?.runner_selection ?? profileSelection ?? { route_id: null, step: runnerStep, readiness: "unknown", recovery_action: "Wait for the server to publish runner readiness." };
   const runnerOptions = approvedRunnerOptions(executionProfile, runnerStep, runnerSelection);
   const runnerSelectionEnabled = executionProfile?.initialized === true && Number.isInteger(executionProfile?.revision);
+  const preparationRunnerOptions = Array.isArray(executionProfile?.preparation_runners) ? executionProfile.preparation_runners : [];
+  useEffect(() => {
+    const projectId = executionProfile?.project_id ?? null;
+    const defaultRouteId = preparationRunnerOptions.find((option) => option.route_id?.endsWith(".default"))?.route_id
+      ?? preparationRunnerOptions[0]?.route_id
+      ?? "";
+    setPreparationRunnerChoice((current) => {
+      if (current.projectId !== projectId) return { projectId, routeId: defaultRouteId };
+      if (preparationRunnerOptions.some((option) => option.route_id === current.routeId)) return current;
+      return { projectId, routeId: defaultRouteId };
+    });
+  }, [executionProfile]);
+  const preparationRouteId = preparationRunnerChoice.projectId === (executionProfile?.project_id ?? null)
+    ? preparationRunnerChoice.routeId
+    : preparationRunnerOptions.find((option) => option.route_id?.endsWith(".default"))?.route_id ?? preparationRunnerOptions[0]?.route_id ?? "";
+  const preparationRunnerReady = executionProfile?.initialized === true
+    && preparationRunnerOptions.some((option) => option.route_id === preparationRouteId && option.readiness === "ready");
   const visibleTasks = useMemo(() => tasks.filter((task) => {
     const matchesQuery = !query.trim() || `${taskTitle(task)} ${task.work_type ?? ""}`.toLowerCase().includes(query.trim().toLowerCase());
     const matchesFilter = filter === "all" || (filter === "ready" ? ["draft", "prepared"].includes(task.status) : task.status === filter);
@@ -557,7 +712,7 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
 
   const preparedTask = useMemo(() => {
     const text = outcome.trim();
-    if (!text) return selectedTask;
+    if (!text || !draftMode || (draftMode === "create" && selectedTask)) return selectedTask;
     const base = selectedTask ?? {
       task_id: null,
       project_id: project?.project_id ?? null,
@@ -583,9 +738,12 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
   useEffect(() => {
     if (selectedTaskId) {
       setFocusedTaskId(selectedTaskId);
-      setScreen((current) => ["active", "review", "complete", "attention"].includes(current) ? current : taskDestination(tasks.find((task) => task.task_id === selectedTaskId)));
+      setScreen((current) => ["active", "review", "complete", "attention"].includes(current)
+        || (!pendingPreparation && ["new", "sources"].includes(current))
+        ? current
+        : taskDestination(tasks.find((task) => task.task_id === selectedTaskId)));
     }
-  }, [selectedTaskId, tasks]);
+  }, [pendingPreparation, selectedTaskId, tasks]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -612,24 +770,12 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
         setScreen("attention");
       } else if (!editing && key === "e") {
         event.preventDefault();
-        setScreen(taskHasCompletionProof(selectedTask) ? "complete" : "review");
+        setEvidenceIndexOpen(true);
       } else if (!editing && key === "?") { event.preventDefault(); setHelpOpen(true); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [screen, selectedTask]);
-
-  useEffect(() => {
-    if (screen !== "new" || !sourceOpenerRef.current) return undefined;
-    const frame = window.requestAnimationFrame(() => {
-      const target = sourceOpenerRef.current?.isConnected
-        ? sourceOpenerRef.current
-        : [...document.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Add Markdown");
-      if (target && typeof target.focus === "function") target.focus();
-      sourceOpenerRef.current = null;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [screen]);
+  }, [pendingPreparation, screen, selectedTask]);
 
   async function refreshTaskReview(path = null) {
     if (!selectedTask?.task_id || !loadTaskReview) {
@@ -651,6 +797,7 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
   }, [screen, selectedTask?.task_id]);
 
   function chooseTask(task) {
+    if (task?.lineage?.intent_submission_id !== pendingSubmissionId) onStopFollowingPreparation?.();
     setDraftMode(null);
     setFocusedTaskId(task?.task_id ?? null);
     onSelectTask?.(task);
@@ -659,90 +806,108 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
   }
 
   function startNewTask() {
+    if (pendingPreparation) return;
     setDraftMode("create");
     setFocusedTaskId(NEW_TASK_DRAFT_ID);
     setOutcome("");
-    setPendingSource(null);
-    setMarkdown("");
-    setUploadName("");
-    setSourceError("");
-    setRepositoryPath("");
-    setRepositoryRevision("");
+    setPendingSources([]);
+    setSourceContinuation({ submissionId: null, sourceIds: [] });
     onSelectTask?.(null);
     onNewTask?.();
     setScreen("new");
   }
 
   async function prepareTask() {
-    const relativePath = safeProjectRelativePath(repositoryPath);
-    const task = await onCreateTask?.({
-      requestText: outcome.trim(),
-      attachments: uploadName ? [{ name: uploadName, content: markdown }] : [],
-      markdownSources: relativePath ? [{ project_relative_path: relativePath, pinned_base_revision: repositoryRevision.trim() || null }] : [],
-    });
-    if (!task?.task_id) return;
-    setDraftMode(null);
-    setOutcome("");
-    setFocusedTaskId(task.task_id);
-    onSelectTask?.(task);
-    setScreen(taskDestination(task));
+    if (!preparationRunnerReady || !preparationRouteId || actionBusy || preparingTask || pendingPreparation) return;
+    setPreparingTask(true);
+    try {
+      const task = await onCreateTask?.({
+        requestText: outcome.trim(),
+        attachments: pendingSources.flatMap((source) => source.attachment ? [source.attachment] : []),
+        markdownSources: pendingSources.flatMap((source) => source.kind === "repository-markdown" && source.reference?.project_relative_path ? [source.reference] : []),
+        sourceSubmissionId: sourceContinuation.submissionId,
+        sourceIds: sourceContinuation.sourceIds,
+        preparationRouteId,
+      });
+      if (!task?.task_id) return;
+      setPendingSources([]);
+      setSourceContinuation({ submissionId: null, sourceIds: [] });
+      setDraftMode(null);
+      setOutcome("");
+      setFocusedTaskId(task.task_id);
+      onSelectTask?.(task);
+      setScreen(taskDestination(task));
+    } finally {
+      setPreparingTask(false);
+    }
   }
 
   function editTask(task) {
     setDraftMode("edit");
-    setOutcome(task?.normalization?.outcome || task?.intent?.outcome || "");
-    setPendingSource(null);
-    setMarkdown("");
-    setUploadName("");
-    setSourceError("");
-    setRepositoryPath("");
-    setRepositoryRevision("");
+    setOutcome(taskOutcome(task));
+    setPendingSources([]);
+    setSourceContinuation({
+      submissionId: task?.lineage?.intent_submission_id ?? null,
+      sourceIds: (Array.isArray(task?.source_items) ? task.source_items : [])
+        .filter((source) => ["upload-snapshot", "repository-markdown"].includes(source?.kind))
+        .map((source) => source.source_id),
+    });
+    setScreen("new");
+  }
+
+  function addMarkdownSources({ sources = [], pastedText = "", sourceIds = [] } = {}) {
+    setPendingSources(sources);
+    if (sourceContinuation.submissionId) setSourceContinuation((current) => ({ ...current, sourceIds }));
+    if (pastedText.trim()) setOutcome((current) => [current.trim(), pastedText.trim()].filter(Boolean).join("\n\n"));
     setScreen("new");
   }
 
   function backToTasks() {
     setInspectorOpen(null);
+    if (pendingPreparation) {
+      onStopFollowingPreparation?.();
+      onRefresh?.();
+    }
     setScreen("home");
     onSelectTask?.(null);
   }
 
-  async function readUpload(file) {
-    setSourceError("");
-    if (!file) return;
-    if (!/\.md(?:own)?$/iu.test(file.name) || file.size > 1_000_000) {
-      setSourceError("Upload a UTF-8 Markdown file smaller than 1 MB.");
-      return;
-    }
-    try {
-      const text = await file.text();
-      let digest = "";
-      if (globalThis.crypto?.subtle) {
-        const hash = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-        digest = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
-      }
-      setMarkdown(text);
-      const filename = file.name.replace(/[\\/]/gu, "_");
-      setUploadName(filename);
-      setPendingSource({ schema_version: 1, source_id: "draft.upload." + filename, kind: "upload-snapshot", immutable: true, stale: false, digest, preview: { filename, media_type: file.type || "text/markdown", byte_length: file.size, sanitized_markdown: sanitizeMarkdown(text) } });
-    } catch {
-      setSourceError("The Markdown upload could not be read; try another file.");
-    }
-  }
-
-  function sourcePreview() {
-    const repositorySource = sourceItems.find((item) => item.kind === "repository-markdown");
-    return { upload: sanitizeMarkdown(markdown) || "Choose a Markdown file to preview.", repository: sanitizeMarkdown(repositorySource?.preview?.sanitized_markdown || "") || "Pinned repository Markdown is read-only until the source is confirmed.", inline: sanitizeMarkdown(markdown) }[sourceMode];
-  }
-
   const listSelectedTask = visibleTasks.some((task) => task.task_id === selectedTask?.task_id) ? selectedTask : null;
   const filteredTasks = visibleTasks;
-  const screenTitle = screen === "new" ? "New task" : screen === "sources" ? "Tasks" : screen === "prepared" ? "Prepared task" : screen === "active" ? "Active task" : screen === "review" ? taskTitle(selectedTask) : screen === "complete" ? taskTitle(selectedTask) : screen === "attention" ? "Attention" : "Tasks";
+  const preparationPending = preparedTask?.status === "draft" && ["submitted", "preparing"].includes(preparedTask?.status_detail);
+  const connectionStatus = {
+    loading: ["checking", "Checking"],
+    connected: ["connected", "Connected"],
+    partial: ["partial", "Partial"],
+    offline: ["offline", "Offline"],
+  }[connectionState] ?? ["unknown", "Status unavailable"];
+  const screenTitle = ({ new: "New task", sources: "Tasks", prepared: "Prepared task", active: "Active task", review: taskTitle(selectedTask), complete: taskTitle(selectedTask), attention: "Attention" })[screen] || "Tasks";
+  const newTaskScreen = <NewTaskScreen outcome={outcome} setOutcome={setOutcome} selectedSources={sourceItems} onAddSources={(opener) => { sourceOpenerRef.current = opener; setScreen("sources"); }} onPrepare={prepareTask} onCancel={() => { setPendingSources([]); setSourceContinuation({ submissionId: null, sourceIds: [] }); if (pendingPreparation) { onStopFollowingPreparation?.(); onRefresh?.(); } setScreen("home"); }} executionProfile={executionProfile} preparationRunnerOptions={preparationRunnerOptions} preparationRouteId={preparationRouteId} onSelectPreparationRunner={(routeId) => setPreparationRunnerChoice({ projectId: executionProfile?.project_id ?? null, routeId })} onCheckPreparationRunner={onCheckPreparationRunner} onInitializeRunnerProfile={onInitializeRunnerProfile} preparationRunnerReady={preparationRunnerReady} actionBusy={actionBusy} preparing={preparingTask} pendingPreparation={pendingPreparation} hidden={screen !== "new"} />;
+  const completionScreenByProof = new Map([
+    [true, <CompletionScreen task={selectedTask} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} onOpenInspector={() => setInspectorOpen("completion")} onBackToTasks={backToTasks} actionBusy={actionBusy} />],
+    [false, <div className="task-review-state task-review-state--error" role="alert"><strong>Closure evidence is not complete.</strong><p>The server has not published verification and delivery proof for this task yet.</p><Button onClick={() => setScreen("review")}>Back to review</Button></div>],
+  ]).get(taskHasCompletionProof(selectedTask));
+  const screenContent = {
+    home: <TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={startNewTask} project={project} />,
+    new: newTaskScreen,
+    sources: <>{newTaskScreen}<div className="task-home-underlay"><TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={() => setScreen("new")} project={project} /></div><MarkdownSourceDialog selectedSources={retainedTaskSources} initialSources={pendingSources} sourceSubmissionId={sourceContinuation.submissionId} openerElementRef={sourceOpenerRef} onClose={() => setScreen("new")} onAdd={addMarkdownSources} /></>,
+    prepared: <PreparedScreen task={preparedTask} selectedSources={sourceItems} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} runnerSelection={runnerSelection} projectDefaultSelection={profileSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} onCheckRunner={onCheckExecutionRunner} actionBusy={actionBusy} actionError={actionError} onEdit={() => editTask(preparedTask)} onStart={async (action) => { if (!action) return; const result = await onTaskAction?.(preparedTask, action, { expected_revision: preparedTask?.revision, expected_selection_revision: preparedTask?.runner_selection?.selection_revision ?? 0 }); if (result) setScreen("active"); }} />,
+    active: <ActiveScreen task={selectedTask} project={project} interactions={selectedInteractions} onAnswerInteraction={onAnswerInteraction} runnerSelection={runnerSelection} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} onReview={() => setScreen("review")} onOpenInspector={() => setInspectorOpen("runtime")} />,
+    attention: <AttentionScreen tasks={tasks} selectedTask={attentionTask} interactions={attentionInteractions} onAnswerInteraction={onAnswerInteraction} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onSelect={chooseTask} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} onEditTask={editTask} onOpenReview={() => setScreen("review")} actionBusy={actionBusy} />,
+    review: <ReviewScreen task={selectedTask} reviewState={reviewState} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} onSelectPath={(path) => void refreshTaskReview(path)} onRetry={() => void refreshTaskReview(reviewState.data?.selected_path)} onReviewDecision={(decision, reason) => onReviewDecision?.(selectedTask, decision, reason)} onOpenInspector={() => setInspectorOpen("review")} onBackToTasks={backToTasks} actionBusy={actionBusy} />,
+    complete: completionScreenByProof,
+  };
+  const inspectorContent = new Map([
+    ["runtime", <RuntimeInspector task={selectedTask} />],
+    ["completion", <CompletionInspector task={selectedTask} actionBusy={actionBusy} onBackToTasks={backToTasks} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} />],
+    ["review", <ReviewInspector task={selectedTask} review={selectedTask?.review} reviewData={reviewState.data} note={reviewNote} setNote={setReviewNote} />],
+  ]).get(inspectorOpen);
 
   return <section className={`task-workspace-shell aor-ui aor-density-relaxed task-workspace-shell--${screen}${navCollapsed ? " task-workspace-shell--nav-collapsed" : ""}`} aria-label="Task Workspace — server-owned Task projection" data-screen={screen}>
     <aside className="task-workspace__sidebar">
       <div className="task-workspace__logo">AOR</div>
       <button type="button" className="task-workspace__project-switcher" aria-label="Current project" onClick={() => onOpenProject?.()}><Glyph name="layers" /><span>{project?.display_name || project?.label || "Project"}</span><Glyph name="chevronDown" /></button>
-      <nav className="task-workspace__side-nav" aria-label="Task navigation">{SIDE_NAV.map(([target, label, icon]) => { const selected = target === "home" ? screen !== "attention" : target === screen; const attentionCount = tasks.filter((task) => task.status === "attention").length; return <button type="button" key={label} aria-label={label} className={selected ? "is-selected" : ""} aria-current={selected ? "page" : undefined} onClick={() => target === "home" ? backToTasks() : target === "project" ? onOpenProject?.() : setScreen(target === "evidence" ? (taskHasCompletionProof(selectedTask) ? "complete" : "review") : target)}><Glyph name={icon} /><span>{label}</span>{label === "Attention" && attentionCount > 0 ? <span className="task-nav-count">{attentionCount}</span> : null}</button>; })}</nav>
+      <nav className="task-workspace__side-nav" aria-label="Task navigation">{SIDE_NAV.map(([target, label, icon]) => { const selected = target === "home" ? screen !== "attention" && !evidenceIndexOpen : target === "evidence" ? evidenceIndexOpen : target === screen; const attentionCount = tasks.filter((task) => task.status === "attention").length; return <button type="button" key={label} aria-label={label} className={selected ? "is-selected" : ""} aria-current={selected ? "page" : undefined} onClick={() => target === "home" ? backToTasks() : target === "project" ? onOpenProject?.() : target === "evidence" ? setEvidenceIndexOpen(true) : setScreen(target)}><Glyph name={icon} /><span>{label}</span>{label === "Attention" && attentionCount > 0 ? <span className="task-nav-count">{attentionCount}</span> : null}</button>; })}</nav>
       <div className="task-workspace__sidebar-footer">
         <TaskShortcutList />
         <div className="task-workspace__operator"><span className="task-workspace__operator-dot" aria-hidden="true" /><span>Operator</span><small>Local</small></div>
@@ -750,25 +915,18 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
       </div>
     </aside>
     <div className="task-workspace__viewport">
-      {connectionState !== "connected" ? <div className="task-workspace__notice" role="alert"><strong>{connectionState === "offline" ? "Tasks are temporarily unavailable." : "Task data is partially available."}</strong><p>{resourceError?.detail || "AOR will not infer lifecycle or next action from stale data."}</p>{onRefresh ? <Button onClick={onRefresh}>Retry</Button> : null}</div> : null}
+      {connectionState !== "connected" ? <div className={`task-workspace__notice${connectionState === "offline" ? " task-workspace__notice--danger" : ""}`} role={connectionState === "loading" ? "status" : "alert"}><strong>{connectionState === "offline" ? "Tasks are temporarily unavailable." : connectionState === "loading" ? "Loading project data…" : "Some project data is unavailable."}</strong>{connectionState !== "loading" ? <p>{resourceError?.detail || "AOR will not infer lifecycle or next action from stale data."}</p> : null}{connectionState !== "loading" && onRefresh ? <Button onClick={onRefresh}>Retry</Button> : null}</div> : null}
       {actionError ? <div className="task-workspace__notice task-workspace__notice--danger" role="alert"><strong>Task action needs recovery</strong><p>{actionError}</p></div> : null}
       <header className="task-workspace__topbar">
-        <div className="task-workspace__breadcrumb">{screen !== "home" && screen !== "attention" && screen !== "sources" ? <button type="button" onClick={backToTasks} aria-label="Back to tasks"><Glyph name="back" />Tasks</button> : null}<div className="task-workspace__title-stack">{screen === "home" ? <span className="task-workspace__product-label">Command Desk</span> : null}<h1 aria-label={SCREENS.find(([id]) => id === screen)?.[1] || screenTitle}>{screenTitle}</h1></div>{screen === "attention" ? <select aria-label="Attention status filter" className="task-title-filter" value="attention" onChange={() => setFilter("attention")}><option value="attention">Open</option></select> : null}{screen === "new" ? <span className="task-draft-label">{outcome.trim() ? "Unsaved local draft" : "Draft not saved"}</span> : null}{screen === "prepared" ? <span className="task-status-chip"><span />{preparedTask?.status === "prepared" ? "Ready to start" : taskStatusLabel(preparedTask)}</span> : null}{screen === "prepared" && Number.isInteger(preparedTask?.revision) ? <span className="task-revision-label">Revision {preparedTask.revision}</span> : null}</div>
-        <div className="task-workspace__top-actions">{["home", "active", "attention", "prepared"].includes(screen) ? <label className="task-search" htmlFor="task-search-input"><Glyph name="search" /><input id="task-search-input" name="task-search" aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>/</kbd></label> : null}{["home", "active", "attention", "prepared"].includes(screen) ? <select id="task-filter" name="task-filter" aria-label="Filter tasks" className="task-filter" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All tasks</option><option value="attention">Open</option><option value="active">Active</option><option value="ready">Ready</option><option value="completed">Completed</option></select> : null}<span className="task-live-badge"><Glyph name="signal" />Live</span><span className="task-safe-badge"><Glyph name="shield" />Patch only</span><button type="button" className="task-top-icon task-top-icon--utility" aria-label="Help" onClick={() => setHelpOpen(true)}><Glyph name="help" /></button><Button variant="primary" onClick={startNewTask}><Glyph name="plus" />New task<kbd aria-hidden="true">N</kbd></Button><button type="button" className="task-top-icon task-top-icon--keyboard" aria-label="Open command palette" onClick={() => document.querySelector('[aria-label="Search tasks"]')?.focus()}><kbd>⌘</kbd></button></div>
+        <div className="task-workspace__breadcrumb">{screen !== "home" && screen !== "attention" && screen !== "sources" ? <button type="button" onClick={backToTasks} aria-label="Back to tasks"><Glyph name="back" />Tasks</button> : null}<div className="task-workspace__title-stack">{screen === "home" ? <span className="task-workspace__product-label">Command Desk</span> : null}<h1 aria-label={SCREENS.find(([id]) => id === screen)?.[1] || screenTitle}>{screenTitle}</h1></div>{screen === "attention" ? <select aria-label="Attention status filter" className="task-title-filter" value="attention" onChange={() => setFilter("attention")}><option value="attention">Open</option></select> : null}{screen === "new" ? <span className="task-draft-label">{pendingPreparation ? "Task accepted" : outcome.trim() ? "Unsaved local draft" : "Draft not saved"}</span> : null}{screen === "prepared" ? <span className={`task-status-chip${preparationPending ? " task-status-chip--preparing" : ""}`}><span />{preparedTask?.status === "prepared" ? "Ready to start" : preparationPending ? "Preparing task…" : taskStatusLabel(preparedTask)}</span> : null}{screen === "prepared" && Number.isInteger(preparedTask?.revision) ? <span className="task-revision-label">Revision {preparedTask.revision}</span> : null}</div>
+        <div className="task-workspace__top-actions">{["home", "active", "attention", "prepared"].includes(screen) ? <label className="task-search" htmlFor="task-search-input"><Glyph name="search" /><input id="task-search-input" name="task-search" aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>/</kbd></label> : null}{["home", "active", "attention", "prepared"].includes(screen) ? <select id="task-filter" name="task-filter" aria-label="Filter tasks" className="task-filter" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All tasks</option><option value="attention">Open</option><option value="active">Active</option><option value="ready">Ready</option><option value="completed">Completed</option></select> : null}<span className={`task-connection-badge task-connection-badge--${connectionStatus[0]}`} role="status" aria-label={`AOR data connection: ${connectionStatus[1]}`} title={`AOR data connection: ${connectionStatus[1]}`}><Glyph name="signal" />{connectionStatus[1]}</span><span className="task-safe-badge"><Glyph name="shield" />{deliveryMode(selectedTask)}</span><button type="button" className="task-top-icon task-top-icon--utility" aria-label="Help" onClick={() => setHelpOpen(true)}><Glyph name="help" /></button><Button variant="primary" onClick={startNewTask} disabled={pendingPreparation} title={pendingPreparation ? "Wait for task preparation to finish or return to the task queue." : undefined}><Glyph name="plus" />New task<kbd aria-hidden="true">N</kbd></Button><button type="button" className="task-top-icon task-top-icon--keyboard" aria-label="Open command palette" onClick={() => document.querySelector('[aria-label="Search tasks"]')?.focus()}><kbd>⌘</kbd></button></div>
       </header>
       <main className="task-workspace__body">
-        {screen === "home" ? <TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={startNewTask} project={project} /> : null}
-        {screen === "new" ? <NewTaskScreen outcome={outcome} setOutcome={setOutcome} selectedSources={sourceItems} onAddSources={(opener) => { sourceOpenerRef.current = opener; setScreen("sources"); }} onPrepare={prepareTask} onCancel={() => { setPendingSource(null); setScreen("home"); }} runnerSelection={runnerSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} actionBusy={actionBusy} /> : null}
-        {screen === "sources" ? <><div className="task-home-underlay"><TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={() => setScreen("new")} project={project} /></div><SourcesScreen selectedSources={sourceItems} sourceMode={sourceMode} setSourceMode={(mode) => { setSourceMode(mode); setSourceError(""); }} markdown={markdown} setMarkdown={setMarkdown} uploadName={uploadName} sourceError={sourceError} readUpload={readUpload} repositoryPath={repositoryPath} setRepositoryPath={setRepositoryPath} repositoryRevision={repositoryRevision} setRepositoryRevision={setRepositoryRevision} sourcePreview={sourcePreview} openerRef={sourceOpenerRef} onClose={() => setScreen("new")} onPrepare={() => { const relativePath = safeProjectRelativePath(repositoryPath); if (sourceMode === "repository" && relativePath) setPendingSource({ schema_version: 1, source_id: `draft.repository.${relativePath}`, kind: "repository-markdown", immutable: true, stale: false, digest: repositoryRevision, preview: { project_relative_path: relativePath, pinned_base_revision: repositoryRevision, sanitized_markdown: "# Repository source" } }); setScreen(draftMode === "edit" ? "prepared" : "new"); }} /></> : null}
-        {screen === "prepared" ? <PreparedScreen task={preparedTask} selectedSources={sourceItems} runnerSelection={runnerSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} actionBusy={actionBusy} actionError={actionError} onEdit={() => editTask(preparedTask)} onStart={async (action) => { if (!action) return; const result = await onTaskAction?.(preparedTask, action, { expected_revision: preparedTask?.revision }); if (result) setScreen("active"); }} /> : null}
-        {screen === "active" ? <ActiveScreen task={selectedTask} project={project} runnerSelection={runnerSelection} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} actionBusy={actionBusy} onReview={() => setScreen("review")} onOpenInspector={() => setInspectorOpen("runtime")} /> : null}
-        {screen === "attention" ? <AttentionScreen tasks={tasks} selectedTask={selectedTask?.status === "attention" ? selectedTask : tasks.find((task) => task.status === "attention")} onSelect={chooseTask} onTaskAction={onTaskAction} actionBusy={actionBusy} /> : null}
-        {screen === "review" ? <ReviewScreen task={selectedTask} reviewState={reviewState} onSelectPath={(path) => void refreshTaskReview(path)} onRetry={() => void refreshTaskReview(reviewState.data?.selected_path)} onReviewDecision={(decision, reason) => onReviewDecision?.(selectedTask, decision, reason)} onOpenInspector={() => setInspectorOpen("review")} onBackToTasks={backToTasks} actionBusy={actionBusy} /> : null}
-        {screen === "complete" && taskHasCompletionProof(selectedTask) ? <CompletionScreen task={selectedTask} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} onOpenInspector={() => setInspectorOpen("completion")} onBackToTasks={backToTasks} actionBusy={actionBusy} /> : null}
-        {screen === "complete" && !taskHasCompletionProof(selectedTask) ? <div className="task-review-state task-review-state--error" role="alert"><strong>Closure evidence is not complete.</strong><p>The server has not published verification and delivery proof for this task yet.</p><Button onClick={() => setScreen("review")}>Back to review</Button></div> : null}
+        {screenContent[screen]}
       </main>
     </div>
-    <Dialog open={Boolean(inspectorOpen)} onClose={() => setInspectorOpen(null)} labelledBy="task-mobile-inspector-title" className="task-inspector-drawer" backdropClassName="task-inspector-backdrop"><header><h2 id="task-mobile-inspector-title">{inspectorOpen === "runtime" ? "Task details" : inspectorOpen === "completion" ? "Closure details" : "Review details"}</h2><button type="button" className="task-plain-icon" aria-label="Close details" onClick={() => setInspectorOpen(null)}><Glyph name="close" /></button></header>{inspectorOpen === "runtime" ? <RuntimeInspector task={selectedTask} /> : inspectorOpen === "completion" ? <CompletionInspector task={selectedTask} actionBusy={actionBusy} onBackToTasks={backToTasks} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} /> : <ReviewInspector review={selectedTask?.review} reviewData={reviewState.data} note={reviewNote} setNote={setReviewNote} />}</Dialog>
+    <Dialog open={Boolean(inspectorOpen)} onClose={() => setInspectorOpen(null)} labelledBy="task-mobile-inspector-title" className="task-inspector-drawer" backdropClassName="task-inspector-backdrop"><header><h2 id="task-mobile-inspector-title">{({ runtime: "Task details", completion: "Closure details" })[inspectorOpen] || "Review details"}</h2><button type="button" className="task-plain-icon" aria-label="Close details" onClick={() => setInspectorOpen(null)}><Glyph name="close" /></button></header>{inspectorContent}</Dialog>
+    <EvidenceIndexDialog open={evidenceIndexOpen} tasks={tasks} onClose={() => setEvidenceIndexOpen(false)} onOpenTask={chooseTask} />
     <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
   </section>;
 }

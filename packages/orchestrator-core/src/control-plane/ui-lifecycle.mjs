@@ -2,20 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createProjectReadContext } from "./project-context.mjs";
+import { asString, firstNonNullish } from "../shared/value-normalization.mjs";
 
 /**
  * @returns {string}
  */
 function nowIso() {
   return new Date().toISOString();
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 /**
@@ -161,7 +154,7 @@ export function detachUiLifecycle(options) {
 
   const detachCountRaw = Number(snapshot.state.detach_count);
   const detachCount = Number.isFinite(detachCountRaw) ? detachCountRaw : 0;
-  const lastRunId = requestedRunId ?? asString(snapshot.state.attached_run_id) ?? asString(snapshot.state.last_run_id);
+  const lastRunId = firstNonNullish(requestedRunId, asString(snapshot.state.attached_run_id), asString(snapshot.state.last_run_id));
 
   const nextState = {
     ...snapshot.state,

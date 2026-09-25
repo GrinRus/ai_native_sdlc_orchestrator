@@ -16,6 +16,7 @@ import {
   readJson,
   requireDirectory,
   resolveOptionalStringFlag,
+  runCliEntrypoint,
   writeJson,
 } from "./lib/common.mjs";
 import {
@@ -712,15 +713,4 @@ function runCli(rawArgs) {
   return 3;
 }
 
-try {
-  process.exitCode = runCli(process.argv.slice(2));
-} catch (error) {
-  if (error instanceof UsageError) {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  } else {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
-  }
-}
+runCliEntrypoint(runCli);

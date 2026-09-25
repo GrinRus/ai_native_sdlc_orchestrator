@@ -1,4 +1,5 @@
 import { normalizeProviderStepStatus } from "../../provider-step-status.mjs";
+import { toInteractionHistorySummary } from "../interaction-projection.mjs";
 import { asPositiveInteger, asRecord, asString } from "./http-utils.mjs";
 
 function withoutRuntimeRootFields(value) {
@@ -99,16 +100,6 @@ export function toInteractionAnswerResponse(result) {
 }
 
 /**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
  * @param {Record<string, unknown>} payload
  * @returns {Record<string, unknown> | null}
  */
@@ -143,7 +134,6 @@ function toTimestampMs(value) {
 export function toHistoryEvent(event) {
   const payload = asRecord(event.payload);
   const interaction = asRecord(payload.interaction);
-  const continuation = asRecord(interaction.continuation);
   const providerStepStatus = normalizeProviderStepStatus(asRecord(payload.provider_step_status), {
     nowMs: toTimestampMs(event.timestamp) ?? undefined,
   });
@@ -160,24 +150,7 @@ export function toHistoryEvent(event) {
     step_result_ref: asString(payload.step_result_ref),
     answer_audit_ref: asString(payload.answer_audit_ref),
     provider_step_status: providerStepStatus,
-    interaction:
-      Object.keys(interaction).length > 0
-        ? {
-            interaction_id: asString(interaction.interaction_id),
-            status: asString(interaction.status),
-            step_result_ref: asString(interaction.step_result_ref),
-            question_summary: asString(interaction.question_summary),
-            answer_required: interaction.answer_required === true,
-            answer_audit_refs: asStringArray(interaction.answer_audit_refs),
-            continuation:
-              Object.keys(continuation).length > 0
-                ? {
-                    next_action: asString(continuation.next_action),
-                    reason_code: asString(continuation.reason_code),
-                  }
-                : null,
-          }
-        : null,
+    interaction: Object.keys(interaction).length > 0 ? toInteractionHistorySummary(interaction) : null,
     policy_context: toPolicyContext(payload),
   };
 }

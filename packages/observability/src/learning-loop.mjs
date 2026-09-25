@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { derivePublicId, normalizeIdentifierFragment, validateContractDocument } from "../../contracts/src/index.mjs";
+import { asStringArray } from "../../contracts/src/value-normalization.mjs";
 
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
@@ -24,16 +25,6 @@ function nowIso() {
  */
 function normalizeId(value) {
   return normalizeIdentifierFragment(value);
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
 }
 
 /**

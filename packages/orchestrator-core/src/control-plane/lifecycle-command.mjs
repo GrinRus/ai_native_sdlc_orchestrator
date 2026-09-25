@@ -7,6 +7,7 @@ import { executeImplementedCommand } from "../operator-cli/command-handler.mjs";
 import { startRunJob } from "../run-job.mjs";
 import { createOperatorError } from "./operator-error.mjs";
 import { toLogicalEvidenceRef } from "../aor-home.mjs";
+import { asRecord, asString } from "../shared/value-normalization.mjs";
 
 const LIFECYCLE_COMMANDS = new Set([
   "project init",
@@ -46,24 +47,6 @@ function lifecycleError(code, detail, operation = null) {
 }
 
 /**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
  * @param {string} value
  * @returns {string}
  */
@@ -92,10 +75,6 @@ function hasBlockingValue(value) {
   return typeof value === "object" && value !== null && Object.keys(/** @type {Record<string, unknown>} */ (value)).length > 0;
 }
 
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
 function asStringList(value) {
   if (typeof value === "string" && value.trim().length > 0) {
     return [value.trim()];

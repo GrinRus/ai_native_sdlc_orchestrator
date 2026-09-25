@@ -5,7 +5,8 @@ import path from "node:path";
 import { derivePublicId, loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs"; import { resolveMissionSpecificPlannerCandidate, revisionAdviceForValidationIssue } from "./planner-decomposition.mjs";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toLogicalEvidenceRef, toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
+import { asObject as asRecord, asRecordArray, asStringArray } from "./shared/value-normalization.mjs";
 
 /**
  * @param {string[]} values
@@ -13,34 +14,6 @@ import { toLogicalEvidenceRef } from "./aor-home.mjs";
  */
 function unique(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
-    : [];
 }
 
 /**
@@ -53,10 +26,6 @@ function sanitizeFileSegment(value) {
 
 function stableDigest(value) {
   return `sha256:${crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
-}
-
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 function stableTaskSegment(value, fallback) {

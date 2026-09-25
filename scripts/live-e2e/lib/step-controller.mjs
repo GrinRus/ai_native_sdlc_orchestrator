@@ -6,11 +6,13 @@ import {
   asStringArray,
   fileExists,
   normalizeId,
+  normalizeObservationStatus as toLiveE2eObservationStatus,
   nowIso,
   readJson,
   uniqueStrings,
   writeJson,
 } from "./common.mjs";
+export { toLiveE2eObservationStatus };
 import {
   readStepQualityAssessmentReport,
   requiresAcceptedProductStepQuality,
@@ -72,22 +74,6 @@ const OPERATOR_ACTIONS = Object.freeze([
   "diagnose",
   "block",
 ]);
-
-/**
- * @param {string} status
- * @returns {"pass" | "warn" | "not_pass" | "blocked" | "interaction_required" | "resumed"}
- */
-export function toLiveE2eObservationStatus(status) {
-  const normalized = asNonEmptyString(status).toLowerCase();
-  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
-  if (normalized === "warn" || normalized === "warning" || normalized === "skipped") return "warn";
-  if (normalized === "blocked" || normalized === "block") return "blocked";
-  if (normalized === "interaction_required" || normalized === "interactive" || normalized === "requested") {
-    return "interaction_required";
-  }
-  if (normalized === "resumed") return "resumed";
-  return "not_pass";
-}
 
 /**
  * @param {Record<string, unknown>} profile

@@ -17,6 +17,7 @@ import {
   readYamlDocument,
   resolveOptionalBooleanFlag,
   resolveOptionalStringFlag,
+  runCliEntrypoint,
   uniqueStrings,
   writeJson,
 } from "./lib/common.mjs";
@@ -1305,15 +1306,4 @@ function runCli(rawArgs) {
   throw new UsageError(`Unknown quality-assessment command '${command}'.`);
 }
 
-try {
-  process.exitCode = runCli(process.argv.slice(2));
-} catch (error) {
-  if (error instanceof UsageError) {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  } else {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
-  }
-}
+runCliEntrypoint(runCli);

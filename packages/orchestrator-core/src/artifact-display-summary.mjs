@@ -1,31 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
+import { asRecord, asString, asStringArray, firstNonNullish } from "./shared/value-normalization.mjs";
 
 /**
  * @param {string} value
@@ -245,14 +220,7 @@ function inferStage(family, type, rawRef) {
  */
 function statusFromDocument(document) {
   return (
-    asString(document.status) ??
-    asString(document.overall_status) ??
-    asString(document.overall_decision) ??
-    asString(document.decision) ??
-    asString(document.review_recommendation) ??
-    asString(document.delivery_status) ??
-    asString(document.release_status) ??
-    null
+    firstNonNullish(asString(document.status), asString(document.overall_status), asString(document.overall_decision), asString(document.decision), asString(document.review_recommendation), asString(document.delivery_status), asString(document.release_status), null)
   );
 }
 
@@ -262,12 +230,7 @@ function statusFromDocument(document) {
  */
 function timestampFromDocument(document) {
   return (
-    asString(document.created_at) ??
-    asString(document.updated_at) ??
-    asString(document.decided_at) ??
-    asString(document.finished_at) ??
-    asString(document.started_at) ??
-    null
+    firstNonNullish(asString(document.created_at), asString(document.updated_at), asString(document.decided_at), asString(document.finished_at), asString(document.started_at), null)
   );
 }
 
@@ -383,18 +346,14 @@ export function buildArtifactDisplaySummary(options) {
   const family = asString(options.family);
   const document = asRecord(options.document);
   const rawRef =
-    asString(options.rawRef) ??
-    asString(options.artifactRef) ??
-    asString(options.sourceRef) ??
-    asString(options.file) ??
-    "artifact://unknown";
+    firstNonNullish(asString(options.rawRef), asString(options.artifactRef), asString(options.sourceRef), asString(options.file), "artifact://unknown");
   const type = asString(options.type) ?? inferType(family, rawRef);
   const stage = asString(options.stage) ?? inferStage(family, type, rawRef);
   const status = asString(options.status) ?? statusFromDocument(document) ?? "ready";
   const label = asString(options.label) ?? labelFromDocument(document, family, rawRef);
   const description = asString(options.description) ?? descriptionFromDocument(document, type, status);
   const timestamp = asString(options.timestamp) ?? timestampFromDocument(document) ?? timestampFromFile(asString(options.file));
-  const sourceRef = asString(options.sourceRef) ?? asString(options.artifactRef) ?? rawRef;
+  const sourceRef = firstNonNullish(asString(options.sourceRef), asString(options.artifactRef), rawRef);
 
   return {
     type,

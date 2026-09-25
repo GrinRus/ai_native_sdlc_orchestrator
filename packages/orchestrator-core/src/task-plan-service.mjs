@@ -13,20 +13,7 @@ import { resolveExecutionUnitWorkspace } from "./execution-unit-workspace.mjs";
 import { resolveOverallTaskProgressStatus, resolveTaskProgressStatus } from "./task-progress-projection.mjs";
 import { deriveWorkspaceProjectId, resolveLogicalEvidenceRef, toLogicalEvidenceRef } from "./aor-home.mjs";
 import { normalizeSemanticEvaluation } from "./semantic-evaluation.mjs";
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-function asRecordArray(value) {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry)) : [];
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
+import { asRecord, asRecordArray, asStringArray } from "./shared/value-normalization.mjs";
 
 function unique(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))];

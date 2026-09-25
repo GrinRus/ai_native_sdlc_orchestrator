@@ -8,8 +8,6 @@ import {
   handleFlowPlanAction,
   handleLifecycleCommandAction,
   handleQualityRepairAction,
-  handleOperatorRequestAction,
-  handleOperatorRequestCreate,
   handleProjectAction,
   handleFolderPickerAction,
   handleIntentSubmissionAction,
@@ -20,6 +18,7 @@ import {
   handleRunControlAction,
   handleUiLifecycleAction,
 } from "./http-mutation-handlers.mjs";
+import { handleOperatorRequestAction, handleOperatorRequestCreate } from "./http-operator-request-handlers.mjs";
 import { readProjectTopology } from "../topology-management.mjs";
 import { readExecutionProfile } from "../execution-profile.mjs";
 import { handleReadRoute } from "./http-read-handlers.mjs";

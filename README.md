@@ -127,10 +127,12 @@ In the Task Workspace:
 1. Select or connect a project.
 2. Choose **New task**, describe the outcome, and optionally add Markdown
    source material.
-3. Choose **Prepare task**. Preparation is read-only and does not authorize
-   source changes.
+3. Choose **Prepare task**. Preparation may invoke the selected ready runner to
+   normalize the brief, but it is read-only and does not authorize source
+   changes.
 4. Review the prepared outcome, acceptance criteria, scope, runner, and safety
-   mode.
+   mode. Choose a task-scoped route override or keep the project default; the
+   choice stays with that Task and is checked before it starts.
 5. Choose **Start task**, then follow activity, attention, changes, checks, and
    evidence through completion.
 
@@ -142,9 +144,11 @@ AOR never stages, commits, or pushes those files. Source changes requested by a
 Task begin only after **Start task** and remain bounded by its selected delivery
 and write-back policy.
 
-From an active Task, **Ask AOR** creates a durable operator request rather than
-a direct chat session. It passes through the same scope, policy, and
-evidence-producing runtime as CLI and API execution.
+From a prepared, active, attention, or review Task, **Ask AOR** submits a
+durable bounded operator request rather than opening a direct chat session.
+The Task Workspace runs it through the same scope, policy, and evidence-
+producing runtime as CLI and API execution. If execution is interrupted, the
+request remains available to resume from the Task.
 
 ### Credential-free UI smoke
 
@@ -172,6 +176,47 @@ pnpm aor task start \
   --submission-id <submission-id> \
   --json
 ```
+
+To start a prepared Task with a task-scoped execution runner, check that exact
+approved route first and pass it to `task start`:
+
+```bash
+pnpm aor route check \
+  --project-id <workspace-project-id> \
+  --step implement \
+  --route route.implement.default \
+  --json
+pnpm aor task start \
+  --project-id <workspace-project-id> \
+  --submission-id <submission-id> \
+  --route route.implement.default \
+  --json
+```
+
+The route must be approved for the prepared Task's execution step. Start checks
+its current readiness before confirming the Task. Omitting `--route` keeps the
+Task's saved selection or follows the project default. Use
+`--use-project-default true` to clear a saved Task override.
+
+To choose a specific preparation runner from the CLI, check its exact approved
+route first, then pass that route when preparing:
+
+```bash
+pnpm aor route check \
+  --project-id <workspace-project-id> \
+  --step discovery \
+  --route route.intake-normalize.default \
+  --json
+pnpm aor task prepare \
+  --project-id <workspace-project-id> \
+  --preparation-route route.intake-normalize.default \
+  --request "Review authorization and fix timeout handling" \
+  --json
+```
+
+If the selected route is not ready, `task prepare` fails before saving an
+intent submission. Omitting `--preparation-route` keeps automatic selection
+for a ready supported runner.
 
 </details>
 

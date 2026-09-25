@@ -8,21 +8,24 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("Task Workspace exposes all eight server-owned screens and safe Markdown preview", () => {
   const source = fs.readFileSync(path.join(root, "src/task-workspace.jsx"), "utf8");
+  const askAorSource = fs.readFileSync(path.join(root, "src/task-ask-aor-panel.jsx"), "utf8");
+  const markdownSource = fs.readFileSync(path.join(root, "src/task-markdown-source-dialog.jsx"), "utf8");
+  const dialogSource = fs.readFileSync(path.join(root, "src/dialog.jsx"), "utf8");
   for (const label of ["Tasks Home", "New Task", "Markdown Sources", "Prepared Task", "Active Task Workspace", "Attention", "Review Changes", "Completion & Evidence"]) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
     assert.match(source, new RegExp(escapedLabel, "u"));
   }
-  assert.match(source, /sanitizeMarkdown/u);
-  assert.doesNotMatch(source, /dangerouslySetInnerHTML/u);
+  assert.match(markdownSource, /sanitizeMarkdown/u);
+  assert.doesNotMatch(`${source}\n${markdownSource}`, /dangerouslySetInnerHTML/u);
   assert.match(source, /server-owned Task projection/u);
   assert.match(source, /Draft/u);
   assert.match(source, /Tasks are temporarily unavailable/u);
   assert.match(source, /setFocusedTaskId/u);
   assert.match(source, /onTaskAction/u);
-  assert.match(source, /request\("request"/u);
+  assert.match(askAorSource, /onTaskAction\?\.\(task, "request"/u);
   assert.match(source, /onReviewDecision/u);
   assert.match(source, /taskHasCompletionProof/u);
-  assert.match(source, /Ask AOR/u);
+  assert.match(askAorSource, /Ask AOR/u);
   assert.match(source, /actionBusy/u);
   assert.match(source, /Start follow-up task/u);
   assert.match(source, /Task completed/u);
@@ -37,7 +40,8 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /task-context-tabs/u);
   assert.match(source, /pendingSource/u);
   assert.match(source, /Digest:/u);
-  assert.match(source, /aria-modal="true"/u);
+  assert.match(markdownSource, /<Dialog/u);
+  assert.match(dialogSource, /aria-modal="true"/u);
   assert.match(source, /approvedRunnerOptions/u);
   assert.match(source, /onSelectRunner/u);
   assert.match(source, /No approved execution route is published/u);
@@ -56,7 +60,8 @@ test("web client reads bounded Task review evidence separately from the Task lis
   assert.match(source, /async function reviewTask/u);
   assert.match(source, /review decide/u);
   assert.match(source, /execution-profile/u);
-  assert.match(source, /expected_revision: executionProfile\.revision/u);
+  assert.match(source, /const revision = executionProfile\?\.revision/u);
+  assert.match(source, /expected_revision: revision/u);
   assert.match(source, /liveRunIds/u);
   assert.match(source, /liveRunIds\.map/u);
   assert.match(source, /setSelectedTaskId\(taskId\)/u);

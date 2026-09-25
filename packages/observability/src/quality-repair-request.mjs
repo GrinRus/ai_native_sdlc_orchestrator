@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
+import { asRecord, asString, asStringArray, asRecordArray } from "../../contracts/src/value-normalization.mjs";
 
 const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/;
 const QUALITY_REPAIR_STATUSES = new Set([
@@ -47,34 +48,6 @@ function normalizeId(value) {
     normalized.pop();
   }
   return normalized.join("");
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
 }
 
 /**
@@ -447,16 +420,6 @@ export function updateQualityRepairRequest(options) {
     requestRef,
     lineage: buildQualityRepairLineage(request, requestRef),
   };
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
-    : [];
 }
 
 /**

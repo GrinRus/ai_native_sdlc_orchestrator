@@ -2,16 +2,9 @@ import crypto from "node:crypto";
 import path from "node:path";
 
 import { withFileLock } from "../../observability/src/index.mjs";
+import { asString, uniqueNonBlankStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 const REQUEST_TRANSACTION_LOCK = ".operator-request.transaction.lock";
-
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function uniqueStrings(values) {
-  return [...new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0))];
-}
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map((entry) => stableJson(entry)).join(",")}]`;

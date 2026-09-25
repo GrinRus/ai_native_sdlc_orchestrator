@@ -43,6 +43,16 @@ export function readRunJobFile(file) {
   return fs.existsSync(file) ? readJson(file) : null;
 }
 
+export function readRunJobStatus({ runtimeLayout, runId }) {
+  if (!runtimeLayout || !validatePublicId(runId).ok) return null;
+  const file = jobPath(runtimeLayout, derivePublicId([runId, "job"], "job"));
+  let job;
+  try { job = readRunJobFile(file); } catch { return null; }
+  return job?.run_id === runId && RUN_JOB_STATUSES.includes(job.status) && Number.isInteger(job.revision) && job.revision >= 0
+    ? { run_id: runId, status: job.status }
+    : null;
+}
+
 export function updateRunJobFile(file, update, expectedRevision, expectedFencingToken) {
   const lock = `${file}.lock`;
   return withFileLock(lock, () => {

@@ -1,38 +1,4 @@
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
-}
+import { asRecord, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
 
 /**
  * @param {string} value
@@ -84,7 +50,7 @@ export function normalizeProfileRepos(profile) {
         repo_id: repoId,
         name: asString(repo.name) ?? repoId,
         role: asString(repo.role) ?? "unspecified",
-        default_branch: asString(repo.default_branch) ?? asString(source.default_ref) ?? "main",
+        default_branch: firstNonNullish(asString(repo.default_branch), asString(source.default_ref), "main"),
         source_kind: sourceKind,
         source_root: sourceRoot,
         remote_url: asString(source.remote_url),
@@ -111,14 +77,14 @@ export function normalizeRepoGraph(profile) {
   return edges
     .map((entry) => {
       const edge = asRecord(entry);
-      const fromRepoId = asString(edge.from_repo_id) ?? asString(edge.from) ?? asString(edge.source_repo_id);
-      const toRepoId = asString(edge.to_repo_id) ?? asString(edge.to) ?? asString(edge.target_repo_id);
+      const fromRepoId = firstNonNullish(asString(edge.from_repo_id), asString(edge.from), asString(edge.source_repo_id));
+      const toRepoId = firstNonNullish(asString(edge.to_repo_id), asString(edge.to), asString(edge.target_repo_id));
       if (!fromRepoId || !toRepoId) return null;
 
       return {
         from_repo_id: fromRepoId,
         to_repo_id: toRepoId,
-        relationship: asString(edge.relationship) ?? asString(edge.kind) ?? "dependency",
+        relationship: firstNonNullish(asString(edge.relationship), asString(edge.kind), "dependency"),
         validation_refs: uniqueStrings(
           asStringArray(edge.validation_refs).length > 0
             ? asStringArray(edge.validation_refs)

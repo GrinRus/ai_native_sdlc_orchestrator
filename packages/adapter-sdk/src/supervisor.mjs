@@ -1,8 +1,5 @@
 import { spawnSync } from "node:child_process";
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
+import { asRecord, firstNonNullish } from "../../contracts/src/value-normalization.mjs";
 
 function asOptionalString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -51,7 +48,7 @@ export function runSupervisedProcessSync(options) {
     const parsed = asRecord(JSON.parse(stdout));
     const errorCode = asOptionalString(parsed.error_code);
     const errorMessage = asOptionalString(parsed.error_message);
-    const error = errorCode || errorMessage ? new Error(errorMessage ?? errorCode ?? "External runtime failed.") : null;
+    const error = errorCode || errorMessage ? new Error(firstNonNullish(errorMessage, errorCode, "External runtime failed.")) : null;
     if (error && errorCode) Object.assign(error, { code: errorCode });
     return {
       status: typeof parsed.status === "number" ? parsed.status : null,

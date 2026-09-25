@@ -10,11 +10,13 @@ import {
   asRecord,
   asStringArray,
   normalizeId,
+  normalizeObservationStatus,
   nowIso,
   parseFlags,
   readYamlDocument,
   readJson,
   resolveOptionalStringFlag,
+  runCliEntrypointIfMain,
 } from "./lib/common.mjs";
 import { prepareOperatorDecisionArtifact } from "./lib/decision-helper.mjs";
 import { writeStepQualityAssessmentReports as writeStepQualityAssessmentReportsForEntries } from "./lib/step-quality-assessment.mjs";
@@ -23,22 +25,6 @@ const CURRENT_FILE = fileURLToPath(import.meta.url);
 const SCRIPT_DIR = path.dirname(CURRENT_FILE);
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
 const REQUIRED_PHASES = Object.freeze(["plan", "execute", "inspect", "classify", "decide", "persist"]);
-
-/**
- * @param {string} status
- * @returns {"pass" | "warn" | "not_pass" | "blocked" | "interaction_required" | "resumed"}
- */
-function normalizeObservationStatus(status) {
-  const normalized = asNonEmptyString(status).toLowerCase();
-  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
-  if (normalized === "warn" || normalized === "warning" || normalized === "skipped") return "warn";
-  if (normalized === "blocked" || normalized === "block") return "blocked";
-  if (normalized === "interaction_required" || normalized === "interactive" || normalized === "requested") {
-    return "interaction_required";
-  }
-  if (normalized === "resumed") return "resumed";
-  return "not_pass";
-}
 
 /**
  * @param {Record<string, unknown>} report
@@ -268,7 +254,6 @@ export function resolveEvaluatorRunProfileArgs(rawArgs) {
   return [...rawArgs, "--run-id", generatedRunId];
 }
 
-
 /**
  * @param {string[]} rawArgs
  */
@@ -411,17 +396,4 @@ function runCli(rawArgs) {
   return unresolvedAction || terminalFailure ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === CURRENT_FILE) {
-  try {
-    process.exitCode = runCli(process.argv.slice(2));
-  } catch (error) {
-    if (error instanceof UsageError) {
-      process.stderr.write(`${error.message}\n`);
-      process.exitCode = 1;
-    } else {
-      const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`${message}\n`);
-      process.exitCode = 1;
-    }
-  }
-}
+runCliEntrypointIfMain(import.meta.url, runCli);

@@ -1,5 +1,7 @@
 schema_version: 1
 source: project-default
+selection_revision: 0
+step: implement
 route_id: route.implement.default
 readiness: unknown
 requested_model: null

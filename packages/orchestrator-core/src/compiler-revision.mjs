@@ -1,46 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { normalizeIdentifierFragment as normalizeForId, validateContractDocument } from "../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { asRecord, asString, uniqueNonBlankStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 const ACTIONS = new Set(["inspect", "promote", "freeze", "demote"]);
 const COMPATIBILITY_STATUSES = new Set(["compatible", "incompatible", "unknown"]);
 const PROMOTION_DECISION_REGEX = /^promotion-decision-.*\.json$/u;
 const COMPILER_REVISION_STATUS_REGEX = /^compiler-revision-status-.*\.json$/u;
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function normalizeForId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values.filter((entry) => typeof entry === "string" && entry.trim().length > 0))];
-}
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init

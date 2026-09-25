@@ -233,6 +233,33 @@ test("operator request create/run routes request ref through compiled context an
   });
 });
 
+test("Task Workspace operator requests persist a resumable run-pending state before execution", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const created = createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      sourceSurface: "task-workspace",
+      targetStage: "readiness",
+      intentType: "analyze",
+      requestText: "Inspect the prepared Task before starting it.",
+      targetRefs: ["README.md"],
+      queueForRun: true,
+    });
+    assert.equal(created.status, "run-pending");
+    const queued = getOperatorRequestStatus({ cwd: repoRoot, projectRef: repoRoot, requestRef: created.operatorRequestRef });
+    assert.equal(queued.status, "run-pending");
+    assert.equal(queued.operatorRequest.execution.recovery_action, "request run");
+
+    const resumed = runOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      requestRef: created.operatorRequestRef,
+    });
+    assert.equal(resumed.status, "completed");
+    assert.equal(getOperatorRequestStatus({ cwd: repoRoot, projectRef: repoRoot, requestRef: created.operatorRequestRef }).status, "completed");
+  });
+});
+
 test("operator request creation is idempotent and a stale running request resumes once", async () => {
   await withTempRepo(async (repoRoot) => {
     const first = createOperatorRequest({

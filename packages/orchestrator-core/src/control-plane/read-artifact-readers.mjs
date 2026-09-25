@@ -15,6 +15,8 @@ import {
   readLatestExternalRunHealthProjectionForRuntime,
 } from "./external-run-health-read-model.mjs";
 import { buildOnboardingSummary } from "./onboarding-summary.mjs";
+import { asRecord, asString, asStringArray, firstNonNullish } from "../shared/value-normalization.mjs";
+import { listJsonFilesByModificationTime } from "../shared/json-files.mjs";
 
 const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
 const WAVE_TICKET_REGEX = /^wave-ticket-.*\.json$/;
@@ -56,22 +58,6 @@ function asNonNegativeInteger(value) {
     return undefined;
   }
   return Math.floor(parsed);
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 /**
@@ -135,25 +121,7 @@ function withDisplaySummary(entry) {
  * @returns {string[]}
  */
 export function listJsonFiles(dirPath, options = {}) {
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-
-  const files = fs
-    .readdirSync(dirPath)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => path.join(dirPath, entry))
-    .sort((left, right) => {
-      const leftStat = fs.statSync(left);
-      const rightStat = fs.statSync(right);
-      const mtimeDelta = rightStat.mtimeMs - leftStat.mtimeMs;
-      if (mtimeDelta !== 0) {
-        return mtimeDelta;
-      }
-      return path.basename(right).localeCompare(path.basename(left));
-    });
-
-  return applyReadModelLimit(files, options.limit);
+  return applyReadModelLimit(listJsonFilesByModificationTime(dirPath), options.limit);
 }
 
 /**
@@ -310,7 +278,7 @@ function loadReadableEvidenceSidecarSummaries(options) {
       document,
       type: options.type,
       stage: options.stage,
-      label: asString(document.title) ?? asString(document.packet_id) ?? options.fallbackLabel,
+      label: firstNonNullish(asString(document.title), asString(document.packet_id), options.fallbackLabel),
       description: asString(document.summary) ?? options.fallbackDescription,
       status: "ready",
     }));
@@ -433,16 +401,6 @@ function readLatestReportSidecar(init, matcher) {
 
 /**
  * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
  * @returns {Map<string, Record<string, unknown>>}
  */
 function commandGroupIndex(value) {
@@ -515,7 +473,7 @@ function verificationFailureStepResultSurface(init, refs) {
  */
 function verificationPlanCommandGroupSurface(group, latestGroup, init) {
   const latestStatus = asString(latestGroup?.status);
-  const status = latestStatus ?? asString(group.status) ?? "planned";
+  const status = firstNonNullish(latestStatus, asString(group.status), "planned");
   const skipPolicy = asRecord(group.skip_policy);
   const stepResultRefs =
     Array.isArray(latestGroup?.step_result_refs)
@@ -551,17 +509,11 @@ function verificationPlanCommandGroupSurface(group, latestGroup, init) {
     status,
     last_result_status: latestStatus,
     outcome:
-      asString(latestGroup?.outcome) ??
-      asString(latestGroup?.command_group_outcome) ??
-      asString(group.outcome) ??
-      asString(group.command_group_outcome) ??
-      asString(skipPolicy.outcome),
+      firstNonNullish(asString(latestGroup?.outcome), asString(latestGroup?.command_group_outcome), asString(group.outcome), asString(group.command_group_outcome), asString(skipPolicy.outcome)),
     failed_command_count: failedCommandCount,
     failed_step_result_refs: failedStepResultRefs,
     blocked_next_step:
-      asString(latestGroup?.blocked_next_step) ??
-      asString(group.blocked_next_step) ??
-      failureSurface.blockedNextStep,
+      firstNonNullish(asString(latestGroup?.blocked_next_step), asString(group.blocked_next_step), failureSurface.blockedNextStep),
     command_source: asString(group.command_source),
     step_result_refs: stepResultRefs,
   };
@@ -592,7 +544,7 @@ function readVerificationPlanSurface(init) {
   });
   return {
     status: asString(planDocument.status) ?? (commandGroups.length > 0 ? "planned" : "no-tests"),
-    verification_label: asString(planDocument.verification_label) ?? asString(summaryDocument.verification_label) ?? "default",
+    verification_label: firstNonNullish(asString(planDocument.verification_label), asString(summaryDocument.verification_label), "default"),
     plan_file: plan?.file ?? null,
     plan_ref: plan?.artifact_ref ?? null,
     latest_summary_file: summary?.file ?? null,

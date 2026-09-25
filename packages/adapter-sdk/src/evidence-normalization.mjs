@@ -1,6 +1,4 @@
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
+import { asRecord } from "../../contracts/src/value-normalization.mjs";
 
 export function normalizeSemanticEvents(output, status) {
   if (Array.isArray(output.semantic_events)) {

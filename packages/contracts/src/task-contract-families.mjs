@@ -28,6 +28,7 @@ export const TASK_CONTRACT_FAMILIES = Object.freeze([
       run_ids: "array", lineage: "object", source_items: "array", attention_items: "array",
       review: "object", completion: "object", lifecycle_path: "object", runner_selection: "object",
       primary_action: "object", prepared_contract: "object", completed_read_only: "boolean", read_only: "boolean",
+      run_state: "object",
     },
     enumChecks: [{ field: "status", allowedValues: ["draft", "prepared", "active", "attention", "completed"] }],
   },
@@ -51,7 +52,7 @@ export const TASK_CONTRACT_FAMILIES = Object.freeze([
     fieldTypes: { schema_version: "number", source: "string", readiness: "string", recovery_action: "string" },
     enumChecks: [
       { field: "source", allowedValues: ["project-default", "task-override"] },
-      { field: "readiness", allowedValues: ["ready", "unknown", "stale", "unavailable", "blocked"] },
+      { field: "readiness", allowedValues: ["ready", "unknown", "stale", "unavailable", "blocked", "unconfigured", "runner-missing", "auth-missing", "model-unsupported", "capability-mismatch", "policy-denied"] },
     ],
   },
   {

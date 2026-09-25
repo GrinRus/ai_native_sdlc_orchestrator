@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile } from "../../contracts/src/index.mjs";
+import { asRecord } from "../../contracts/src/value-normalization.mjs";
 
 const SUPPORTED_STEP_CLASSES = Object.freeze([
   "discovery",
@@ -15,14 +16,6 @@ const SUPPORTED_STEP_CLASSES = Object.freeze([
   "eval",
   "harness",
 ]);
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
 
 /**
  * @param {{

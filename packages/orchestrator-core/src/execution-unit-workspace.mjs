@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { asStringArray as strings } from "./shared/value-normalization.mjs";
 
 function record(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
@@ -9,10 +10,6 @@ function record(value) {
 
 function records(value) {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "object" && entry !== null) : [];
-}
-
-function strings(value) {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()) : [];
 }
 
 function readJson(file) {

@@ -1013,12 +1013,30 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
           request_text: "Inspect the bounded discovery blocker without writing to the checkout.",
         },
       );
-      assert.equal(taskRequestResponse.status, 201);
+      assert.ok([200, 202].includes(taskRequestResponse.status));
       const taskRequestPayload = await taskRequestResponse.json();
       assert.equal(taskRequestPayload.readback.durable, true);
       assert.equal(taskRequestPayload.readback.task_id, guidedTask.task_id);
       assert.equal(taskRequestPayload.operator_request.document.target_flow_id, guidedTask.flow_id);
+      assert.equal(taskRequestPayload.operator_request.status, taskRequestResponse.status === 200 ? "completed" : "run-pending");
+      assert.equal(taskRequestPayload.operator_request_run.status, taskRequestPayload.operator_request.status);
+      if (taskRequestResponse.status === 200) assert.ok(taskRequestPayload.operator_request_run.compiled_context_ref);
+      else assert.equal(taskRequestPayload.operator_request_run.recovery_action, "request run");
+      assert.ok(taskRequestPayload.readback.evidence_refs.includes(taskRequestPayload.operator_request.operator_request_ref));
       assert.equal(Object.hasOwn(taskRequestPayload.operator_request.document, "request_text"), false);
+
+      const replayedTaskRequestResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(guidedTask.task_id)}/actions`,
+        {
+          action: "request",
+          request_text: "Inspect the bounded discovery blocker without writing to the checkout.",
+        },
+      );
+      assert.ok([200, 202].includes(replayedTaskRequestResponse.status));
+      const replayedTaskRequestPayload = await replayedTaskRequestResponse.json();
+      assert.equal(replayedTaskRequestPayload.operator_request.request_id, taskRequestPayload.operator_request.request_id);
+      assert.equal(replayedTaskRequestPayload.operator_request_run.run_id ?? null, taskRequestPayload.operator_request_run.run_id ?? null);
+      assert.equal(replayedTaskRequestPayload.operator_request_run.idempotent, true);
 
       const missingTaskResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks/task.missing`);
       assert.equal(missingTaskResponse.status, 404);
@@ -1870,6 +1888,17 @@ test("intent submission API preserves immutable input and creates normalization 
   await withTempRepo(async (projectRoot) => {
     const transport = await createControlPlaneHttpServer({ cwd: projectRoot, projectRef: projectRoot, host: "127.0.0.1", port: 0 });
     try {
+      const submissionsBefore = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`);
+      assert.equal(submissionsBefore.status, 200);
+      const prematureSubmission = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`, {
+        request_text: "Do not persist a task with an unchecked preparation runner.",
+        preparation_route_id: "route.intake-normalize.default",
+      });
+      assert.equal(prematureSubmission.status, 409);
+      assert.ok(["intent_provider.not_ready", "intent_provider.not_checked"].includes((await prematureSubmission.json()).error.code));
+      const submissionsAfter = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`);
+      assert.equal((await submissionsAfter.json()).submissions.length, (await submissionsBefore.json()).submissions.length);
+
       const createResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`, {
         request_text: "Review timeout handling.",
         attachments: [{ name: "acceptance.md", content: "Timeout failures remain actionable." }],
@@ -1880,6 +1909,20 @@ test("intent submission API preserves immutable input and creates normalization 
       assert.equal(created.submission.status, "submitted");
       assert.equal(created.submission.attachments[0].original_name, "acceptance.md");
       assert.equal(Object.hasOwn(created.submission.attachments[0], "absolute_path"), false);
+
+      const continueResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`, {
+        request_text: "Keep the same acceptance source while revising the outcome.",
+        source_submission_id: created.submission.submission_id,
+        source_ids: [`${created.submission.submission_id}.source.1`],
+        auto_prepare: false,
+      });
+      assert.equal(continueResponse.status, 202);
+      const continued = await continueResponse.json();
+      assert.deepEqual(continued.submission.source_lineage, {
+        source_submission_id: created.submission.submission_id,
+        source_ids: [`${created.submission.submission_id}.source.1`],
+      });
+      assert.equal(continued.submission.attachments[0].sha256, created.submission.attachments[0].sha256);
 
       const reviseResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
         action: "revise",
@@ -1960,6 +2003,23 @@ test("intent submission API preserves immutable input and creates normalization 
       assert.equal(staleTaskAction.status, 409);
       assert.equal((await staleTaskAction.json()).error.code, "intent_submission.stale_revision");
 
+      const runnerSelectionResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(preparedTask.task_id)}/actions`, {
+        action: "select-runner",
+        route_id: "route.review.default",
+        expected_revision: latestRevision.report.revision,
+        expected_selection_revision: 0,
+      });
+      assert.equal(runnerSelectionResponse.status, 200);
+      const runnerSelection = await runnerSelectionResponse.json();
+      assert.deepEqual(runnerSelection.runner_selection, { route_id: "route.review.default", step: "review" });
+      assert.equal(runnerSelection.selection_revision, 1);
+      assert.equal(runnerSelection.readback.durable, true);
+      const refreshedTasks = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks`);
+      const selectedTask = (await refreshedTasks.json()).tasks.find((task) => task.task_id === preparedTask.task_id);
+      assert.equal(selectedTask.runner_selection.source, "task-override");
+      assert.equal(selectedTask.runner_selection.route_id, "route.review.default");
+      assert.equal(selectedTask.runner_selection.selection_revision, 1);
+
       const confirmResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
         action: "confirm",
         expected_revision: latestRevision.report.revision,
@@ -1992,6 +2052,38 @@ test("intent submission API preserves immutable input and creates normalization 
       assert.equal(current.submission.request_text, "Review timeout handling.");
       assert.equal(current.normalization.title, "Review authorization timeout handling");
       assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("Task intent.resume action retries preparation and publishes the blocked recovery state", async () => {
+  await withTempRepo(async (projectRoot) => {
+    const transport = await createControlPlaneHttpServer({ cwd: projectRoot, projectRef: projectRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const createResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`, {
+        request_text: "Prepare this task after a task-preparation runner is configured.",
+        auto_prepare: false,
+      });
+      assert.equal(createResponse.status, 202);
+      const created = await createResponse.json();
+      const taskListUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/tasks`;
+      const initialTasks = await getJson(taskListUrl);
+      const initialTask = (await initialTasks.json()).tasks.find((task) => task.lineage.intent_submission_id === created.submission.submission_id);
+      assert.ok(initialTask);
+      assert.equal(initialTask.primary_action.action_id, "intent.resume");
+
+      const resumeResponse = await postJson(`${taskListUrl}/${encodeURIComponent(initialTask.task_id)}/actions`, { action: "intent.resume" });
+      assert.equal(resumeResponse.status, 409);
+      assert.equal((await resumeResponse.json()).error.code, "intent_provider.not_ready");
+
+      const blockedTasks = await getJson(taskListUrl);
+      const blockedTask = (await blockedTasks.json()).tasks.find((task) => task.task_id === initialTask.task_id);
+      assert.equal(blockedTask.status, "attention");
+      assert.equal(blockedTask.status_detail, "blocked");
+      assert.equal(blockedTask.primary_action.action_id, "intent.resume");
+      assert.equal(blockedTask.primary_action.available, true);
     } finally {
       await transport.close();
     }
