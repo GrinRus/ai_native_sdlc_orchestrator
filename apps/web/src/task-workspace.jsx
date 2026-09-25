@@ -163,14 +163,14 @@ function approvedRunnerOptions(executionProfile, step, runnerSelection) {
   return options;
 }
 
-function taskStatusLabel(task) { return { queued: "Queued", running: "Running", paused: "Paused", "waiting-input": "Waiting for input", canceling: "Stopping", succeeded: "Run succeeded", failed: "Run failed", canceled: "Canceled" }[task?.run_state?.status] || { draft: "Draft", prepared: "Ready", completed: "Completed", attention: "Needs attention", failed: "Failed", blocked: "Blocked", active: "Running", running: "Running" }[task?.status] || "Status unavailable"; }
+function taskStatusLabel(task) { return { queued: "Queued", running: "Running", paused: "Paused", "waiting-input": "Waiting for input", canceling: "Stopping", succeeded: "Run succeeded", failed: "Run failed", canceled: "Canceled" }[task?.run_state?.status] || { draft: "Draft", prepared: "Ready", completed: "Completed", attention: "Needs attention", failed: "Failed", blocked: "Blocked", active: "In progress", running: "Running" }[task?.status] || "Status unavailable"; }
 
 function taskStatusTone(task) { return { paused: "warning", canceling: "warning", failed: "warning", canceled: "warning" }[task?.run_state?.status] || { completed: "neutral", draft: "neutral", prepared: "success", attention: "warning", failed: "warning", blocked: "warning", active: "success", running: "success" }[task?.status] || "warning"; }
 
 function taskRuntimeControls(task) {
   const status = task?.run_state?.status;
   const control = { paused: { action: "resume", canStop: true }, running: { action: "pause", canStop: true } }[status];
-  return control ?? { action: status ? null : "pause", canStop: !status };
+  return control ?? { action: null, canStop: false };
 }
 
 function operatorControlLabel(control, fallback) { const label = typeof control === "string" ? control : control?.label; return typeof label === "string" && label.trim() ? label.trim() : fallback; }
