@@ -699,12 +699,12 @@ export async function handleTaskAction({ request, response, params, registry, ru
         return;
       }
       const flags = {};
+      const operation = task.primary_action?.operator_control?.operation;
+      if (operation?.command === definition.lifecycle_command) Object.assign(flags, operation.flags);
       if (action === "discovery-run" && task.intent_submission_ref) {
         flags["input-packet"] = resolveTaskInputPacketPath(task.intent_submission_ref, runtimeOptions, params.projectId);
       }
-      if (["review-run", "learning-handoff"].includes(action) && task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];
       if (["delivery-prepare", "release-prepare"].includes(action)) {
-        if (task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];
         flags.mode = task.prepared_contract?.delivery_mode ?? "no-write";
         flags["require-review-decision"] = true;
       }
@@ -716,11 +716,8 @@ export async function handleTaskAction({ request, response, params, registry, ru
         && commandDefinition?.inputs?.some((input) => input.startsWith("--route-overrides "))) {
         flags["route-overrides"] = `${taskRunner.step}=${taskRunner.route_id}`;
       }
-      for (const [key, value] of Object.entries(payload)) {
-        if (["action", "expected_revision", "expected_selection_revision", "command_id", "request_text", "allowed_paths", "intent_type"].includes(key)) continue;
-        if (value !== undefined) flags[key] = value;
-      }
-      if (action === "review-quality-repair") flags["run-id"] = task.primary_action?.operator_control?.operation?.command === definition.lifecycle_command ? asString(task.primary_action.operator_control.operation.flags?.["run-id"]) : undefined;
+      for (const key of Object.keys(definition.payload)) if (payload[key] !== undefined) flags[key] = payload[key];
+      if (["review run", "learning handoff", "run start"].includes(definition.lifecycle_command)) flags["run-id"] ??= null;
       const lifecycle = runLifecycleCommand({
         ...runtimeOptions,
         cwd: runtimeOptions.cwd ?? runtimeOptions.projectRef,

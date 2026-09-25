@@ -31,6 +31,10 @@ catalog parity tests and the S14 UI wiring handoff.
 `review-quality-repair` reruns review against the completed repair run selected
 by the current server-published action. The API consumes its structured
 `operator_control.operation`; callers do not choose or copy the run ID.
+`run-review-quality-repair` and `run-qa-quality-repair` start the requested
+implementation repair, while `qa-quality-repair` starts post-repair QA. These
+no-payload actions execute only their server-published structured operation,
+including its run ID, target step, and selected evidence refs.
 
 A successful `follow-up` response includes the full durable readback of the
 completed source Task and `new_intent_submission_id`. Clients use that
