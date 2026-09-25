@@ -101,8 +101,7 @@ must preserve the accepted submission for recovery without submitting it again.
    resume through its published action or open a linked edit where the operator
    can check a different preparation runner while carrying selected sources
    forward.
-7. **Review Changes** — review file tree, Markdown/code diff, checks, and
-   delivery effects before accepting or requesting revision.
+7. **Review Changes** — run the server-published review action when evidence is missing; then inspect file changes, checks, and delivery effects before accepting or requesting revision.
 8. **Completion and Evidence** — inspect outcome, verification, delivery, and
    evidence lineage; primary action `Start follow-up task`.
 
