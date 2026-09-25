@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "863b459f6efcc3736467b2e65f81d1b98e00b638466cdd352d0ed712bb677d63",
+  "source_hash": "9a770fe0f3d66f5b43e05f9c56ee5d4b1560827b00d14fce5589a689aa66d64c",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -26,12 +26,12 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-C_jTNxw5.css",
-    "apps/web/dist/assets/index-DLDqIe0o.js",
+    "apps/web/dist/assets/index-Cc7sAp2T.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
     "apps/web/dist/assets/index-C_jTNxw5.css": "8a17352da322083932945f970b12c26d8bf591acf1df769c7d051665c786507d",
-    "apps/web/dist/assets/index-DLDqIe0o.js": "7ee24bd540a7d32b44e5c992a36aa00a5eee845a1c7e3195157b819638dcbe77",
-    "apps/web/dist/index.html": "33bf33c3e2a0fd6011985b0c4197f0f170192b1bbf3af1fb70d0a1c3bb456654"
+    "apps/web/dist/assets/index-Cc7sAp2T.js": "7d82bed46e1af5234014c810783044216033aa89b8417f6aa12bc1d10ff07131",
+    "apps/web/dist/index.html": "1936060d25150f0462168d32a483cf6fdaa7120fb43a1b64027bdc010cf0bf05"
   }
 }

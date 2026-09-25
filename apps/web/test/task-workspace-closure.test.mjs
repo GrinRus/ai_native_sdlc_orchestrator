@@ -39,9 +39,10 @@ test("W70-S08 closure fixture covers every source, lifecycle, and recovery branc
 });
 
 test("Task Workspace source and runner states remain query-safe and fail closed", () => {
-  for (const marker of ["stale", "runner_selection", "Readiness checks do not start a runner"]) {
+  for (const marker of ["stale", "runner_selection"]) {
     assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "iu"));
   }
+  assert.match(runnerSource, /Readiness checks do not start a runner/iu);
   assert.match(markdownSource, /Upload Markdown/u);
   assert.match(markdownSource, /kind: "repository-markdown"/u);
   for (const querySurface of [source, runnerSource, markdownSource]) {

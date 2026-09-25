@@ -110,6 +110,7 @@ export function ExecutionRunnerSummary({ task, safetyMode = "Policy pending", ru
     <RouteDetails route={selectedRoute} selection={runnerSelection} />
     <dl className="task-runner-details"><div><dt>Model</dt><dd>{model}</dd></div><div><dt>Reasoning</dt><dd>{reasoning}</dd></div><div><dt>Safety</dt><dd>{safetyMode}</dd></div></dl>
     <p className="task-safety"><Glyph name="evidence" />No upstream writes</p>
+    <small className="task-provider-note">Readiness checks do not start a runner. The selected route runs when the task reaches this step.</small>
   </section>;
 }
 
