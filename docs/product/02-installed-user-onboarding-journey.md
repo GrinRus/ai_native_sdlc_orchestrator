@@ -121,10 +121,11 @@ Submitting calls `POST /api/projects/:projectId/tasks/:taskId/actions` with
 current step and evidence refs, defaults the intent to `analyze`, fixes its
 delivery mode to `no-write`, and attempts to run it through the shared runtime.
 The composer does not expose target-ref, allowed-path, delivery-mode, or
-preview controls. When a run is interrupted or remains pending, the Task
-projection keeps its request identity and the composer exposes **Resume
-request**. Task Workspace blocks another request or retry for the selected
-Task until that unfinished request is resolved. Use `aor request status` and
+preview controls. When a run is interrupted or remains pending, the durable
+operator request keeps its identity; Task Workspace reads the sanitized
+operator-request list and exposes **Resume request**. Task Workspace blocks
+another request or retry for the selected Task until that unfinished request
+is resolved. Use `aor request status` and
 `aor request run` for the equivalent headless inspection and recovery path.
 W71-S08 owns durable create-and-run recovery and review/completion continuity.
 Task activity, checks, changes, and evidence remain scoped to the selected Task.

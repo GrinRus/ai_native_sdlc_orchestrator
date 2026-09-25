@@ -183,10 +183,17 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
         ? "operator-request-ask-aor"
         : "operator-request-revision";
       if (requestId === "operator-request-ask-aor") {
-        operatorRequests = [{
-          operator_request_ref: "packet://operator-request@evidence://reports/operator-request-ask-aor-older.json",
-          document: { request_id: "operator-request-ask-aor-older", target_flow_id: "flow.closure", status: "run-pending", request_summary: "Earlier interrupted request.", target_refs: ["evidence://closure"], updated_at: "2026-01-01T00:00:00.000Z" },
-        }, ...operatorRequests];
+        operatorRequests = [
+          {
+            operator_request_ref: "packet://operator-request@evidence://reports/operator-request-other-flow.json",
+            document: { request_id: "operator-request-other-flow", target_flow_id: "flow.other", status: "run-pending", request_summary: "Request from another Flow.", target_refs: ["evidence://closure"], updated_at: "2099-01-01T00:00:00.000Z" },
+          },
+          {
+            operator_request_ref: "packet://operator-request@evidence://reports/operator-request-ask-aor-older.json",
+            document: { request_id: "operator-request-ask-aor-older", target_flow_id: "flow.closure", status: "run-pending", request_summary: "Earlier interrupted request.", target_refs: ["evidence://closure"], updated_at: "2026-01-01T00:00:00.000Z" },
+          },
+          ...operatorRequests,
+        ];
       }
       operatorRequests = [{
         operator_request_ref: `packet://operator-request@evidence://reports/${requestId}.json`,
@@ -295,6 +302,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await expect(sendAskAorRequest).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByText("Unfinished request waiting to resume: Inspect this bounded change. Resume it before sending another request.", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Request from another Flow/u)).toHaveCount(0);
   await expect(sendAskAorRequest).toBeDisabled();
   expect(actionPayloads.at(-1)).toEqual({ action: "request", request_text: "Inspect this bounded change." });
   await page.getByRole("button", { name: "Resume request", exact: true }).click();
