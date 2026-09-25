@@ -116,6 +116,7 @@ function TaskApp() {
   const [tasks, setTasks] = useState([]);
   const [interactionsByRun, setInteractionsByRun] = useState({});
   const [operatorRequests, setOperatorRequests] = useState([]);
+  const [operatorRequestsAvailable, setOperatorRequestsAvailable] = useState(false);
   const [executionProfile, setExecutionProfile] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(initialLocation.taskId);
   const [connectionState, setConnectionState] = useState("loading");
@@ -154,6 +155,7 @@ function TaskApp() {
         setTasks([]); setSelectedTaskId(null);
         setInteractionsByRun({});
         setOperatorRequests([]);
+        setOperatorRequestsAvailable(false);
         setExecutionProfile(null);
         setConnectionState("connected");
         setLoaded(true);
@@ -178,16 +180,17 @@ function TaskApp() {
         ["runner profile", executionProfileResult],
         ["operator requests", operatorRequestResult],
       ].filter(([, result]) => result.status === "rejected");
-      const nextOperatorRequests = operatorRequestResult.status === "fulfilled" && Array.isArray(operatorRequestResult.value)
-        ? operatorRequestResult.value
-        : [];
+      const operatorRequestListAvailable = operatorRequestResult.status === "fulfilled"
+        && Array.isArray(operatorRequestResult.value);
+      const nextOperatorRequests = operatorRequestListAvailable ? operatorRequestResult.value : [];
       const state = stateResult.status === "fulfilled" ? stateResult.value : null;
       setExecutionProfile(executionProfileResult.status === "fulfilled" ? executionProfileResult.value : null);
       setProjects((current) => current.map((project) => project.project_id === nextProjectId && state?.onboarding_summary
         ? { ...project, onboarding_summary: state.onboarding_summary }
         : project));
       if (taskResult.status === "fulfilled") setTasks(nextTasks);
-      if (operatorRequestResult.status === "fulfilled") setOperatorRequests(nextOperatorRequests);
+      setOperatorRequests(nextOperatorRequests);
+      setOperatorRequestsAvailable(operatorRequestListAvailable);
       setConnectionState(taskResult.status === "rejected" ? "offline" : unavailableReads.length || interactionResult.failures.length ? "partial" : "connected");
       const resourceFailures = [
         ...unavailableReads.map(([label, result]) => {
@@ -213,6 +216,8 @@ function TaskApp() {
     } catch (refreshError) {
       const message = refreshError instanceof Error ? refreshError.message : String(refreshError);
       setConnectionState("offline");
+      setOperatorRequests([]);
+      setOperatorRequestsAvailable(false);
       setError(message);
       setResourceError(refreshError);
       setLoaded(true);
@@ -281,6 +286,11 @@ function TaskApp() {
       if (["pause", "resume"].includes(action)) await new Promise((resolve) => window.setTimeout(resolve, 300));
       await refresh({ silent: true });
       return result;
+    }, async (actionError) => {
+      const message = errorMessage(actionError);
+      await refresh({ silent: true });
+      setError(message);
+      return null;
     });
   }
 
@@ -422,7 +432,7 @@ function TaskApp() {
   if (!activeProject) return <><EmptyWorkspace onOpenProject={() => setProjectDialogOpen(true)} error={error} onRetry={() => void refresh()} />{projectDialog}</>;
 
   return <div className="task-app" data-app-surface="task-workspace">
-    <TaskWorkspace project={activeProject} tasks={tasks} interactionsByRun={interactionsByRun} operatorRequests={operatorRequests} selectedTaskId={selectedTaskId} pendingPreparation={pendingSubmission?.projectId === activeProjectId} pendingSubmissionId={pendingSubmission?.projectId === activeProjectId ? pendingSubmission.submissionId : null} onStopFollowingPreparation={() => setPendingSubmission((current) => current?.projectId === activeProjectId ? null : current)} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} onAnswerInteraction={answerInteraction} onResumeOperatorRequest={resumeOperatorRequest} executionProfile={executionProfile} onSelectRunner={selectRunner} onCheckPreparationRunner={checkPreparationRunner} onCheckExecutionRunner={checkExecutionRunner} onInitializeRunnerProfile={initializeRunnerProfile} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
+    <TaskWorkspace project={activeProject} tasks={tasks} interactionsByRun={interactionsByRun} operatorRequests={operatorRequests} operatorRequestsAvailable={operatorRequestsAvailable} selectedTaskId={selectedTaskId} pendingPreparation={pendingSubmission?.projectId === activeProjectId} pendingSubmissionId={pendingSubmission?.projectId === activeProjectId ? pendingSubmission.submissionId : null} onStopFollowingPreparation={() => setPendingSubmission((current) => current?.projectId === activeProjectId ? null : current)} onSelectTask={(task) => { const taskId = task?.task_id ?? null; setSelectedTaskId(taskId); writeTaskLocation({ projectId: activeProjectId, taskId }); }} onNewTask={() => { setSelectedTaskId(null); writeTaskLocation({ projectId: activeProjectId }); }} onCreateTask={createTask} onTaskAction={runTaskAction} onAnswerInteraction={answerInteraction} onResumeOperatorRequest={resumeOperatorRequest} executionProfile={executionProfile} onSelectRunner={selectRunner} onCheckPreparationRunner={checkPreparationRunner} onCheckExecutionRunner={checkExecutionRunner} onInitializeRunnerProfile={initializeRunnerProfile} onReviewDecision={reviewTask} loadTaskReview={loadTaskReview} actionBusy={busy} actionError={error} onRefresh={() => void refresh()} onOpenProject={() => { setProjectResult(null); setProjectDialogOpen(true); }} connectionState={connectionState} resourceError={resourceError} />
     {projectDialog}
   </div>;
 }

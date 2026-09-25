@@ -120,6 +120,11 @@ Flow lineage:
   that are persisted as `run-pending` before execution through the shared
   runtime. An interrupted request remains visible in the sanitized operator
   request list and can be resumed through its existing request-run action.
+  Creating a different `request` or `retry` for the same Task while an
+  operator request is `created`, `run-pending`, or `running` returns
+  `409 operator_request.unfinished_exists`; replay with the same idempotency
+  key and inputs returns the existing request. The web surface disables
+  submission while it cannot read the sanitized request list.
   The Task action returns `200` with completed run evidence or `202` with the
   durable pending status and recovery action.
   The accepted action ids, permissions, payload requirements, and lifecycle

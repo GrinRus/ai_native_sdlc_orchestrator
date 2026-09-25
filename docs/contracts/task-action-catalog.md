@@ -47,4 +47,9 @@ Task Workspace `request` and `retry` actions persist an idempotent
 They return the runtime result or a durable recovery state. The UI reads the
 sanitized operator-request list and offers `Resume request` for unfinished
 requests; the resume action uses the same request-run endpoint as API and CLI
-clients.
+clients. Creating a different request or retry for the same Task while an
+existing request is `created`, `run-pending`, or `running` returns
+`409 operator_request.unfinished_exists`. The server checks this under the
+request transaction lock; same-key replay with the same inputs still resolves
+to the existing request. The UI disables request and retry controls when the
+sanitized request list is unavailable.

@@ -573,6 +573,10 @@ export async function handleTaskAction({ request, response, params, registry, ru
         sendError(response, 400, "task.request_text_required", "A durable Task request requires request_text.");
         return;
       }
+      const targetRefs = [...new Set([
+        asString(task.intent_submission_ref),
+        ...asStringArray(task.evidence_refs),
+      ].filter(Boolean))];
       const currentStep = asString(task.current_step);
       const targetStage = OPERATOR_REQUEST_STAGES.includes(currentStep)
         ? currentStep
@@ -584,11 +588,12 @@ export async function handleTaskAction({ request, response, params, registry, ru
         intentType: action === "retry" ? "repair" : (asString(payload.intent_type) ?? "analyze"),
         requestText,
         targetFlowId: task.flow_id ?? undefined,
-        targetRefs: asStringArray(task.evidence_refs),
+        targetRefs,
         allowedPaths: asStringArray(payload.allowed_paths),
         idempotencyKey: asString(payload.idempotency_key) ?? asString(payload.command_id) ?? undefined,
         deliveryMode: "no-write",
         queueForRun: true,
+        rejectUnfinishedForScope: true,
       });
       let result;
       try {

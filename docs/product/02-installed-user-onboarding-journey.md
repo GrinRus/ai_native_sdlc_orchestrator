@@ -125,7 +125,10 @@ preview controls. When a run is interrupted or remains pending, the durable
 operator request keeps its identity; Task Workspace reads the sanitized
 operator-request list and exposes **Resume request**. Task Workspace blocks
 another request or retry for the selected Task until that unfinished request
-is resolved. Use `aor request status` and
+is resolved. The server enforces this atomically and returns
+`409 operator_request.unfinished_exists` if another client submits a different
+request concurrently. The composer disables sending and retrying when the
+request list cannot be loaded. Use `aor request status` and
 `aor request run` for the equivalent headless inspection and recovery path.
 W71-S08 owns durable create-and-run recovery and review/completion continuity.
 Task activity, checks, changes, and evidence remain scoped to the selected Task.
