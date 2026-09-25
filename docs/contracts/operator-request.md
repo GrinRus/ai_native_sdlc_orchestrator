@@ -46,6 +46,14 @@ Task Workspace reads the sanitized operator-request list for the selected Task
 and offers a resume action for `created`, `run-pending`, or interrupted
 `running` requests. Resume uses the same `POST /operator-requests/{requestId}/actions`
 run action exposed to other API clients and the CLI `aor request run` command.
+Task Workspace `request` and `retry` creation atomically rejects a different
+request while a same-scope request is `created`, `run-pending`, or `running`,
+returning `409 operator_request.unfinished_exists`. A matching explicit
+`target_flow_id` defines the scope; requests without a flow id match by
+intersecting `target_refs`. Replaying the same idempotency key and inputs still
+returns the existing request before this check. The web composer disables
+submission and retry while the sanitized request list cannot be read, and the
+server check remains authoritative across tabs and clients.
 
 ## Runtime Semantics
 

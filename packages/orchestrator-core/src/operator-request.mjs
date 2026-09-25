@@ -61,6 +61,7 @@ export const OPERATOR_REQUEST_TARGET_STEPS = Object.freeze([
 const DELIVERY_MODES = Object.freeze(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 const OPERATOR_INTERVENTION_CONTEXT_BUNDLE = "context-bundle://context.bundle.operator-intervention@v1";
 const REQUEST_FILE_REGEX = /^operator-request-.*\.json$/u;
+const UNFINISHED_OPERATOR_REQUEST_STATUSES = new Set(["created", "run-pending", "running"]);
 
 export class OperatorRequestError extends Error {
   /**
@@ -427,6 +428,7 @@ function resolveTargetStep(intentType, targetStage) {
  *   targetFlowId?: string,
  *   idempotencyKey?: string,
  *   queueForRun?: boolean,
+ *   rejectUnfinishedForScope?: boolean,
  * }} options
  */
 export function createOperatorRequest(options) {
@@ -501,7 +503,8 @@ export function createOperatorRequest(options) {
   }
 
   return /** @type {ReturnType<typeof createOperatorRequest>} */ (withOperatorRequestTransaction(init, () => {
-    const existing = listRawOperatorRequestsForInit(init).find(
+    const existingRequests = listRawOperatorRequestsForInit(init);
+    const existing = existingRequests.find(
       (entry) => asString(entry.document.idempotency_key) === idempotencyKey,
     );
     if (existing) {
@@ -532,6 +535,27 @@ export function createOperatorRequest(options) {
         projectRoot: init.projectRoot,
         runtimeRoot: init.runtimeRoot,
       };
+    }
+    if (options.rejectUnfinishedForScope === true) {
+      const targetEvidence = new Set(targetRefs);
+      const unfinished = existingRequests.find((entry) => {
+        if (!UNFINISHED_OPERATOR_REQUEST_STATUSES.has(asString(entry.document.status) ?? "")) return false;
+        const existingFlowId = entry.document.target_flow_id;
+        if (existingFlowId !== undefined && existingFlowId !== null) {
+          return typeof existingFlowId === "string"
+            && existingFlowId.length > 0
+            && existingFlowId === targetFlowId;
+        }
+        return Array.isArray(entry.document.target_refs)
+          && entry.document.target_refs.some((ref) => targetEvidence.has(ref));
+      });
+      if (unfinished) {
+        throw new OperatorRequestError(
+          "operator_request.unfinished_exists",
+          "An unfinished operator request already exists for this Task. Resume it before sending another request.",
+          409,
+        );
+      }
     }
     const timestamp = new Date().toISOString();
     const suffix = normalizeForId(idempotencyKey) || "request";
