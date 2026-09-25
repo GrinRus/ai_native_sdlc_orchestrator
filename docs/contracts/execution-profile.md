@@ -42,6 +42,17 @@ execution route after a route change, so clearing stale readiness has a direct
 recovery path. Readiness checks record local runner/auth/model status and do
 not start a provider.
 
+Authentication readiness is an operator-provided local attestation, not an
+inspection of a runner's credential store. The check treats
+`AOR_AUTH_READY_<ADAPTER>=true` in the AOR process environment as ready, where
+the adapter ID is uppercased and non-alphanumeric characters become
+underscores (for example, `claude-code` maps to
+`AOR_AUTH_READY_CLAUDE_CODE`). An explicit `false` marker denies readiness;
+without a marker, a previously recorded positive Workspace readiness summary
+is used. Set the marker before starting the local app or running `aor route
+check`; restart an already running app before checking again. The marker is a
+boolean attestation, not a credential, and does not authenticate the runner.
+
 `POST /api/projects/:projectId/execution-profile/actions` supports `initialize`,
 `select`, `reset`, and `check`. The first action is an explicit initialization
 of runtime/profile state. The readiness check can name one approved route and

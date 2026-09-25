@@ -71,6 +71,14 @@ For the installed CLI:
 - for AI-backed preparation or execution, a supported runner binary with its
   normal authentication already configured.
 
+Runner readiness checks do not inspect a runner's credential store. They use
+the local boolean attestation `AOR_AUTH_READY_<ADAPTER>=true` in the process
+environment (`AOR_AUTH_READY_CODEX_CLI`, `AOR_AUTH_READY_CLAUDE_CODE`, or
+`AOR_AUTH_READY_QWEN_CODE`). Set it only after signing in to that runner. Set
+the variable before starting `aor app` or running `aor route check`; restart an
+already running app before checking again. The marker is not a credential and
+does not authenticate the runner.
+
 For source development, also use Corepack and the repository-pinned pnpm
 `10.12.4`. AOR does not install or authenticate Codex CLI, Claude Code,
 OpenCode, Qwen Code, or custom runners.
@@ -342,6 +350,13 @@ AOR. `mock-runner` supports deterministic tests; Codex CLI and Claude Code have
 adapters but await fresh W66 qualification. OpenCode and Qwen Code remain
 candidate coverage. An adapter profile declares capability; it does not prove
 that a runner is installed, authenticated, safe, or release-qualified.
+
+Task preparation first requires an initialized local runner profile. The New
+Task screen then lists approved preparation runners and requires a readiness
+check before preparation. An `Auth not confirmed` result means AOR has no
+positive local attestation; it does not establish that the runner's own login
+is missing. Use the environment marker above, restart the local app, and check
+the selected runner again.
 
 ## Artifacts and interfaces
 
