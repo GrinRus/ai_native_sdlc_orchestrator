@@ -1,5 +1,3 @@
-import path from "node:path";
-
 import { asString, asStringArray, readMutationPayload, sendError, sendJson } from "./http-utils.mjs";
 import {
   toInteractionAnswerResponse,
@@ -9,7 +7,6 @@ import {
 } from "./http-presenters.mjs";
 import { InteractionAnswerError, submitInteractionAnswer } from "../interaction-answer.mjs";
 import { runLifecycleCommand } from "../lifecycle-command.mjs";
-import { resolveAorHome, resolveLogicalEvidenceRef } from "../../aor-home.mjs";
 import { requestRunJobCancel } from "../../run-job.mjs";
 import { OPERATOR_REQUEST_STAGES, OperatorRequestError, createOperatorRequest, getOperatorRequestStatus, runOperatorRequest } from "../../operator-request.mjs";
 import { applyRunControlAction } from "../run-control.mjs";
@@ -17,6 +14,7 @@ import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
 import { readFlowProjection } from "../flow-projections.mjs";
 import { listTaskProjections } from "../read-surface.mjs";
 import { validateTaskActionPayload } from "../task-action-catalog.mjs";
+import { prepareMissionIntakeLifecycleFlags, resolveTaskInputPacketPath } from "../task-intake-action.mjs";
 import {
   approveTaskPlan,
   createTaskPlan,
@@ -432,15 +430,6 @@ export async function handleIntentSubmissionAction({ request, response, params, 
   }
 }
 
-function resolveTaskInputPacketPath(reference, runtimeOptions, workspaceProjectId) {
-  return resolveLogicalEvidenceRef({
-    projectRoot: runtimeOptions.projectRef ?? runtimeOptions.cwd ?? process.cwd(),
-    projectRuntimeRoot: path.join(runtimeOptions.runtimeRoot ?? resolveAorHome(), "projects", workspaceProjectId),
-    workspaceProjectId,
-    reference,
-  });
-}
-
 export async function handleTaskAction({ request, response, params, registry, runtimeOptions }) {
   const payload = await readMutationPayload(request, response);
   if (!payload) return;
@@ -698,9 +687,25 @@ export async function handleTaskAction({ request, response, params, registry, ru
         });
         return;
       }
+      const currentPayload = task.primary_action?.payload && typeof task.primary_action.payload === "object" && !Array.isArray(task.primary_action.payload)
+        ? task.primary_action.payload
+        : definition.payload;
+      const currentPayloadValidation = validateTaskActionPayload(action, payload, {
+        payloadSchema: currentPayload,
+        rejectUnknown: action === "complete-mission-intake",
+        requireUiFields: action === "complete-mission-intake",
+      });
+      if (!currentPayloadValidation.ok) {
+        sendError(response, 400, currentPayloadValidation.code, currentPayloadValidation.message, {
+          action_catalog: true,
+          field_errors: currentPayloadValidation.field_errors,
+        });
+        return;
+      }
       const flags = {};
       const operation = task.primary_action?.operator_control?.operation;
       if (operation?.command === definition.lifecycle_command) Object.assign(flags, operation.flags);
+      if (action === "complete-mission-intake") prepareMissionIntakeLifecycleFlags(flags, payload, currentPayload, runtimeOptions, params.projectId);
       if (action === "discovery-run" && task.intent_submission_ref) {
         flags["input-packet"] = resolveTaskInputPacketPath(task.intent_submission_ref, runtimeOptions, params.projectId);
       }
@@ -716,7 +721,9 @@ export async function handleTaskAction({ request, response, params, registry, ru
         && commandDefinition?.inputs?.some((input) => input.startsWith("--route-overrides "))) {
         flags["route-overrides"] = `${taskRunner.step}=${taskRunner.route_id}`;
       }
-      for (const key of Object.keys(definition.payload)) if (payload[key] !== undefined) flags[key] = payload[key];
+      if (action !== "complete-mission-intake") {
+        for (const key of Object.keys(definition.payload)) if (payload[key] !== undefined) flags[key] = payload[key];
+      }
       if (["review run", "learning handoff", "run start"].includes(definition.lifecycle_command)) flags["run-id"] ??= null;
       const lifecycle = runLifecycleCommand({
         ...runtimeOptions,

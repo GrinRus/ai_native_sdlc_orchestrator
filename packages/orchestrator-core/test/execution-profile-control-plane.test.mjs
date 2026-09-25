@@ -138,6 +138,7 @@ test("execution profile is derived, revisioned, and readiness evidence contains 
         "--title", "Active flow guard",
         "--brief", "Prove route mutations stop while a flow is active.",
         "--goal", "Keep route selection stable.",
+        "--constraint", "Keep the route guard reproducible.",
         "--kpi", "route-stable:Route stable:ready:status",
         "--dod", "Active flow is visible.",
         "--json",

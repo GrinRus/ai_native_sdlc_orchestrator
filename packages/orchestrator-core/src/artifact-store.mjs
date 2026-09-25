@@ -80,6 +80,10 @@ function normalizeStringArray(value) {
     : [];
 }
 
+function firstTrimmedString(...values) {
+  return values.find((value) => typeof value === "string" && value.trim().length > 0)?.trim() ?? null;
+}
+
 /**
  * @param {Record<string, unknown>} record
  * @returns {Array<{ kpi_id: string, name: string, target: string, measurement?: string }>}
@@ -179,31 +183,35 @@ function normalizeSourceKind(value) {
  * @returns {Array<{ source_id: string, source_kind: string, title: string, ref: string }>}
  */
 function readOptionalSourceRefs(record) {
-  const value = record.source_refs;
-  if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) {
-    throw new Error("Intake request field 'source_refs' must be an array when provided.");
-  }
-
-  return value.map((entry, index) => {
-    if (!isPlainObject(entry)) {
-      throw new Error(`Intake request field 'source_refs[${index}]' must be an object.`);
+  const productIntake = isPlainObject(record.product_intake) ? record.product_intake : {};
+  const sources = [
+    { field: "source_refs", value: record.source_refs },
+    { field: "product_intake.source_refs", value: productIntake.source_refs },
+  ].filter(({ value }) => value !== undefined && value !== null);
+  return sources.flatMap(({ field, value }) => {
+    if (!Array.isArray(value)) {
+      throw new Error(`Intake request field '${field}' must be an array when provided.`);
     }
-    const sourceId = typeof entry.source_id === "string" ? entry.source_id.trim() : "";
-    const sourceKind = normalizeSourceKind(entry.source_kind);
-    const title = typeof entry.title === "string" ? entry.title.trim() : "";
-    const ref = typeof entry.ref === "string" ? entry.ref.trim() : "";
-    if (!sourceId || !sourceKind || !title || !ref) {
-      throw new Error(
-        `Intake request field 'source_refs[${index}]' must include source_id, source_kind, title, and ref.`,
-      );
-    }
-    return {
-      source_id: sourceId,
-      source_kind: sourceKind,
-      title,
-      ref,
-    };
+    return value.map((entry, index) => {
+      if (!isPlainObject(entry)) {
+        throw new Error(`Intake request field '${field}[${index}]' must be an object.`);
+      }
+      const sourceId = typeof entry.source_id === "string" ? entry.source_id.trim() : "";
+      const sourceKind = normalizeSourceKind(entry.source_kind);
+      const title = typeof entry.title === "string" ? entry.title.trim() : "";
+      const ref = typeof entry.ref === "string" ? entry.ref.trim() : "";
+      if (!sourceId || !sourceKind || !title || !ref) {
+        throw new Error(
+          `Intake request field '${field}[${index}]' must include source_id, source_kind, title, and ref.`,
+        );
+      }
+      return {
+        source_id: sourceId,
+        source_kind: sourceKind,
+        title,
+        ref,
+      };
+    });
   });
 }
 
@@ -238,27 +246,34 @@ function dedupeSourceRefs(sourceRefs) {
  * }} options
  */
 function buildProductIntake(options) {
+  const existingProductIntake = isPlainObject(options.requestDocument.product_intake) ? options.requestDocument.product_intake : {};
+  const existingFeatureRequest = isPlainObject(options.requestDocument.feature_request) ? options.requestDocument.feature_request : {};
+  const uniqueStrings = (values) => values.filter((entry, index, entries) => entries.indexOf(entry) === index);
   const goals = [
     ...normalizeStringArray(options.goals),
+    ...readOptionalStringArray(existingProductIntake, "goals"),
     ...readOptionalStringArray(options.requestDocument, "goals"),
-  ].filter((entry, index, entries) => entries.indexOf(entry) === index);
+  ].filter((entry) => entry.length > 0);
   const constraints = [
     ...options.requestConstraints,
+    ...readOptionalStringArray(existingProductIntake, "constraints"),
+    ...readOptionalStringArray(existingFeatureRequest, "constraints"),
     ...readOptionalStringArray(options.requestDocument, "constraints"),
-  ].filter((entry, index, entries) => entries.indexOf(entry) === index);
+  ];
   const kpis = [
     ...normalizeKpis(options.kpis),
+    ...readOptionalKpis(existingProductIntake),
     ...readOptionalKpis(options.requestDocument),
   ].filter((entry, index, entries) =>
     entries.findIndex((candidate) => candidate.kpi_id === entry.kpi_id) === index,
   );
-  const guidedDefinitionOfDone = normalizeStringArray(options.definitionOfDone);
-  const definitionOfDone =
-    guidedDefinitionOfDone.length > 0
-      ? guidedDefinitionOfDone
-      : options.requestDocument.definition_of_done !== undefined
-        ? readOptionalStringArray(options.requestDocument, "definition_of_done")
-        : readOptionalStringArray(options.requestDocument, "dod");
+  const definitionOfDone = uniqueStrings([
+    ...normalizeStringArray(options.definitionOfDone),
+    ...readOptionalStringArray(existingProductIntake, "definition_of_done"),
+    ...readOptionalStringArray(existingProductIntake, "dod"),
+    ...readOptionalStringArray(options.requestDocument, "definition_of_done"),
+    ...readOptionalStringArray(options.requestDocument, "dod"),
+  ]);
   const requestedSourceKind = normalizeSourceKind(options.sourceKind) ?? "local-note";
   const sourceRefs = readOptionalSourceRefs(options.requestDocument);
   const inlineSourceRefs = Array.isArray(options.sourceRefs) ? options.sourceRefs : [];
@@ -295,8 +310,8 @@ function buildProductIntake(options) {
   }
 
   const productIntake = {
-    goals: goals.length > 0 ? goals : [options.requestBrief],
-    constraints,
+    goals: uniqueStrings(goals).length > 0 ? uniqueStrings(goals) : [options.requestBrief],
+    constraints: uniqueStrings(constraints),
     kpis,
     definition_of_done: definitionOfDone,
     source_refs: dedupeSourceRefs(sourceRefs),
@@ -426,31 +441,37 @@ export function materializeBootstrapArtifactPacket(options) {
  * }} options
  */
 export function materializeIntakeArtifactPacket(options) {
-  const requestTitle = typeof options.requestTitle === "string" && options.requestTitle.trim().length > 0
-    ? options.requestTitle.trim()
-    : "Catalog-backed feature mission request";
-  const requestBrief = typeof options.requestBrief === "string" && options.requestBrief.trim().length > 0
-    ? options.requestBrief.trim()
-    : "Prepare one bounded feature mission request for full-journey execution.";
   const missionId =
     typeof options.missionId === "string" && options.missionId.trim().length > 0 ? options.missionId.trim() : null;
   requirePublicId("project_id", options.projectId);
   if (missionId) requirePublicId("mission_id", missionId);
-  const requestConstraints = Array.isArray(options.requestConstraints)
-    ? options.requestConstraints.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
-    : [];
   const requestFile =
     typeof options.requestFile === "string" && options.requestFile.trim().length > 0 ? options.requestFile.trim() : null;
-  const packetIdSuffix = missionId ?? contentAddressedId("request", requestTitle);
-  const packetId = buildPacketId([options.projectId, "artifact", "intake", packetIdSuffix, "v1"]);
-  const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
-  const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
-
   const requestDocumentBody = loadRequestDocument(requestFile);
   const requestDocument =
     typeof requestDocumentBody === "object" && requestDocumentBody !== null && !Array.isArray(requestDocumentBody)
       ? /** @type {Record<string, unknown>} */ (requestDocumentBody)
       : {};
+  const existingFeatureRequest = isPlainObject(requestDocument.feature_request) ? requestDocument.feature_request : {};
+  const existingTraceability = isPlainObject(requestDocument.mission_traceability) ? requestDocument.mission_traceability : {};
+  const existingMissionScope = isPlainObject(requestDocument.mission_scope) ? requestDocument.mission_scope : {};
+  const requestTitle = firstTrimmedString(options.requestTitle, existingFeatureRequest.title) ??
+    (options.command === "aor mission create"
+      ? missionId ? `Guided mission ${missionId}` : "Guided mission request"
+      : "Catalog-backed feature mission request");
+  const requestBrief = firstTrimmedString(options.requestBrief, existingFeatureRequest.brief) ??
+    normalizeStringArray(options.goals)[0] ??
+    (options.command === "aor mission create"
+      ? "Prepare one bounded guided mission request."
+      : "Prepare one bounded feature mission request for full-journey execution.");
+  const requestConstraints = Array.isArray(options.requestConstraints)
+    ? options.requestConstraints.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const packetIdSuffix = missionId ?? contentAddressedId("request", requestTitle);
+  const packetId = buildPacketId([options.projectId, "artifact", "intake", packetIdSuffix, "v1"]);
+  const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
+  const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
+
   const { productIntake, completeness } = buildProductIntake({
     requestDocument,
     requestTitle,
@@ -467,23 +488,37 @@ export function materializeIntakeArtifactPacket(options) {
   });
   const allowedPaths = [
     ...normalizeStringArray(options.allowedPaths),
+    ...readOptionalStringArray(existingMissionScope, "allowed_paths"),
+    ...readOptionalStringArray(existingFeatureRequest, "allowed_paths"),
     ...readOptionalStringArray(requestDocument, "allowed_paths"),
   ].filter((entry, index, entries) => entries.indexOf(entry) === index);
   const forbiddenPaths = [
     ...normalizeStringArray(options.forbiddenPaths),
+    ...readOptionalStringArray(existingMissionScope, "forbidden_paths"),
+    ...readOptionalStringArray(existingFeatureRequest, "forbidden_paths"),
     ...readOptionalStringArray(requestDocument, "forbidden_paths"),
   ].filter((entry, index, entries) => entries.indexOf(entry) === index);
   const deliveryMode =
     normalizeDeliveryMode(options.deliveryMode) ??
+    normalizeDeliveryMode(existingMissionScope.delivery_mode) ??
+    normalizeDeliveryMode(existingTraceability.delivery_mode) ??
+    normalizeDeliveryMode(existingFeatureRequest.delivery_mode) ??
     normalizeDeliveryMode(requestDocument.delivery_mode) ??
     normalizeDeliveryMode(requestDocument.write_mode) ??
     "no-write";
   const requestCoverageFollowUp =
-    typeof requestDocument.coverage_follow_up === "object" &&
-    requestDocument.coverage_follow_up !== null &&
-    !Array.isArray(requestDocument.coverage_follow_up)
-      ? /** @type {Record<string, unknown>} */ (requestDocument.coverage_follow_up)
-      : {};
+    isPlainObject(existingTraceability.coverage_follow_up)
+      ? existingTraceability.coverage_follow_up
+      : isPlainObject(requestDocument.coverage_follow_up)
+        ? requestDocument.coverage_follow_up
+        : {};
+  const workType = firstTrimmedString(options.workType, existingTraceability.work_type, requestDocument.work_type) ??
+    (deliveryMode === "no-write" ? "analyze" : "code-change");
+  const matrixCell = isPlainObject(existingTraceability.matrix_cell)
+    ? existingTraceability.matrix_cell
+    : isPlainObject(requestDocument.matrix_cell)
+      ? requestDocument.matrix_cell
+      : null;
   const followUpSourceHandoffRef =
     typeof options.followUpSourceHandoffRef === "string" && options.followUpSourceHandoffRef.trim().length > 0
       ? options.followUpSourceHandoffRef.trim()
@@ -510,24 +545,13 @@ export function materializeIntakeArtifactPacket(options) {
     mission_traceability: {
       mission_id: missionId,
       source_kind: missionId ? "catalog-feature-mission" : "manual-request",
-      scenario_family:
-        typeof requestDocument.scenario_family === "string" ? requestDocument.scenario_family : null,
-      provider_variant_id:
-        typeof requestDocument.provider_variant_id === "string" ? requestDocument.provider_variant_id : null,
-      feature_size: typeof requestDocument.feature_size === "string" ? requestDocument.feature_size : null,
-      mission_type: typeof requestDocument.mission_type === "string" ? requestDocument.mission_type : null,
-      work_type: typeof options.workType === "string" && options.workType.trim().length > 0
-        ? options.workType.trim()
-        : (typeof requestDocument.work_type === "string"
-          ? requestDocument.work_type
-          : (deliveryMode === "no-write" ? "analyze" : "code-change")),
+      scenario_family: firstTrimmedString(existingTraceability.scenario_family, requestDocument.scenario_family),
+      provider_variant_id: firstTrimmedString(existingTraceability.provider_variant_id, requestDocument.provider_variant_id),
+      feature_size: firstTrimmedString(existingTraceability.feature_size, requestDocument.feature_size),
+      mission_type: firstTrimmedString(existingTraceability.mission_type, requestDocument.mission_type),
+      work_type: workType,
       delivery_mode: deliveryMode,
-      matrix_cell:
-        typeof requestDocument.matrix_cell === "object" &&
-        requestDocument.matrix_cell !== null &&
-        !Array.isArray(requestDocument.matrix_cell)
-          ? requestDocument.matrix_cell
-          : null,
+      matrix_cell: matrixCell,
       coverage_follow_up: Object.keys(coverageFollowUp).length > 0 ? coverageFollowUp : null,
     },
     product_intake: productIntake,
@@ -545,12 +569,12 @@ export function materializeIntakeArtifactPacket(options) {
     feature_request: {
       title: requestTitle,
       brief: requestBrief,
-      constraints: requestConstraints,
+      constraints: productIntake.constraints,
       allowed_paths: allowedPaths,
       forbidden_paths: forbiddenPaths,
       delivery_mode: deliveryMode,
       request_file: requestFile,
-      request_document: requestDocumentBody,
+      request_document: existingFeatureRequest.request_document ?? requestDocumentBody,
     },
     evidence_roots: {
       reports_root: options.runtimeLayout.reportsRoot,

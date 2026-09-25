@@ -19,7 +19,7 @@ const REGISTRY = Object.freeze({
   "handoff-approve": ["workbench", "Review and approve task plan", null],
   "start-new-flow": ["workbench", "Start follow-up Flow", null],
   "mission-create": ["workbench", "Create Mission evidence", null],
-  "complete-mission-intake": ["workbench", "Complete Mission intake", null],
+  "complete-mission-intake": ["mutation", "Complete Mission intake", "mission create"],
   "repair-mission-intake": ["workbench", "Repair Mission intake", null],
   "fix-onboarding": ["workbench", "Repair project setup", null],
   "fix-delivery-blockers": ["evidence", "Inspect delivery blockers", null],
@@ -78,6 +78,11 @@ export function operatorControlForAction(primaryAction, missionState, closureSta
   if (["review run", "learning handoff"].includes(command) && runId) flags["run-id"] = `${runId}${runIdSuffix}`;
   if (["deliver prepare", "release prepare"].includes(command)) { if (runId) flags["run-id"] = runId; flags.mode = text(missionState.delivery_mode) ?? "no-write"; }
   if (command === "run start") Object.assign(flags, runStartFlags(primaryAction, runId, runIdSuffix, runTargetStep));
+  if (actionId === "complete-mission-intake") Object.assign(flags, Object.fromEntries([
+    ["request-file", text(missionState.intake_body_ref)], ["mission-id", text(missionState.mission_id)],
+    ["work-type", text(missionState.work_type)], ["delivery-mode", text(missionState.delivery_mode) ?? "no-write"],
+    ["allowed-path", asStringArray(missionState.allowed_paths)], ["forbidden-path", asStringArray(missionState.forbidden_paths)],
+  ].filter(([, value]) => value && (!Array.isArray(value) || value.length > 0))));
   const operation = command && (!["review run", "learning handoff", "run start"].includes(command) || runId) ? { command, flags } : null;
   const requiresConfirmation = getTaskActionDefinition(actionId)?.requires_confirmation === true;
   return { category, label, availability: operation || category !== "mutation" ? "ready" : "blocked", operation, target_surface: category === "evidence" ? "evidence" : category === "workbench" ? "journey" : "cockpit", requires_confirmation: requiresConfirmation };

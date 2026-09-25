@@ -15,6 +15,16 @@ const runControlPayload = Object.freeze({
   reason: optionalControlPayloadField("string"),
   approval_ref: optionalControlPayloadField("string"),
 });
+const missionIntakePayload = Object.freeze({
+  goal: Object.freeze({ type: "string", required: false, mission_field_group: "goals", lifecycle_flag: "goal", label: "Add a goal" }),
+  constraint: Object.freeze({ type: "string", required: false, mission_field_group: "constraints", lifecycle_flag: "constraint", label: "Add a constraint" }),
+  kpi_name: Object.freeze({ type: "string", required: false, mission_field_group: "kpis", label: "KPI name" }),
+  kpi_target: Object.freeze({ type: "string", required: false, mission_field_group: "kpis", label: "KPI target" }),
+  kpi_measurement: Object.freeze({ type: "string", required: false, mission_field_group: "kpis", label: "How it is measured" }),
+  dod: Object.freeze({ type: "string", required: false, mission_field_group: "definition_of_done", lifecycle_flag: "dod", label: "Definition of done" }),
+  source_kind: Object.freeze({ type: "string", required: false, enum: Object.freeze(["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"]), mission_field_group: "source_refs", lifecycle_flag: "source-kind", label: "Source type" }),
+  source_ref: Object.freeze({ type: "string", required: false, mission_field_group: "source_refs", lifecycle_flag: "source-ref", label: "Source reference" }),
+});
 
 const entries = [
   { action_id: "confirm", category: "mutation", permission: "mutate", dispatch: "intent.confirm", payload: { expected_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
@@ -53,7 +63,7 @@ const entries = [
   { action_id: "run-qa-quality-repair", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "run start", payload: {}, requires_confirmation: true },
   { action_id: "qa-quality-repair", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "run start", payload: {}, requires_confirmation: false },
   { action_id: "start-new-flow", category: "workbench", permission: "read", dispatch: "readback", payload: {}, requires_confirmation: false },
-  { action_id: "complete-mission-intake", category: "workbench", permission: "read", dispatch: "readback", payload: {}, requires_confirmation: false },
+  { action_id: "complete-mission-intake", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "mission create", payload: missionIntakePayload, requires_confirmation: true },
   { action_id: "closure-complete", category: "evidence", permission: "read", dispatch: "readback", payload: {}, requires_confirmation: false },
 ];
 
@@ -70,6 +80,16 @@ export function getTaskActionDefinition(actionId) {
   return BY_ID.get(typeof actionId === "string" ? actionId.trim() : "") ?? null;
 }
 
+export function getTaskActionPayloadForState(actionId, missingFields = []) {
+  const definition = getTaskActionDefinition(actionId);
+  if (!definition) return {};
+  if (definition.action_id !== "complete-mission-intake") return { ...definition.payload };
+  const missing = new Set(Array.isArray(missingFields) ? missingFields : []);
+  return Object.fromEntries(Object.entries(definition.payload)
+    .filter(([, rule]) => missing.has(rule.mission_field_group))
+    .map(([field, rule]) => [field, { ...rule, ...(field === "kpi_measurement" ? {} : { ui_required: true }) }]));
+}
+
 function validScalar(value, type, enumValues) {
   let matchesType = true;
   if (type === "integer") matchesType = Number.isInteger(value) && value >= 0;
@@ -80,15 +100,23 @@ function validScalar(value, type, enumValues) {
   return matchesType && (!Array.isArray(enumValues) || enumValues.includes(value));
 }
 
-export function validateTaskActionPayload(actionId, payload = {}) {
+export function validateTaskActionPayload(actionId, payload = {}, options = {}) {
   const definition = getTaskActionDefinition(actionId);
   if (!definition) return { ok: false, code: "task.unknown_action", message: `Unknown Task action '${actionId ?? "missing"}'.`, definition: null, field_errors: [] };
   const value = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const schema = options.payloadSchema && typeof options.payloadSchema === "object" ? options.payloadSchema : definition.payload;
   const fieldErrors = [];
-  for (const [field, rule] of Object.entries(definition.payload)) {
+  if (options.rejectUnknown === true) {
+    for (const field of Object.keys(value)) {
+      if (field !== "action" && !Object.hasOwn(schema, field)) {
+        fieldErrors.push({ field, code: "unknown", message: `${field} is not published for action '${definition.action_id}'.` });
+      }
+    }
+  }
+  for (const [field, rule] of Object.entries(schema)) {
     const enumValues = "enum" in rule ? rule.enum : undefined;
     const missing = value[field] === undefined || value[field] === null || value[field] === "";
-    if (rule.required && missing) {
+    if ((rule.required || (options.requireUiFields === true && rule.ui_required)) && missing) {
       fieldErrors.push({ field, code: "required", message: `${field} is required for action '${definition.action_id}'.` });
     } else if (!missing && !validScalar(value[field], rule.type, enumValues)) {
       fieldErrors.push({ field, code: "invalid", message: Array.isArray(enumValues) ? `${field} must be one of: ${enumValues.join(", ")}.` : `${field} must be a non-negative integer, non-empty string, or string array as declared by the action catalog.` });

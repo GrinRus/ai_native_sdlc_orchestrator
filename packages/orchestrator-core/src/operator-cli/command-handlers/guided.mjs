@@ -37,6 +37,19 @@ export const GUIDED_COMMAND_GROUP = Object.freeze({
 const LOCAL_CONTROL_PLANE_HOST = "127.0.0.1";
 const LOCAL_CONTROL_PLANE_PORT = 8080;
 
+function publishNextActionFields(outputState, next) {
+  const report = next.nextActionReport;
+  Object.assign(outputState, {
+    resolvedProjectRef: next.projectRoot, resolvedRuntimeRoot: next.runtimeRoot, runtimeLayout: next.runtimeLayout,
+    runtimeStateFile: next.stateFile, projectProfileRef: next.projectProfileRef, onboardingReportId: next.onboardingReportId,
+    onboardingReportFile: next.onboardingReportFile, assetMode: next.assetMode, registryRoots: next.registryRoots,
+    nextActionReportId: next.nextActionReportId, nextActionReportFile: next.nextActionReportFile, nextActionStatus: report.status, nextActionPrimary: report.primary_action,
+    nextActionBlockers: report.blockers, nextActionEvidenceRefs: report.evidence_refs,
+    nextActionMissionState: report.mission_state, nextActionArtifactReadiness: report.artifact_readiness, nextActionClosureState: report.closure_state, nextActionBoundedExecution: report.bounded_execution,
+  });
+  return report;
+}
+
 /**
  * @param {string} value
  * @returns {string}
@@ -314,13 +327,8 @@ export function handleGuidedCommand(context) {
       command: "aor mission create",
       missionId,
       workType,
-      requestTitle:
-        resolveOptionalStringFlag("title", flags.title) ??
-        (missionId ? `Guided mission ${missionId}` : "Guided mission request"),
-      requestBrief:
-        resolveOptionalStringFlag("brief", flags.brief) ??
-        goals[0] ??
-        "Prepare one bounded guided mission request.",
+      requestTitle: resolveOptionalStringFlag("title", flags.title) ?? null,
+      requestBrief: resolveOptionalStringFlag("brief", flags.brief) ?? null,
       requestConstraints: constraints,
       goals,
       kpis,
@@ -370,6 +378,10 @@ export function handleGuidedCommand(context) {
       ? [projectCommand("next", missionInit.projectRoot)]
       : [projectCommand("mission create", missionInit.projectRoot)];
     outputState.futureControlHooks = ["next", "discovery run", "spec build"];
+    publishNextActionFields(outputState, resolveNextAction({
+      cwd: missionInit.projectRoot, projectRef: missionInit.projectRoot,
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]), runtimeRoot: missionInit.runtimeRoot,
+    }));
     return true;
   }
 
@@ -426,28 +438,9 @@ export function handleGuidedCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
-    const report = next.nextActionReport;
+    const report = publishNextActionFields(outputState, next);
     const primary = report.primary_action;
 
-    outputState.resolvedProjectRef = next.projectRoot;
-    outputState.resolvedRuntimeRoot = next.runtimeRoot;
-    outputState.runtimeLayout = next.runtimeLayout;
-    outputState.runtimeStateFile = next.stateFile;
-    outputState.projectProfileRef = next.projectProfileRef;
-    outputState.onboardingReportId = next.onboardingReportId;
-    outputState.onboardingReportFile = next.onboardingReportFile;
-    outputState.assetMode = next.assetMode;
-    outputState.registryRoots = next.registryRoots;
-    outputState.nextActionReportId = next.nextActionReportId;
-    outputState.nextActionReportFile = next.nextActionReportFile;
-    outputState.nextActionStatus = report.status;
-    outputState.nextActionPrimary = primary;
-    outputState.nextActionBlockers = report.blockers;
-    outputState.nextActionEvidenceRefs = report.evidence_refs;
-    outputState.nextActionMissionState = report.mission_state;
-    outputState.nextActionArtifactReadiness = report.artifact_readiness;
-    outputState.nextActionClosureState = report.closure_state;
-    outputState.nextActionBoundedExecution = report.bounded_execution;
     outputState.guidedCommand = "aor next";
     outputState.guidedStage = report.project_state.stage;
     outputState.guidedStatus = report.status;

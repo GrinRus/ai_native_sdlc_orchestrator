@@ -7,6 +7,7 @@ import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
 import { runProjectionCoordinator } from "./operator-projection-services.mjs";
 import { asRecord, asString, asStringArray, uniqueTrimmedStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
 import { operatorControlForAction, selectApprovedHandoffRef, selectPromotionEvidenceRefs } from "./next-action-operator-control.mjs";
+import { getTaskActionPayloadForState } from "./control-plane/task-action-catalog.mjs";
 import { listJsonFilesByModificationTime as listJsonFiles, readJsonFileOrNull as readJsonFile } from "./shared/json-files.mjs";
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
 const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
@@ -1773,7 +1774,13 @@ function executeNextActionProjection(options = {}) {
 
   artifactReadiness ??= buildArtifactReadiness({ init, intake: latestIntake, missionState });
 
-  primaryAction = { ...primaryAction, operator_control: operatorControlForAction(primaryAction, missionState, closureState) };
+  primaryAction = {
+    ...primaryAction,
+    operator_control: operatorControlForAction(primaryAction, missionState, closureState),
+    ...(primaryAction.action_id === "complete-mission-intake"
+      ? { payload: getTaskActionPayloadForState(primaryAction.action_id, missionState.missing_fields) }
+      : {}),
+  };
   const qualityRepairLineage = asRecord(asRecord(closureState.quality_repair).lineage);
 
   const report = {

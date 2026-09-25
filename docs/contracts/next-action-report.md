@@ -31,6 +31,10 @@ It resolves exactly one safe primary action for the current project state while 
 - `reason`
 - `low_level_command`
 - `evidence_refs`
+- optional `payload`, a subset of the canonical Task action payload schema
+  selected by the current server-owned state. It may set `ui_required: true`
+  for fields that resolve the current action's missing inputs. Consumers must
+  not add fields or infer input requirements from command text.
 - optional `operator_control`, an additive browser-safe projection with:
   - `category`: `mutation | workbench | evidence | copy | refresh | unavailable`;
   - an outcome-specific `label`;
