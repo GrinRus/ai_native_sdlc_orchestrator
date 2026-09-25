@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixture = JSON.parse(fs.readFileSync(path.join(root, "browser/fixtures/task-workspace-closure.json"), "utf8"));
 const source = fs.readFileSync(path.join(root, "src/task-workspace.jsx"), "utf8");
+const runnerSource = fs.readFileSync(path.join(root, "src/task-runner-summary.jsx"), "utf8");
 const markdownSource = fs.readFileSync(path.join(root, "src/task-markdown-source-dialog.jsx"), "utf8");
 
 test("W70-S08 closure fixture covers every source, lifecycle, and recovery branch locally", () => {
@@ -38,12 +39,13 @@ test("W70-S08 closure fixture covers every source, lifecycle, and recovery branc
 });
 
 test("Task Workspace source and runner states remain query-safe and fail closed", () => {
-  for (const marker of ["stale", "runner_selection", "Readiness checks do not start a runner"]) {
+  for (const marker of ["stale", "runner_selection"]) {
     assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "iu"));
   }
+  assert.match(runnerSource, /Readiness checks do not start a runner/iu);
   assert.match(markdownSource, /Upload Markdown/u);
   assert.match(markdownSource, /kind: "repository-markdown"/u);
-  for (const querySurface of [source, markdownSource]) {
+  for (const querySurface of [source, runnerSource, markdownSource]) {
     assert.doesNotMatch(querySurface, /process\.env|authorization:|private_path|raw_provider/iu);
   }
 });
