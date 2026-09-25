@@ -94,16 +94,17 @@ must preserve the accepted submission for recovery without submitting it again.
    write effects; primary action `Start task`.
 5. **Active Task Workspace** — monitor current work, send a durable operator
    request, inspect changes/checks/evidence, pause, or stop. Show an available
-   server-published mutation as the primary action when its catalog contract
-   requires no additional payload or confirmation, then refresh the Task
-   projection after it runs.
+   server-published mutation as the primary action. Collect required payload
+   fields and explicit confirmation from the catalog contract, then refresh the
+   Task projection after it runs.
 6. **Attention** — resolve one authoritative human decision with consequence,
    source evidence, and durable readback. When a blocked Task needs a review
    decision, open its current review evidence from Attention and record the
    decision through the shared review action. A blocked intent preparation can
    resume through its published action or open a linked edit where the operator
    can check a different preparation runner while carrying selected sources
-   forward.
+   forward. Other available mutation actions use their catalog payload fields
+   and confirmation requirements in this view.
 7. **Review Changes** — run the server-published review action when evidence is missing; then inspect file changes, checks, and delivery effects before accepting or requesting revision.
 8. **Completion and Evidence** — inspect outcome, verification, delivery, and
    evidence lineage; primary action `Start follow-up task`.
