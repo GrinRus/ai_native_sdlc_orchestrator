@@ -25,7 +25,7 @@ const REGISTRY = Object.freeze({
   "fix-delivery-blockers": ["evidence", "Inspect delivery blockers", null],
   "repair-review-gate": ["workbench", "Review failed verification", null],
   "hold-exhausted-quality-repair": ["workbench", "Inspect exhausted repair", null],
-  "run-review-repair": ["workbench", "Start review repair", null],
+  "run-review-repair": ["mutation", "Start review repair", "run start", ".repair", "implement"],
   "run-review-quality-repair": ["mutation", "Start review repair", "run start", ".repair", "implement"],
   "run-qa-quality-repair": ["mutation", "Start QA repair", "run start", ".repair", "implement"],
   "qa-quality-repair": ["mutation", "Run post-repair QA", "run start", ".repair.qa", "qa"],

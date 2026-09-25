@@ -48,7 +48,7 @@ const entries = [
   { action_id: "repair-review-gate", category: "workbench", permission: "read", dispatch: "readback", payload: {}, requires_confirmation: false },
   { action_id: "resolve-review-hold", category: "workbench", permission: "read", dispatch: "readback", payload: {}, requires_confirmation: false },
   { action_id: "hold-exhausted-quality-repair", category: "workbench", permission: "read", dispatch: "readback", payload: {}, requires_confirmation: false },
-  { action_id: "run-review-repair", category: "workbench", permission: "read", dispatch: "readback", payload: {}, requires_confirmation: true },
+  { action_id: "run-review-repair", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "run start", payload: {}, requires_confirmation: true },
   { action_id: "run-review-quality-repair", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "run start", payload: {}, requires_confirmation: true },
   { action_id: "run-qa-quality-repair", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "run start", payload: {}, requires_confirmation: true },
   { action_id: "qa-quality-repair", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "run start", payload: {}, requires_confirmation: false },
