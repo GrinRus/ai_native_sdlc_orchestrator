@@ -23,7 +23,7 @@ fixture screenshot alone does not prove the full installed journey.
 | Task draft | Choose **New task**, describe the outcome, and attach optional Markdown sources. | Server-owned Task submission and source metadata. | W70-S04 |
 | Prepare | Choose **Prepare task** to derive a reviewable outcome, acceptance criteria, scope, runner, and safety mode without authorizing source writes. | Preparation run, prepared Task state, logical evidence refs. | W70-S04 |
 | Start and work | Explicitly choose **Start task**, then observe bounded activity, changes, checks, blockers, and live events. | Task/run linkage, step results, live-run events, policy and run-control evidence. | W70-S05 |
-| Ask AOR | Create a bounded no-write request from the active Task guidance composer; execute it separately through the request CLI/API. | Created `operator-request`; compiled context, step result, and proposal/patch refs only after a separate successful run. | W70-S05, W71-S08 |
+| Ask AOR | Submit a bounded no-write request from the Task guidance composer; Task Workspace attempts the run and can resume the same request after interruption. | Durable `operator-request`, run attempt, compiled context, step result, and result refs, with explicit recovery when the run remains pending. | W70-S05, W71-S08, W71-S14 |
 | Review and completion | Resolve attention, inspect review and QA evidence, and retain the completed Task as a durable read-only outcome. | Review report and decision, Runtime Harness report, completion and closure evidence. | W70-S06 |
 | Follow-up | Create a fresh Task that may cite prior evidence without mutating the completed source Task. | New Task submission plus preserved internal Flow and evidence lineage. | W70-S06 |
 | Guided proof | Rehearse the clean-project Task journey with no upstream-write defaults. | `installed-user-guided-journey.yaml`, current app-smoke fields, browser Task proof, durable readback, and no-write assertions. | W70-S09 |
@@ -118,13 +118,14 @@ The pre-W67 Mission form used a safe walkthrough template. W67 supersedes that f
 The active Task view exposes an Ask AOR **Task guidance** text composer.
 Submitting calls `POST /api/projects/:projectId/tasks/:taskId/actions` with
 `action=request`. The server creates an `operator-request` for the Task's
-current step and evidence refs, defaults the intent to `analyze`, and fixes
-its delivery mode to `no-write`. The composer does not expose target-ref,
-allowed-path, delivery-mode, or preview controls.
-
-A successful submission confirms request creation only. The current Task action
-does not run that request. Use `aor request run` or the operator-request run API
-for explicit execution; use request status to inspect the resulting evidence.
+current step and evidence refs, defaults the intent to `analyze`, fixes its
+delivery mode to `no-write`, and attempts to run it through the shared runtime.
+The composer does not expose target-ref, allowed-path, delivery-mode, or
+preview controls. When a run is interrupted or remains pending, the Task
+projection keeps its request identity and the composer exposes **Resume
+request**. Task Workspace blocks another request or retry for the selected
+Task until that unfinished request is resolved. Use `aor request status` and
+`aor request run` for the equivalent headless inspection and recovery path.
 W71-S08 owns durable create-and-run recovery and review/completion continuity.
 Task activity, checks, changes, and evidence remain scoped to the selected Task.
 

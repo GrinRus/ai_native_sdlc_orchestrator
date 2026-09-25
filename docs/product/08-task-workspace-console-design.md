@@ -62,6 +62,9 @@ Ask AOR uses the [operator-request contract](../contracts/operator-request.md).
 It preserves the created request identity across run failure and recovery, so a
 retry resumes that request instead of creating another one. Operator requests
 remain distinct from runtime-initiated interaction answers.
+While a Task has a matching `created`, `run-pending`, or `running` request, the
+composer keeps that request available for resume and disables new request and
+retry submissions until the unfinished request is resolved.
 
 Completed Tasks and their internal Flow evidence are immutable. A follow-up
 creates fresh submission and Mission lineage and may cite the completed source
