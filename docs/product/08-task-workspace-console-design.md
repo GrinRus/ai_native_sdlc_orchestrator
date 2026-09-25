@@ -69,7 +69,10 @@ retry submissions until the unfinished request is resolved.
 Completed Tasks and their internal Flow evidence are immutable. A follow-up
 creates fresh submission and Mission lineage and may cite the completed source
 without modifying it. These requirements remain runtime-owned across every
-presentation change.
+presentation change. After the follow-up submission is accepted, Task Workspace
+returns to Tasks, keeps following that submission's server-owned Task
+projection, and opens the new Task when it is published. An interrupted read
+must preserve the accepted submission for recovery without submitting it again.
 
 ## Screen inventory
 
@@ -243,6 +246,8 @@ run state comes from durable run-job evidence.
 - Markdown inputs are distinguishable as immutable uploads or pinned repository
   references and are previewed without active content or hidden network access.
 - Runtime-owned state and actions retain their existing durable owners.
+- Accepting a follow-up returns to Tasks and opens the new Task once its
+  server-owned projection is published; an interrupted read never resubmits it.
 - Desktop, tablet, mobile, keyboard-only, 200% zoom, and reduced-motion browser
   evidence match the target screen set under
   `docs/product/assets/w70-task-workspace-console/`.

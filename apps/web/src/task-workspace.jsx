@@ -826,6 +826,14 @@ export function TaskWorkspace({ project, tasks = [], operatorRequests = [], oper
     setScreen("new");
   }
 
+  async function startFollowUpTask(task) {
+    const result = await onTaskAction?.(task, "follow-up", { request_text: `Follow up on ${taskTitle(task)}.` });
+    if (result?.readback?.follow_up === true) {
+      setInspectorOpen(null);
+      setScreen("home");
+    }
+  }
+
   async function prepareTask() {
     if (!preparationRunnerReady || !preparationRouteId || actionBusy || preparingTask || pendingPreparation) return;
     setPreparingTask(true);
@@ -893,7 +901,7 @@ export function TaskWorkspace({ project, tasks = [], operatorRequests = [], oper
   const screenTitle = ({ new: "New task", sources: "Tasks", prepared: "Prepared task", active: "Active task", review: taskTitle(selectedTask), complete: taskTitle(selectedTask), attention: "Attention" })[screen] || "Tasks";
   const newTaskScreen = <NewTaskScreen outcome={outcome} setOutcome={setOutcome} selectedSources={sourceItems} onAddSources={(opener) => { sourceOpenerRef.current = opener; setScreen("sources"); }} onPrepare={prepareTask} onCancel={() => { setPendingSources([]); setSourceContinuation({ submissionId: null, sourceIds: [] }); if (pendingPreparation) { onStopFollowingPreparation?.(); onRefresh?.(); } setScreen("home"); }} executionProfile={executionProfile} preparationRunnerOptions={preparationRunnerOptions} preparationRouteId={preparationRouteId} onSelectPreparationRunner={(routeId) => setPreparationRunnerChoice({ projectId: executionProfile?.project_id ?? null, routeId })} onCheckPreparationRunner={onCheckPreparationRunner} onInitializeRunnerProfile={onInitializeRunnerProfile} preparationRunnerReady={preparationRunnerReady} actionBusy={actionBusy} preparing={preparingTask} pendingPreparation={pendingPreparation} hidden={screen !== "new"} />;
   const completionScreenByProof = new Map([
-    [true, <CompletionScreen task={selectedTask} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} onOpenInspector={() => setInspectorOpen("completion")} onBackToTasks={backToTasks} actionBusy={actionBusy} />],
+    [true, <CompletionScreen task={selectedTask} onFollowUp={() => void startFollowUpTask(selectedTask)} onOpenInspector={() => setInspectorOpen("completion")} onBackToTasks={backToTasks} actionBusy={actionBusy} />],
     [false, <div className="task-review-state task-review-state--error" role="alert"><strong>Closure evidence is not complete.</strong><p>The server has not published verification and delivery proof for this task yet.</p><Button onClick={() => setScreen("review")}>Back to review</Button></div>],
   ]).get(taskHasCompletionProof(selectedTask));
   const screenContent = {
@@ -908,7 +916,7 @@ export function TaskWorkspace({ project, tasks = [], operatorRequests = [], oper
   };
   const inspectorContent = new Map([
     ["runtime", <RuntimeInspector task={selectedTask} />],
-    ["completion", <CompletionInspector task={selectedTask} actionBusy={actionBusy} onBackToTasks={backToTasks} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} />],
+    ["completion", <CompletionInspector task={selectedTask} actionBusy={actionBusy} onBackToTasks={backToTasks} onFollowUp={() => void startFollowUpTask(selectedTask)} />],
     ["review", <ReviewInspector task={selectedTask} review={selectedTask?.review} reviewData={reviewState.data} note={reviewNote} setNote={setReviewNote} />],
   ]).get(inspectorOpen);
 

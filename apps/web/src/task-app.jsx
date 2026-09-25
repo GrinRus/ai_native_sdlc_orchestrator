@@ -279,12 +279,24 @@ function TaskApp() {
     }
   }
 
+  function trackAcceptedSubmission(projectId, submissionId) {
+    setPendingSubmission({ projectId, submissionId });
+    setSelectedTaskId(null);
+    writeTaskLocation({ projectId });
+  }
+
   async function runTaskAction(task, action, payload = {}) {
     if (!apiProjectBase || !task?.task_id || busy) return null;
     return runBusyAction(async () => {
       const result = await postJson(`${apiProjectBase}/tasks/${encodeURIComponent(task.task_id)}/actions`, { action, ...payload });
       if (["pause", "resume"].includes(action)) await new Promise((resolve) => window.setTimeout(resolve, 300));
-      await refresh({ silent: true });
+      const followUpSubmissionId = action === "follow-up" ? result?.intent_submission?.submission_id : null;
+      if (typeof followUpSubmissionId === "string" && followUpSubmissionId) {
+        trackAcceptedSubmission(activeProjectId, followUpSubmissionId);
+        void refresh({ silent: true, keepSelection: false });
+      } else {
+        await refresh({ silent: true });
+      }
       return result;
     }, async (actionError) => {
       const message = errorMessage(actionError);
@@ -328,8 +340,8 @@ function TaskApp() {
     return runBusyAction(async () => {
       const created = await postJson(`${apiProjectBase}/intent-submissions`, { request_text: requestText, attachments, markdown_sources: markdownSources, ...(sourceSubmissionId ? { source_submission_id: sourceSubmissionId, source_ids: sourceIds } : {}), preparation_route_id: preparationRouteId, auto_prepare: true });
       const submissionId = created?.submission?.submission_id;
-      if (submissionId) setPendingSubmission({ projectId: activeProjectId, submissionId });
-      const refreshed = await refresh({ silent: true });
+      if (submissionId) trackAcceptedSubmission(activeProjectId, submissionId);
+      const refreshed = await refresh({ silent: true, ...(submissionId ? { keepSelection: false } : {}) });
       const task = refreshed.tasks.find((entry) => entry?.lineage?.intent_submission_id === submissionId) ?? null;
       if (task) {
         setSelectedTaskId(task.task_id);
