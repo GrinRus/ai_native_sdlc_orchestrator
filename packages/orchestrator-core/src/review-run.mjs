@@ -3,50 +3,16 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
 import {
   collectMissionChangeEvidence,
   isTransientBackupPath,
   matchesScopePattern,
 } from "./shared/mission-scope.mjs";
+import { listJsonFilesByModificationTime as listJsonFiles } from "./shared/json-files.mjs";
+import { asRecord, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
 
 const VERIFY_FAILURE_OUTPUT_EXCERPT_CHARS = 2000;
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))];
-}
 
 /**
  * @param {unknown} value
@@ -283,15 +249,6 @@ function normalizeId(value) {
 
 /**
  * @param {string} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
-}
-
-/**
- * @param {string} projectRoot
  * @param {string} ref
  * @returns {string}
  */
@@ -414,7 +371,7 @@ function collectVerificationFailureDetails(projectRoot, verifySummary) {
     details.push({
       command,
       command_group_id: asString(stepResult?.command_group_id),
-      role: asString(stepResult?.command_group_role) ?? asString(stepResult?.command_kind) ?? "unknown",
+      role: firstNonNullish(asString(stepResult?.command_group_role), asString(stepResult?.command_kind), "unknown"),
       phase: asString(stepResult?.command_group_phase),
       enforcement: asString(stepResult?.command_group_enforcement) ?? "required",
       enforcement_result: asString(stepResult?.enforcement_result) ?? "fail",
@@ -438,21 +395,6 @@ function collectVerificationFailureDetails(projectRoot, verifySummary) {
     });
   }
   return details;
-}
-
-/**
- * @param {string} dirPath
- * @returns {string[]}
- */
-function listJsonFiles(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-  return fs
-    .readdirSync(dirPath)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => path.join(dirPath, entry))
-    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
 }
 
 /**

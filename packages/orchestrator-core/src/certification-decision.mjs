@@ -8,6 +8,8 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import { validateProjectRuntime } from "./project-validate.mjs";
 import { runProjectionCoordinator } from "./operator-projection-services.mjs";
 import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { asFiniteNumber as asNumber, asRecord, asStringArray, uniqueNonBlankStrings as uniqueStrings } from "./shared/value-normalization.mjs";
+import { resolveDurationSeconds } from "./shared/timing.mjs";
 const PROMOTION_CHANNEL_VALUES = new Set(["draft", "candidate", "stable", "frozen", "demoted"]);
 const FLAKY_PASS_RATE_DELTA_THRESHOLD = 0.02;
 const MAJOR_DRIFT_DELTA_THRESHOLD = 0.1;
@@ -34,44 +36,6 @@ function assertPromotionChannel(options) {
   }
 }
 
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {Array<string | null | undefined>} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values.filter((entry) => typeof entry === "string" && entry.trim().length > 0))];
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
@@ -351,25 +315,6 @@ function resolveContextQualityComparison(options) {
       options.withoutContextEvidence.harness_replay_ref,
     ].filter((entry) => typeof entry === "string"),
   };
-}
-
-/**
- * @param {unknown} startedAt
- * @param {unknown} finishedAt
- * @returns {number | null}
- */
-function resolveDurationSeconds(startedAt, finishedAt) {
-  if (typeof startedAt !== "string" || typeof finishedAt !== "string") {
-    return null;
-  }
-
-  const startMs = Date.parse(startedAt);
-  const finishMs = Date.parse(finishedAt);
-  if (!Number.isFinite(startMs) || !Number.isFinite(finishMs) || finishMs < startMs) {
-    return null;
-  }
-
-  return Math.round(((finishMs - startMs) / 1000) * 1000) / 1000;
 }
 
 /**

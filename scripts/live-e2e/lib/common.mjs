@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml } from "yaml";
+import { hasNonEmptyPermissionDenials } from "./permission-denials.mjs";
+
+export { hasNonEmptyPermissionDenials };
 
 export class UsageError extends Error {
   /**
@@ -10,6 +15,21 @@ export class UsageError extends Error {
   constructor(message) {
     super(message);
     this.name = "UsageError";
+  }
+}
+
+export function runCliEntrypoint(runCli, rawArgs = process.argv.slice(2)) {
+  try {
+    process.exitCode = runCli(rawArgs);
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
+}
+
+export function runCliEntrypointIfMain(moduleUrl, runCli, rawArgs = process.argv.slice(2)) {
+  if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(moduleUrl)) {
+    runCliEntrypoint(runCli, rawArgs);
   }
 }
 
@@ -26,6 +46,31 @@ export function nowIso() {
  */
 export function normalizeId(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** @param {unknown} value @returns {string | null} */
+export function asString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/** @param {unknown} value @returns {Record<string, unknown>} */
+export function asRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? /** @type {Record<string, unknown>} */ (value)
+    : {};
+}
+
+/** @param {unknown} value @returns {string[]} */
+export function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/** @template T @param {...(T | null | undefined)} values @returns {T | null | undefined} */
+export function firstNonNullish(...values) {
+  const selected = values.find((value) => value !== null && value !== undefined);
+  return selected === undefined ? values.at(-1) : selected;
 }
 
 export function deriveRuntimeRunId(qualificationRunId, iteration = 1) {
@@ -60,30 +105,20 @@ export function readYamlDocument(filePath) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-export function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
  * @returns {string}
  */
 export function asNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
 }
 
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-export function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
+/** @param {unknown} status @returns {"pass" | "warn" | "not_pass" | "blocked" | "interaction_required" | "resumed"} */
+export function normalizeObservationStatus(status) {
+  const normalized = asNonEmptyString(status).toLowerCase();
+  if (["pass", "passed", "success"].includes(normalized)) return "pass";
+  if (["warn", "warning", "skipped"].includes(normalized)) return "warn";
+  if (["blocked", "block"].includes(normalized)) return "blocked";
+  if (["interaction_required", "interactive", "requested"].includes(normalized)) return "interaction_required";
+  return normalized === "resumed" ? "resumed" : "not_pass";
 }
 
 /**
@@ -109,29 +144,6 @@ export function asStringMap(value) {
     ([key, entry]) => typeof key === "string" && typeof entry === "string" && entry.trim().length > 0,
   );
   return Object.fromEntries(entries.map(([key, entry]) => [key, entry.trim()]));
-}
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-export function hasNonEmptyPermissionDenials(value) {
-  if (Array.isArray(value)) {
-    return value.some((entry) => hasNonEmptyPermissionDenials(entry));
-  }
-
-  const record = asRecord(value);
-  const entries = Object.entries(record);
-  if (entries.length === 0) {
-    return false;
-  }
-
-  const permissionDenials = record.permission_denials;
-  if (Array.isArray(permissionDenials) && permissionDenials.length > 0) {
-    return true;
-  }
-
-  return entries.some(([, entry]) => hasNonEmptyPermissionDenials(entry));
 }
 
 /**

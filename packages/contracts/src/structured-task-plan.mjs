@@ -1,5 +1,6 @@
 import { describeActualType, isPlainObject, issue } from "./utils.mjs";
 import { matchesAllowedPath } from "./canonical-values.mjs";
+import { asStringArray } from "./value-normalization.mjs";
 import {
   validateCriterionCoverage,
   validateEvidenceOwnership,
@@ -31,12 +32,6 @@ export const CRITERION_KIND_VALUES = Object.freeze(["goal", "kpi", "definition-o
 
 function asNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
 }
 
 function requireString(record, field, source, issues) {

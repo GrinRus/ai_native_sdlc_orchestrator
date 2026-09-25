@@ -1,10 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
-import { toLogicalEvidenceRef } from "../aor-home.mjs";
+import { normalizeIdentifierFragment as normalizeForId } from "../../../contracts/src/index.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "../aor-home.mjs";
 
 import { listQualityArtifacts as listQualityArtifactsForRuntime } from "../control-plane/read-surface.mjs";
 
 import { getCommandDefinition, RUNTIME_ROOT_DIRNAME } from "./command-catalog.mjs";
+import { asStringArray, uniqueNonEmptyStrings as uniqueStrings } from "../shared/value-normalization.mjs";
+export { uniqueStrings };
+export { asStringArray };
+export { normalizeForId };
+export { toEvidenceRef };
 
 export {
   listDeliveryManifests,
@@ -285,14 +291,6 @@ export function resolveOptionalStringListFlag(flagName, value) {
 }
 
 /**
- * @param {string[]} values
- * @returns {string[]}
- */
-export function uniqueStrings(values) {
-  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
-}
-
-/**
  * @param {string} filePath
  * @returns {Record<string, unknown>}
  */
@@ -309,32 +307,10 @@ export function writeJson(filePath, payload) {
   fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-export function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
 export function asPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? /** @type {Record<string, unknown>} */ (value)
     : {};
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-export function normalizeForId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 /**
@@ -343,15 +319,6 @@ export function normalizeForId(value) {
  */
 export function toRunRef(runId) {
   return runId.startsWith("run://") ? runId : `run://${runId}`;
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
-export function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

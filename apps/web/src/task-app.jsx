@@ -10,6 +10,7 @@ import "./ui/tokens.css";
 import "./ui/components.css";
 import "./task-app.css";
 import "./task-workspace.css";
+import { firstNonNullish } from "../../../packages/contracts/src/value-normalization.mjs";
 
 const EMPTY_PROJECT_FORM = Object.freeze({ sourceKind: "local", projectRef: "", gitUrl: "", label: "" });
 
@@ -29,6 +30,18 @@ function writeTaskLocation({ projectId = null, taskId = null } = {}) {
 
 function projectLabel(project) {
   return project?.display_name || project?.label || project?.project_id || "Project";
+}
+
+function postJson(path, payload) {
+  return readJson(path, {
+    method: "POST",
+    headers: { "content-type": "application/json; charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function readTaskInteractions(projectBase, tasks) {
@@ -131,7 +144,7 @@ function TaskApp() {
       const availableProjects = Array.isArray(projectIndex.projects) && projectIndex.projects.length
         ? projectIndex.projects
         : Array.isArray(appConfig.projects) ? appConfig.projects : [];
-      const requestedProjectId = projectId ?? activeProjectId ?? initialLocation.projectId ?? projectIndex.default_project_id ?? appConfig.default_project_id ?? appConfig.project_id;
+      const requestedProjectId = firstNonNullish(projectId, activeProjectId, initialLocation.projectId, projectIndex.default_project_id, appConfig.default_project_id, appConfig.project_id);
       const selectedProject = availableProjects.find((project) => project.project_id === requestedProjectId) ?? availableProjects[0] ?? null;
       const nextProjectId = selectedProject?.project_id ?? null;
       setConfig(appConfig);
@@ -246,68 +259,64 @@ function TaskApp() {
     return () => stops.forEach((stop) => stop());
   }, [apiProjectBase, liveRunIds]);
 
+  async function runBusyAction(operation, onError = (actionError) => {
+    setError(errorMessage(actionError));
+    return null;
+  }) {
+    setBusy(true);
+    setError("");
+    try {
+      return await operation();
+    } catch (actionError) {
+      return await onError(actionError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runTaskAction(task, action, payload = {}) {
     if (!apiProjectBase || !task?.task_id || busy) return null;
-    setBusy(true); setError("");
-    try {
-      const result = await readJson(`${apiProjectBase}/tasks/${encodeURIComponent(task.task_id)}/actions`, {
-        method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ action, ...payload }),
-      });
+    return runBusyAction(async () => {
+      const result = await postJson(`${apiProjectBase}/tasks/${encodeURIComponent(task.task_id)}/actions`, { action, ...payload });
       if (["pause", "resume"].includes(action)) await new Promise((resolve) => window.setTimeout(resolve, 300));
       await refresh({ silent: true });
       return result;
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : String(actionError));
-      return null;
-    } finally { setBusy(false); }
+    });
   }
 
   async function answerInteraction(interaction, answerPayload) {
     if (!apiProjectBase || !interaction?.run_id || !interaction?.interaction_id || busy) {
       throw new Error("The runner interaction is unavailable until its run is selected.");
     }
-    setBusy(true); setError("");
-    try {
-      const result = await readJson(`${apiProjectBase}/interactions/answers`, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ run_id: interaction.run_id, interaction_id: interaction.interaction_id, ...answerPayload }),
-      });
+    return runBusyAction(async () => {
+      const result = await postJson(`${apiProjectBase}/interactions/answers`, { run_id: interaction.run_id, interaction_id: interaction.interaction_id, ...answerPayload });
       await refresh({ silent: true });
       return result;
-    } catch (answerError) {
+    }, async (answerError) => {
       await refresh({ silent: true });
       throw answerError;
-    } finally { setBusy(false); }
+    });
   }
 
   async function resumeOperatorRequest(operatorRequest) {
     const requestId = operatorRequest?.document?.request_id;
     const requestRef = operatorRequest?.operator_request_ref;
     if (!apiProjectBase || !requestId || !requestRef || busy) return null;
-    setBusy(true); setError("");
-    try {
-      const result = await readJson(`${apiProjectBase}/operator-requests/${encodeURIComponent(requestId)}/actions`, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ action: "run", request_ref: requestRef }),
-      });
+    return runBusyAction(async () => {
+      const result = await postJson(`${apiProjectBase}/operator-requests/${encodeURIComponent(requestId)}/actions`, { action: "run", request_ref: requestRef });
       await refresh({ silent: true });
       return result;
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : String(actionError));
+    }, async (actionError) => {
+      setError(errorMessage(actionError));
       await refresh({ silent: true });
       return null;
-    } finally { setBusy(false); }
+    });
   }
 
   async function createTask({ requestText, attachments = [], markdownSources = [], sourceSubmissionId = null, sourceIds = [], preparationRouteId } = {}) {
     if (!apiProjectBase || busy) return null;
-    setBusy(true); setError("");
-    try {
-      const created = await readJson(`${apiProjectBase}/intent-submissions`, {
-        method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ request_text: requestText, attachments, markdown_sources: markdownSources, ...(sourceSubmissionId ? { source_submission_id: sourceSubmissionId, source_ids: sourceIds } : {}), preparation_route_id: preparationRouteId, auto_prepare: true }),
-      });
+    return runBusyAction(async () => {
+      const created = await postJson(`${apiProjectBase}/intent-submissions`, { request_text: requestText, attachments, markdown_sources: markdownSources, ...(sourceSubmissionId ? { source_submission_id: sourceSubmissionId, source_ids: sourceIds } : {}), preparation_route_id: preparationRouteId, auto_prepare: true });
       const submissionId = created?.submission?.submission_id;
       if (submissionId) setPendingSubmission({ projectId: activeProjectId, submissionId });
       const refreshed = await refresh({ silent: true });
@@ -320,27 +329,21 @@ function TaskApp() {
         }
       }
       return task;
-    } catch (createError) {
-      const message = createError instanceof Error ? createError.message : String(createError);
+    }, async (createError) => {
+      const message = errorMessage(createError);
       await refresh({ silent: true });
       setError(message);
       return null;
-    } finally { setBusy(false); }
+    });
   }
 
   async function reviewTask(task, decision, reason = "") {
     if (!apiProjectBase || !task?.run_ids?.[0] || busy) { setError("Review decision is unavailable until a durable run is selected."); return null; }
-    setBusy(true); setError("");
-    try {
-      const result = await readJson(`${apiProjectBase}/lifecycle-command/actions`, {
-        method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ command: "review decide", flags: { run_id: task.run_ids[0], decision, ...(reason.trim() ? { reason: reason.trim() } : {}) } }),
-      });
+    return runBusyAction(async () => {
+      const result = await postJson(`${apiProjectBase}/lifecycle-command/actions`, { command: "review decide", flags: { run_id: task.run_ids[0], decision, ...(reason.trim() ? { reason: reason.trim() } : {}) } });
       await refresh({ silent: true });
       return result;
-    } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : String(reviewError));
-      return null;
-    } finally { setBusy(false); }
+    });
   }
 
   async function loadTaskReview(taskId, selectedPath = null) {
@@ -361,22 +364,17 @@ function TaskApp() {
   async function runExecutionProfileAction(action, route = {}) {
     const revision = executionProfile?.revision;
     if (!apiProjectBase || !Number.isInteger(revision) || busy || (action === "check" && (!route.step || !route.route_id))) return null;
-    setBusy(true); setError("");
-    try {
-      const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ action, ...route, expected_revision: revision }),
-      });
+    return runBusyAction(async () => {
+      const result = await postJson(`${apiProjectBase}/execution-profile/actions`, { action, ...route, expected_revision: revision });
       if (result?.execution_profile) setExecutionProfile(result.execution_profile);
       await refresh({ silent: true });
       return result;
-    } catch (checkError) {
-      const message = checkError instanceof Error ? checkError.message : String(checkError);
+    }, async (checkError) => {
+      const message = errorMessage(checkError);
       await refresh({ silent: true });
       setError(message);
       return null;
-    } finally { setBusy(false); }
+    });
   }
 
   function initializeRunnerProfile() { return runExecutionProfileAction("initialize"); }
@@ -391,11 +389,9 @@ function TaskApp() {
   async function connectProject() {
     const sourceValue = projectForm.sourceKind === "git" ? projectForm.gitUrl.trim() : projectForm.projectRef.trim();
     if (!sourceValue || busy) return;
-    setBusy(true); setProjectResult(null); setError("");
-    try {
-      const accepted = await readJson("/api/projects/actions", {
-        method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ action: "connect", source: projectForm.sourceKind === "git" ? { kind: "git", url: sourceValue } : { kind: "local", path: sourceValue }, ...(projectForm.label.trim() ? { label: projectForm.label.trim() } : {}) }),
-      });
+    setProjectResult(null);
+    return runBusyAction(async () => {
+      const accepted = await postJson("/api/projects/actions", { action: "connect", source: projectForm.sourceKind === "git" ? { kind: "git", url: sourceValue } : { kind: "local", path: sourceValue }, ...(projectForm.label.trim() ? { label: projectForm.label.trim() } : {}) });
       let job = accepted.job;
       for (let attempt = 0; attempt < 240 && ["queued", "running"].includes(job?.status); attempt += 1) {
         await new Promise((resolve) => window.setTimeout(resolve, 250));
@@ -406,15 +402,16 @@ function TaskApp() {
       setProjectResult({ status: "ok", message: "Project connected. Runtime data remains in AOR Home." });
       setProjectDialogOpen(false);
       await refresh({ projectId: job.project_id, keepSelection: false });
-    } catch (connectError) {
-      const message = connectError instanceof Error ? connectError.message : String(connectError);
+    }, (connectError) => {
+      const message = errorMessage(connectError);
       setProjectResult({ status: "error", message }); setError(message);
-    } finally { setBusy(false); }
+      return null;
+    });
   }
 
   async function pickProjectFolder() {
     try {
-      const result = await readJson("/api/workspace/folder-picker/actions", { method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ action: "open" }) });
+      const result = await postJson("/api/workspace/folder-picker/actions", { action: "open" });
       if (result.path) setProjectForm((current) => ({ ...current, sourceKind: "local", projectRef: result.path }));
       else setProjectResult({ status: "error", message: result.message || "Native picker is unavailable; enter an absolute path." });
     } catch (pickerError) { setProjectResult({ status: "error", message: pickerError instanceof Error ? pickerError.message : String(pickerError) }); }

@@ -1,49 +1,15 @@
 import fs from "node:fs"; import path from "node:path";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { listRunControlStateFiles } from "./control-plane/read-artifact-readers.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
-import { runProjectionCoordinator } from "./operator-projection-services.mjs"; import { operatorControlForAction } from "./next-action-operator-control.mjs";
+import { runProjectionCoordinator } from "./operator-projection-services.mjs";
+import { asRecord, asString, asStringArray, uniqueTrimmedStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
+import { operatorControlForAction } from "./next-action-operator-control.mjs";
+import { listJsonFilesByModificationTime as listJsonFiles, readJsonFileOrNull as readJsonFile } from "./shared/json-files.mjs";
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
 const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return Array.from(
-    new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0).map((value) => value.trim())),
-  );
-}
 
 /**
  * @param {string} value
@@ -116,40 +82,6 @@ function runStartCommand(options) {
  */
 function normalizeForFileName(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
-}
-
-/**
- * @param {string} filePath
- * @returns {Record<string, unknown> | null}
- */
-function readJsonFile(filePath) {
-  try {
-    return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * @param {string} dirPath
- * @returns {string[]}
- */
-function listJsonFiles(dirPath) {
-  if (!fs.existsSync(dirPath)) return [];
-  return fs
-    .readdirSync(dirPath)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => path.join(dirPath, entry))
-    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
 }
 
 /**
@@ -1578,12 +1510,7 @@ function resolveMissionState(body) {
   const completeness = asRecord(body?.product_intake_completeness);
   return {
     deliveryMode:
-      asString(missionScope.delivery_mode) ??
-      asString(missionTraceability.delivery_mode) ??
-      asString(featureRequest.delivery_mode) ??
-      asString(requestDocument.delivery_mode) ??
-      asString(requestDocument.write_mode) ??
-      "no-write",
+      firstNonNullish(asString(missionScope.delivery_mode), asString(missionTraceability.delivery_mode), asString(featureRequest.delivery_mode), asString(requestDocument.delivery_mode), asString(requestDocument.write_mode), "no-write"),
     allowedPaths: asStringArray(missionScope.allowed_paths).length > 0
       ? asStringArray(missionScope.allowed_paths)
       : asStringArray(featureRequest.allowed_paths).length > 0

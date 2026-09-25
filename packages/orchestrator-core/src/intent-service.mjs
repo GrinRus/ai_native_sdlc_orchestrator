@@ -4,6 +4,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
+import { normalizeProjectRelativeMarkdownPath, isValidPinnedGitRevision } from "../../contracts/src/task-markdown-source.mjs";
+import { WORK_TYPE_TO_STEP } from "../../contracts/src/task-work-type.mjs";
 import { sanitizeMarkdownPreview } from "../../contracts/src/markdown-sanitization.mjs";
 import { readJsonState, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
@@ -13,7 +15,8 @@ import { runLifecycleCommand } from "./control-plane/lifecycle-command.mjs";
 import { resolveNextAction } from "./next-action.mjs";
 import { inspectGitIdentity } from "./aor-home.mjs";
 import { buildCorrectionGuidance, extractStructuredCandidate } from "./structured-candidate.mjs";
-import { readExecutionProfile, resolvePreparationRunner } from "./control-plane/execution-profile.mjs";
+import { readExecutionProfile, resolvePreparationRunner, resolveTaskExecutionRoute } from "./control-plane/execution-profile.mjs";
+import { asRecord, asStringArray as asStrings, firstNonNullish } from "./shared/value-normalization.mjs";
 
 const EXTENSIONS = new Map([
   [".txt", "text/plain"], [".md", "text/markdown"], [".json", "application/json"],
@@ -41,14 +44,11 @@ const CHANGE_PATH = Object.freeze([
   { id: "delivery", label: "Deliver" },
   { id: "learning", label: "Learn" },
 ]);
-const WORK_TYPE_TO_STEP = Object.freeze({
-  analyze: "discovery",
-  explain: "research",
-  review: "review",
-  "document-change": "implement",
-  "code-change": "implement",
+const PREPARATION_ROUTE_BY_ADAPTER = Object.freeze({
+  "codex-cli": "route.intake-normalize.default",
+  "claude-code": "route.intake-normalize.claude",
+  "qwen-code": "route.intake-normalize.qwen",
 });
-
 export class IntentServiceError extends Error {
   constructor(code, message, statusCode = 400, details = {}) {
     super(message);
@@ -60,8 +60,6 @@ export class IntentServiceError extends Error {
 }
 
 function now() { return new Date().toISOString(); }
-function asStrings(value) { return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()) : []; }
-function asRecord(value) { return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {}; }
 
 function atomicJson(file, document) { writeJsonAtomic(file, document); }
 
@@ -158,8 +156,8 @@ function repositoryMarkdownRecords(context, markdownSources) {
   if (markdownSources.length > MAX_FILES) throw new IntentServiceError("intent_source.count_exceeded", `At most ${MAX_FILES} Markdown sources are allowed.`);
   const head = awaitableSpawn("git", ["-C", context.projectRoot, "rev-parse", "HEAD"]);
   return markdownSources.map((source, index) => {
-    const relativePath = String(source?.project_relative_path ?? source?.path ?? "").trim().replaceAll("\\", "/");
-    if (!relativePath || path.posix.isAbsolute(relativePath) || relativePath.split("/").includes("..")) {
+    const relativePath = normalizeProjectRelativeMarkdownPath(source?.project_relative_path ?? source?.path);
+    if (!relativePath) {
       throw new IntentServiceError("intent_source.invalid_path", "Repository Markdown paths must be project-relative and cannot traverse outside the project.");
     }
     if (path.extname(relativePath).toLowerCase() !== ".md") {
@@ -179,8 +177,8 @@ function repositoryMarkdownRecords(context, markdownSources) {
       throw new IntentServiceError("intent_source.invalid_utf8", `Repository Markdown source '${relativePath}' is not valid UTF-8.`);
     }
     const digest = crypto.createHash("sha256").update(content).digest("hex");
-    const pinnedRevision = String(source?.pinned_base_revision ?? head ?? "").trim();
-    if (pinnedRevision && !/^[0-9a-f]{40}$/iu.test(pinnedRevision)) {
+    const pinnedRevision = String(firstNonNullish(source?.pinned_base_revision, head, "")).trim();
+    if (!isValidPinnedGitRevision(pinnedRevision)) {
       throw new IntentServiceError("intent_source.invalid_revision", "Pinned Markdown base revision must be a full Git commit id.");
     }
     if (pinnedRevision && pinnedRevision !== String(head ?? "").trim()) {
@@ -462,9 +460,7 @@ export function createIntentSubmission({ registry, projectId, requestText = "", 
   const preparationRequested = autoPrepare || preflightPreparation;
   if (preparationRequested && !normalization && !selectedPreparationRouteId) {
     const adapter = providerReadiness(registry, projectId);
-    selectedPreparationRouteId = adapter === "claude-code" ? "route.intake-normalize.claude"
-      : adapter === "qwen-code" ? "route.intake-normalize.qwen"
-        : adapter === "codex-cli" ? "route.intake-normalize.default" : "";
+    selectedPreparationRouteId = PREPARATION_ROUTE_BY_ADAPTER[adapter] ?? "";
   }
   if (selectedPreparationRouteId) {
     requireReadyPreparationRunner(registry, projectId, selectedPreparationRouteId, { requireCurrentCheck: explicitPreparationRoute });
@@ -535,12 +531,9 @@ export function prepareIntentSubmission({ registry, projectId, submissionId, nor
           : providerReadiness(registry, projectId);
       let selectedRouteId = normalization
         ? previousNormalization?.provider?.route_id ?? "route.intake-normalize.default"
-        : submission.preparation_route_id ?? "route.intake-normalize.default";
+        : firstNonNullish(submission.preparation_route_id, PREPARATION_ROUTE_BY_ADAPTER[provider], "route.intake-normalize.default");
       if (!normalization) {
         if (!provider) throw new IntentServiceError("intent_provider.not_ready", "Configure and authenticate Codex, Claude, or Qwen before preparing this task.", 409);
-        if (!submission.preparation_route_id) {
-          selectedRouteId = provider === "claude-code" ? "route.intake-normalize.claude" : provider === "qwen-code" ? "route.intake-normalize.qwen" : "route.intake-normalize.default";
-        }
         const routed = executeRoutedStep({
           ...context.runtimeOptions,
           stepClass: "discovery",
@@ -788,18 +781,14 @@ function requireReadyExecutionRoute({ registry, projectId, loaded }) {
   } catch (error) {
     throw new IntentServiceError(error?.code ?? "execution-profile.unavailable", error instanceof Error ? error.message : String(error), error?.statusCode ?? 409);
   }
-  const row = executionProfile.routes?.find((entry) => entry?.step === step);
-  const routeId = override?.route_id ?? row?.route_id;
-  const selected = override
-    ? row?.approved_routes?.find((entry) => entry?.route_id === override.route_id)
-    : row;
-  if (!routeId || routeId.startsWith("route.intake-normalize.") || !selected) {
+  const resolved = resolveTaskExecutionRoute({ executionProfile, step, overrideRouteId: override?.route_id ?? null });
+  const routeId = resolved.requested_route_id;
+  const selected = resolved.selected;
+  if (!resolved.approved || !routeId || !selected) {
     throw new IntentServiceError("intent_execution.route_unavailable", "Task start requires an approved execution route for its selected step.", 409, { route_id: routeId ?? null, step });
   }
-  const routeReadinessCurrent = Number.isInteger(selected.readiness_revision)
-    && selected.readiness_revision === executionProfile.revision;
-  if (selected.readiness !== "ready" || !routeReadinessCurrent) {
-    const readiness = selected.readiness ?? "unknown";
+  if (resolved.readiness !== "ready") {
+    const readiness = resolved.readiness;
     throw new IntentServiceError("intent_execution.route_not_ready", `Execution route '${routeId}' is not ready (${readiness}). Check the exact route before starting this Task.`, 409, {
       route_id: routeId,
       step,

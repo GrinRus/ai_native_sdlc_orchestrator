@@ -1,59 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { normalizePathScope, pathScopesOverlap, validateContractDocument } from "../../contracts/src/index.mjs";
+import { normalizeIdentifierFragment as normalizeForId, normalizePathScope, pathScopesOverlap, validateContractDocument } from "../../contracts/src/index.mjs";
 import { readJsonState, withFileLock, writeJsonAtomic } from "../../observability/src/file-transaction.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
+import { asRecord, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 const LOCK_STATE_FILE = "multirepo-locks.json";
 const LOCK_STATUS_VALUES = new Set(["active", "released", "conflict", "stale", "inspected"]);
 const ACTION_VALUES = new Set(["acquire", "release", "inspect"]);
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function normalizeForId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-}
 
 /**
  * @param {Date | string | number | undefined} value
@@ -76,15 +33,6 @@ function normalizeNow(value) {
  */
 function iso(date) {
   return date.toISOString();
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

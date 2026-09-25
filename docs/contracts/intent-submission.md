@@ -62,10 +62,11 @@ Confirmation rechecks each repository Markdown path, digest, and pinned
 revision. A stale source returns `409` with its source ID before a Mission is
 created; the operator must edit the Task and add the current file again.
 
-`markdown_sources[]` entries contain a project-relative `.md` path, a pinned
-full Git revision, a SHA-256 digest, bounded byte metadata, and a sanitized
-preview. Creation reads only the connected local checkout; an explicit pinned
-revision must match its current `HEAD`, and AOR never fetches a remote URL. A
+`markdown_sources[]` entries contain a POSIX project-relative `.md` path with
+no empty, `.` or `..` segments or backslashes, a pinned full Git revision, a
+SHA-256 digest, bounded byte metadata, and a sanitized preview. Creation reads
+only the connected local checkout. An explicit pinned revision must match its
+current `HEAD`, and AOR never fetches a remote URL. A
 later read compares the current checkout revision/digest and marks the source
 stale instead of silently changing the pinned snapshot.
 

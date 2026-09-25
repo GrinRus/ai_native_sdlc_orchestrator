@@ -11,6 +11,7 @@ import {
 } from "../../../provider-routing/src/route-resolution.mjs";
 import { initializeProjectRuntime, resolveProjectRegistryRoots } from "../project-init.mjs";
 import { listFlowProjections } from "./flow-projections.mjs";
+import { asString, firstNonNullish } from "../shared/value-normalization.mjs";
 
 const PREPARATION_ROUTE_PREFIX = "route.intake-normalize.";
 
@@ -24,6 +25,10 @@ const STATUS_PRIORITY = [
   "unconfigured",
   "ready",
 ];
+const KNOWN_ROUTE_READINESS = new Set([
+  "ready", "stale", "unavailable", "blocked", "unconfigured", "runner-missing",
+  "auth-missing", "model-unsupported", "capability-mismatch", "policy-denied",
+]);
 
 export class ExecutionProfileError extends Error {
   constructor(code, message, statusCode = 400) {
@@ -60,7 +65,7 @@ function executableAvailable(command, environment) {
       return false;
     }
   }
-  const pathValue = environment.PATH ?? environment.Path ?? "";
+  const pathValue = firstNonNullish(environment.PATH, environment.Path, "");
   const extensions = process.platform === "win32"
     ? String(environment.PATHEXT ?? ".EXE;.CMD;.BAT").split(";")
     : [""];
@@ -76,7 +81,7 @@ function executableAvailable(command, environment) {
 
 function adapterCommand(adapterId, profile, environment) {
   const key = `AOR_RUNNER_COMMAND_${adapterId.replace(/[^a-z0-9]/giu, "_").toUpperCase()}`;
-  return environment[key] ?? profile?.execution?.external_runtime?.command ?? null;
+  return firstNonNullish(environment[key], profile?.execution?.external_runtime?.command, null);
 }
 
 function authReady(adapterId, input, environment) {
@@ -188,7 +193,7 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
     const classified = classifyResolutionError(error);
     return {
       step,
-      route_id: routeId ?? profile.default_route_profiles?.[step] ?? null,
+      route_id: firstNonNullish(routeId, profile.default_route_profiles?.[step], null),
       adapter: null,
       runner: null,
       provider: null,
@@ -235,6 +240,38 @@ export function resolvePreparationRunner({ registry, projectId, routeId, environ
     check,
     routeId,
   });
+}
+
+/**
+ * Resolve a Task's effective route consistently for its projection and start guard.
+ * @param {{ executionProfile: Record<string, any> | null | undefined, step: string | null | undefined, overrideRouteId?: string | null }} options
+ */
+export function resolveTaskExecutionRoute({ executionProfile, step, overrideRouteId = null }) {
+  const row = Array.isArray(executionProfile?.routes)
+    ? executionProfile.routes.find((candidate) => candidate?.step === step)
+    : null;
+  const hasOverride = overrideRouteId !== null && overrideRouteId !== undefined;
+  const override = hasOverride ? row?.approved_routes?.find((candidate) => candidate?.route_id === overrideRouteId) : null;
+  const selected = hasOverride ? override : row;
+  const routeId = hasOverride ? overrideRouteId : asString(row?.route_id);
+  const isApproved = Boolean(routeId && typeof routeId === "string" && selected && !routeId.startsWith(PREPARATION_ROUTE_PREFIX));
+  const readinessRevision = Number.isInteger(selected?.readiness_revision) ? selected.readiness_revision : null;
+  const readinessCurrent = Number.isInteger(executionProfile?.revision) && readinessRevision === executionProfile.revision;
+  const readiness = hasOverride && !override
+    ? "policy-denied"
+    : selected?.readiness === "ready" && !readinessCurrent
+      ? "stale"
+      : KNOWN_ROUTE_READINESS.has(selected?.readiness) ? selected.readiness : "unknown";
+  return {
+    source: hasOverride ? "task-override" : "project-default",
+    route_id: isApproved ? routeId : null,
+    requested_route_id: routeId,
+    selected: selected ?? null,
+    step: step ?? null,
+    readiness,
+    readiness_revision: readinessRevision,
+    approved: isApproved,
+  };
 }
 
 function overallStatus(rows) {

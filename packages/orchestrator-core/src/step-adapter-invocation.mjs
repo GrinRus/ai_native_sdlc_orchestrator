@@ -4,32 +4,7 @@ import {
   createMockAdapter,
 } from "../../adapter-sdk/src/index.mjs";
 import { executePostValidators, resolvePostValidatorPlan } from "./post-validation.mjs";
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
+import { asObject as asRecord, asString, asStringArray } from "./shared/value-normalization.mjs";
 
 /**
  * @param {Record<string, unknown> | null} adapterResolution

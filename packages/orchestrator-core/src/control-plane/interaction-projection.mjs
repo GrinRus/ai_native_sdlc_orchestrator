@@ -1,18 +1,7 @@
+import { asRecord, asString, asStringArray } from "../shared/value-normalization.mjs";
 const PERMISSION_DECISIONS = ["approve_once", "deny", "approve_for_run"];
 const INTERACTION_TYPES = ["permission_request", "clarification_question", "auth_required"];
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u;
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-function asString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()) : [];
-}
 
 function safeIdentifier(value) {
   const candidate = asString(value);

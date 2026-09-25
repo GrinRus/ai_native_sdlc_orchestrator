@@ -1,3 +1,5 @@
+import { asRecord, asString, asStringArray, asNumber, firstNonNullish } from "../../contracts/src/value-normalization.mjs";
+
 export const FINANCE_MONITORING_DIMENSION_NAMES = Object.freeze([
   "project",
   "route",
@@ -11,40 +13,6 @@ const MONITORING_EVIDENCE_CLASSES = Object.freeze([
   "offline_certification",
   "rehearsal",
 ]);
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
 
 /**
  * @param {string[]} values
@@ -155,11 +123,7 @@ function resolveRunFinance(run) {
 function classifyMonitoringEvent(event) {
   const payload = asRecord(event.payload);
   const rawScope =
-    asString(payload.evidence_scope) ??
-    asString(payload.monitoring_scope) ??
-    asString(payload.execution_scope) ??
-    asString(payload.scope) ??
-    asString(payload.source);
+    firstNonNullish(asString(payload.evidence_scope), asString(payload.monitoring_scope), asString(payload.execution_scope), asString(payload.scope), asString(payload.source));
   if (!rawScope) {
     return null;
   }

@@ -1,4 +1,5 @@
 import { derivePublicId } from "../../contracts/src/index.mjs";
+import { asRecord, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
 
 export const POST_VALIDATOR_IDS = Object.freeze([
   "output-schema",
@@ -16,24 +17,6 @@ const FAILURE_CLASS_BY_ISSUE = Object.freeze({
   "runner-result-partial": "incomplete-result",
   "runner-verification-contradiction": "verification-contradiction",
 });
-
-function asRecord(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-function uniqueStrings(values) {
-  return [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))];
-}
 
 function issue(code, summary, field, repairKind) {
   return {
@@ -223,7 +206,7 @@ export function executePostValidators(options) {
     accepted: blockingFailure === undefined,
     status,
     failureClass: blockingFailure
-      ? FAILURE_CLASS_BY_ISSUE[firstFinding?.code] ?? FAILURE_CLASS_BY_VALIDATOR[blockingFailure.validator_id] ?? "validator-failed"
+      ? firstNonNullish(FAILURE_CLASS_BY_ISSUE[firstFinding?.code], FAILURE_CLASS_BY_VALIDATOR[blockingFailure.validator_id], "validator-failed")
       : null,
     repairKind: blockingFailure ? (firstFinding?.repair_kind ?? "evidence-reconciliation") : null,
     report: validationReport({ runId: options.runId, stepId: options.stepId, status, validators: entries, evidenceRefs }),

@@ -13,9 +13,24 @@ import { readIntentSubmission, reviseIntentSubmission } from "../src/intent-serv
 import {
   applyExecutionProfileAction,
   readExecutionProfile,
+  resolveTaskExecutionRoute,
 } from "../src/control-plane/execution-profile.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+
+test("Task route resolution fails closed for empty overrides and blank project defaults", () => {
+  const row = { step: "implement", route_id: "", readiness: "ready", readiness_revision: 7, approved_routes: [] };
+  const executionProfile = { revision: 7, routes: [row] };
+  const projectDefault = resolveTaskExecutionRoute({ executionProfile, step: "implement" });
+  assert.equal(projectDefault.route_id, null);
+  assert.equal(projectDefault.approved, false);
+
+  const emptyOverride = resolveTaskExecutionRoute({ executionProfile, step: "implement", overrideRouteId: "" });
+  assert.equal(emptyOverride.source, "task-override");
+  assert.equal(emptyOverride.route_id, null);
+  assert.equal(emptyOverride.readiness, "policy-denied");
+  assert.equal(emptyOverride.approved, false);
+});
 
 function fakeRunnerEnvironment(root) {
   const bin = path.join(root, "bin");

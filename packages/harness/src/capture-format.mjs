@@ -1,8 +1,5 @@
 import { createHash } from "node:crypto";
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
+import { asRecord, firstNonNullish } from "../../contracts/src/value-normalization.mjs";
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -64,7 +61,7 @@ export function extractHarnessCompatibility(stepResult, evaluationReport = null)
     reasoning_effort_source: routeResolution.reasoning_effort_source ?? null,
     invocation_digest: digest(invocation.length > 0 ? invocation : { adapter_id: adapter.adapter_id ?? null, effective_model: routeResolution.effective_model ?? null }),
     compiled_context_fingerprint: typeof compiledArtifact.fingerprint === "string" ? compiledArtifact.fingerprint : typeof contextDiagnostics.compiled_context_fingerprint === "string" ? contextDiagnostics.compiled_context_fingerprint : null,
-    compiler_revision: compiledArtifact.compiler_revision ?? contextCompilation.compiler_revision ?? null,
+    compiler_revision: firstNonNullish(compiledArtifact.compiler_revision, contextCompilation.compiler_revision, null),
     subject_digest: typeof subjectSnapshot.digest === "string" ? subjectSnapshot.digest : null,
     suite_digest: report.suite_ref ? digest({ suite_ref: report.suite_ref, suite_version: asRecord(report.summary_metrics).suite_version }) : null,
     dataset_digest: report.dataset_ref ? digest({ dataset_ref: report.dataset_ref, cases: caseResolution }) : null,

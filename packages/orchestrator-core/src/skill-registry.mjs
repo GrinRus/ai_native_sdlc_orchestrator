@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile } from "../../contracts/src/index.mjs";
+import { asObject as asRecord, asStringArray, uniqueValues as uniqueStrings } from "./shared/value-normalization.mjs";
 
 const ROUTE_STEP_VALUES = Object.freeze([
   "discovery",
@@ -15,32 +16,6 @@ const ROUTE_STEP_VALUES = Object.freeze([
   "eval",
   "harness",
 ]);
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values)];
-}
 
 /**
  * @param {string} value

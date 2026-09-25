@@ -1,42 +1,9 @@
+import { asRecord, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
 const RUNNER_OWNED_STATE_PREFIXES = [".codex/", ".claude/", ".qwen/", ".opencode/"];
 const RUNTIME_OWNED_PREFIXES = [".aor/"];
 const RUNTIME_OWNED_FILES = new Set(["project.aor.yaml"]);
 const RUNNING_PROVIDER_STATUSES = new Set(["starting", "running", "silent-running", "artifact-updated", "timeout-risk"]);
 const BLOCKING_RUNTIME_DECISIONS = new Set(["block", "fail"]);
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))];
-}
 
 /**
  * @param {string} value
@@ -274,9 +241,7 @@ export function buildExecutionEvidenceSummary(options = {}) {
   const latestRuntimeHarnessReport = (options.runtimeHarnessReports ?? []).at(-1) ?? {};
   const latestRuntimeHarnessDocument = asRecord(latestRuntimeHarnessReport.document ?? latestRuntimeHarnessReport);
   const runtimeDecision =
-    asString(latestStepDecision.runtime_harness_decision) ??
-    asString(asRecord(latestRuntimeHarnessDocument.run_decision).overall_decision) ??
-    asString(latestRuntimeHarnessDocument.overall_decision);
+    firstNonNullish(asString(latestStepDecision.runtime_harness_decision), asString(asRecord(latestRuntimeHarnessDocument.run_decision).overall_decision), asString(latestRuntimeHarnessDocument.overall_decision));
   const postRunVerificationStatus =
     asString(latestStepDecision.verification_status) ??
     resolveVerificationReportStatus(options.verificationReports ?? []) ??
@@ -297,7 +262,7 @@ export function buildExecutionEvidenceSummary(options = {}) {
         : "fail";
   const reviewReport = asRecord((options.reviewReports ?? []).at(-1)?.document ?? (options.reviewReports ?? []).at(-1));
   const reviewStatus =
-    asString(reviewReport.overall_status) ?? asString(asRecord(reviewReport.code_quality).status) ?? "unknown";
+    firstNonNullish(asString(reviewReport.overall_status), asString(asRecord(reviewReport.code_quality).status), "unknown");
   const deliveryManifest = asRecord((options.deliveryManifests ?? []).at(-1)?.document ?? (options.deliveryManifests ?? []).at(-1));
   const deliveryReadinessStatus = asString(deliveryManifest.status) ?? ((options.deliveryManifests ?? []).length > 0 ? "materialized" : "not_materialized");
   const noUpstreamWriteStatus = deliveryEvidence.remoteWriteResults.some((result) => /\b(?:push|pushed|remote|upstream)\b/iu.test(result))

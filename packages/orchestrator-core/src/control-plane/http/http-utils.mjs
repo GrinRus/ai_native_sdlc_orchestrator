@@ -1,5 +1,7 @@
 import { redactSensitiveValue } from "../../../../observability/src/index.mjs";
 import { createOperatorError } from "../operator-error.mjs";
+import { asObject as asRecord, asString, asStringArray } from "../../shared/value-normalization.mjs";
+export { asRecord, asString, asStringArray };
 
 const RESPONSE_REDACTION_POLICY = Symbol.for("aor.http.responseRedactionPolicy");
 
@@ -22,24 +24,6 @@ export class HttpRequestBodyError extends Error {
 
 /**
  * @param {unknown} value
- * @returns {string | null}
- */
-export function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-export function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
  * @returns {number | null}
  */
 export function asPositiveInteger(value) {
@@ -47,14 +31,6 @@ export function asPositiveInteger(value) {
   if (!Number.isFinite(parsed)) return null;
   const normalized = Math.floor(parsed);
   return normalized >= 0 ? normalized : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-export function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
 }
 
 /**

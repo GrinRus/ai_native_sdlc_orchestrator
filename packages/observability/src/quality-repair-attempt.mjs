@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
+import { asRecord, asString, asStringArray } from "../../contracts/src/value-normalization.mjs";
 import { withFileLock, writeJsonAtomic } from "./file-transaction.mjs";
 
 const ATTEMPT_STATUSES = new Set(["reserved", "running", "completed", "failed", "blocked", "canceled"]);
@@ -10,18 +11,6 @@ const REQUEST_BLOCKED_STATUSES = new Set(["in-progress", "review-required", "qa-
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()) : [];
 }
 
 function uniqueStrings(values) {

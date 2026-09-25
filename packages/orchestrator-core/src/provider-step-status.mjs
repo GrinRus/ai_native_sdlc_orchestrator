@@ -1,32 +1,9 @@
+import { asFiniteNumber as asNumber, asRecord, asString, firstNonNullish } from "./shared/value-normalization.mjs";
 const RUNNING_STATUSES = new Set(["starting", "running", "silent-running", "artifact-updated", "timeout-risk"]);
 const TERMINAL_STATUSES = new Set(["completed", "interrupted", "failed"]);
 const PROVIDER_STEP_STATUSES = new Set([...RUNNING_STATUSES, ...TERMINAL_STATUSES]);
 const INTERRUPTION_OWNERS = new Set(["operator", "provider", "environment", "unknown"]);
 const DEFAULT_SILENT_AFTER_MS = 60_000;
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
 
 /**
  * @param {unknown} value
@@ -165,7 +142,7 @@ export function mergeProviderStepStatus(previous, patch, options = {}) {
   const merged = {
     ...previousStatus,
     ...asRecord(patch),
-    started_at: asString(patch.started_at) ?? asString(previousStatus.started_at) ?? timestamp,
+    started_at: firstNonNullish(asString(patch.started_at), asString(previousStatus.started_at), timestamp),
     updated_at: asString(patch.updated_at) ?? timestamp,
   };
   return /** @type {Record<string, unknown>} */ (normalizeProviderStepStatus(merged, { nowMs }) ?? merged);

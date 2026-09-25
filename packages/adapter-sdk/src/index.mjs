@@ -3,12 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { loadContractFile, validateAllowedPathPattern, validatePublicId } from "../../contracts/src/index.mjs";
+import { asRecord, asStringArray, asString as asOptionalString, firstNonNullish } from "../../contracts/src/value-normalization.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
 import { evidenceReferenceRoot, toEvidenceRef } from "./evidence-refs.mjs";
 import { normalizeSemanticEvents } from "./evidence-normalization.mjs";
 import { buildExternalExecutionOutcome, classifyProviderSemanticFailure } from "./provider-outcome.mjs";
 import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
+import { hasNonEmptyPermissionDenials } from "./permission-denials.mjs";
 import { resolveProviderCommandRoles } from "./provider-work-packet.mjs";
 import { normalizeStrictRunnerOutput, resolveStrictOutputCapability } from "./runner-output-normalization.mjs";
 import { PROCESS_TREE_SUPERVISION_SOURCE } from "./process-tree-supervision.mjs";
@@ -425,24 +427,6 @@ export const STEP_LIFECYCLE_HOOKS = Object.freeze([
 ]);
 
 /**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
  * @param {string} field
  * @param {unknown} value
  * @returns {string}
@@ -452,14 +436,6 @@ function requireString(field, value) {
     throw new Error(`Adapter envelope field '${field}' must be a non-empty string.`);
   }
   return value.trim();
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asOptionalString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 /**
@@ -880,29 +856,6 @@ function safeProgressLabel(value) {
 
 /**
  * @param {unknown} value
- * @returns {boolean}
- */
-function hasNonEmptyPermissionDenials(value) {
-  if (Array.isArray(value)) {
-    return value.some((entry) => hasNonEmptyPermissionDenials(entry));
-  }
-
-  const record = asRecord(value);
-  const entries = Object.entries(record);
-  if (entries.length === 0) {
-    return false;
-  }
-
-  const permissionDenials = record.permission_denials;
-  if (Array.isArray(permissionDenials) && permissionDenials.length > 0) {
-    return true;
-  }
-
-  return entries.some(([, entry]) => hasNonEmptyPermissionDenials(entry));
-}
-
-/**
- * @param {unknown} value
  * @returns {Array<Record<string, unknown>>}
  */
 function collectPermissionDenials(value) {
@@ -1020,7 +973,7 @@ function buildRuntimePermissionRequest(options) {
   const denials = collectPermissionDenials(options.runnerPayload);
   denials.push(...collectPermissionDenials(options.runnerToolTraces));
   const firstDenial = denials[0] ?? {};
-  const toolInput = asRecord(firstDenial.tool_input ?? firstDenial.input ?? firstDenial.arguments);
+  const toolInput = asRecord(firstNonNullish(firstDenial.tool_input, firstDenial.input, firstDenial.arguments));
   const toolName =
     firstString(firstDenial.tool_name) ??
     firstString(firstDenial.name) ??

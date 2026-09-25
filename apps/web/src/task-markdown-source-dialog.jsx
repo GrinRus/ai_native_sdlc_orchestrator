@@ -1,8 +1,10 @@
 import { useState } from "react";
 
+import { normalizeProjectRelativeMarkdownPath as safeProjectRelativePath, isValidPinnedGitRevision as validPinnedRevision } from "../../../packages/contracts/src/task-markdown-source.mjs";
 import { sanitizeMarkdownPreview } from "../../../packages/contracts/src/markdown-sanitization.mjs";
 import { Dialog } from "./dialog.jsx";
 import { Button, Icon, useRovingTabs } from "./ui/components.jsx";
+import { firstNonNullish } from "../../../packages/contracts/src/value-normalization.mjs";
 
 const MAX_SOURCE_COUNT = 10;
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -16,35 +18,28 @@ const PREVIEW_TABS = [
   { id: "preview", label: "Preview", controls: "task-preview-panel" },
   { id: "source", label: "Source", controls: "task-preview-panel" },
 ];
+const INLINE_MARKDOWN_RENDERERS = [
+  [/^`[^`]+`$/u, (piece, key) => <code key={key}>{piece.slice(1, -1)}</code>],
+  [/^\*\*[^*]+\*\*$/u, (piece, key) => <strong key={key}>{piece.slice(2, -2)}</strong>],
+  [/^\*[^*]+\*$/u, (piece, key) => <em key={key}>{piece.slice(1, -1)}</em>],
+  [/^\[[^\]]+\]\([^)]+\)$/u, (piece, key) => {
+    const match = /** @type {RegExpMatchArray} */ (piece.match(/^\[([^\]]+)\]\(([^)]+)\)$/u));
+    const [, label, destination] = match;
+    const href = safeExternalHref(destination);
+    return href
+      ? <span key={key}><a href={href} target="_blank" rel="noopener noreferrer">{label}</a> <small>(destination: {href})</small></span>
+      : <span key={key}>{label} <small>(destination: {destination})</small></span>;
+  }],
+];
 
-function safeProjectRelativePath(value) {
-  const path = String(value ?? "").trim();
-  const segments = path.split("/");
-  return path.length > 0
-    && !path.startsWith("/")
-    && !path.includes("\\")
-    && segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
-    ? path
-    : null;
-}
-
-function validPinnedRevision(value) {
-  return !value || /^[0-9a-f]{40}$/iu.test(value);
-}
+function plainInlineMarkdown(piece, key) { return <span key={key}>{piece}</span>; }
 
 function inlineMarkdown(value, keyPrefix) {
   const pieces = String(value).split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/gu);
   return pieces.map((piece, index) => {
     const key = `${keyPrefix}-${index}`;
-    if (piece.startsWith("`") && piece.endsWith("`")) return <code key={key}>{piece.slice(1, -1)}</code>;
-    if (piece.startsWith("**") && piece.endsWith("**")) return <strong key={key}>{piece.slice(2, -2)}</strong>;
-    if (piece.startsWith("*") && piece.endsWith("*")) return <em key={key}>{piece.slice(1, -1)}</em>;
-    const link = piece.match(/^\[([^\]]+)\]\(([^)]+)\)$/u);
-    if (!link) return <span key={key}>{piece}</span>;
-    const [, label, destination] = link;
-    const href = safeExternalHref(destination);
-    if (!href) return <span key={key}>{label} <small>(destination: {destination})</small></span>;
-    return <span key={key}><a href={href} target="_blank" rel="noopener noreferrer">{label}</a> <small>(destination: {href})</small></span>;
+    const renderer = INLINE_MARKDOWN_RENDERERS.find(([pattern]) => pattern.test(piece))?.[1] ?? plainInlineMarkdown;
+    return renderer(piece, key);
   });
 }
 
@@ -113,6 +108,10 @@ function sourceLabel(source) {
 
 function sourceBytes(source) {
   return Number(source?.preview?.byte_length) || 0;
+}
+
+function sourceCountLabel(action, count) {
+  return `${action} ${count} source${count === 1 ? "" : "s"}`;
 }
 
 function repositorySource(relativePath, revision) {
@@ -217,32 +216,31 @@ function saveMarkdownSources({ mode, canAddRepository, repositoryPath, repositor
 }
 
 function sourceDialogPresentation({ mode, pastedText, activeSource, sourceSubmissionId, sources, allSources, canAddRepository, repositoryPath }) {
-  const previewText = mode === "paste"
-    ? sanitizeMarkdownPreview(pastedText)
-    : activeSource?.kind === "upload-snapshot"
-      ? activeSource.preview?.sanitized_markdown || ""
-      : activeSource?.kind === "repository-markdown"
-        ? activeSource.preview?.sanitized_markdown || "AOR reads and sanitizes this connected repository file during preparation."
-        : "Choose a Markdown source to preview.";
+  const previewByKind = {
+    "upload-snapshot": activeSource?.preview?.sanitized_markdown || "",
+    "repository-markdown": activeSource?.preview?.sanitized_markdown || "AOR reads and sanitizes this connected repository file during preparation.",
+  };
+  const previewText = mode === "paste" ? sanitizeMarkdownPreview(pastedText) : previewByKind[activeSource?.kind] || "Choose a Markdown source to preview.";
   const selectedTab = SOURCE_TABS.find((tab) => tab.id === mode);
-  const saveDisabled = mode === "paste"
-    ? !pastedText.trim()
-    : mode === "repository" && repositoryPath.trim()
-      ? !canAddRepository
-      : allSources.length === 0;
+  const saveDisabled = new Map([["paste", !pastedText.trim()], ["repository", new Map([[true, !canAddRepository], [false, allSources.length === 0]]).get(Boolean(repositoryPath.trim()))]]).get(mode) ?? allSources.length === 0;
   const addLabel = mode === "paste"
     ? "Add to task brief"
     : sourceSubmissionId
-      ? `Keep ${allSources.length} source${allSources.length === 1 ? "" : "s"}`
-      : `Add ${sources.length} source${sources.length === 1 ? "" : "s"}`;
+      ? sourceCountLabel("Keep", allSources.length)
+      : sourceCountLabel("Add", sources.length);
   return { previewText, selectedTab, saveDisabled, addLabel };
 }
+
+function UploadSourcePanel({ dragActive, setDragActive, addFiles }) { return <label className={`task-dropzone${dragActive ? " is-drag-active" : ""}`} id="task-source-upload-panel" onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }} onDragOver={(event) => { event.preventDefault(); setDragActive(true); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDragActive(false); }} onDrop={(event) => { event.preventDefault(); setDragActive(false); void addFiles(event.dataTransfer.files); }}><span className="task-dropzone__icon"><Icon name="upload" /></span><strong>Drop .md files here</strong><span><input aria-label="Upload Markdown" id="task-markdown-upload" type="file" accept=".md,text/markdown" multiple onChange={(event) => { void addFiles(event.target.files); event.target.value = ""; }} />Choose files</span><small>Up to 10 sources · 1 MiB per file · 5 MiB total uploads</small></label>; }
+function RepositorySourcePanel({ repositoryPath, setRepositoryPath, repositoryRevision, setRepositoryRevision, canAddRepository, addRepositorySource }) { return <div className="task-repository-form" id="task-source-repository-panel"><label htmlFor="repository-markdown-path">Project-relative Markdown path</label><input id="repository-markdown-path" value={repositoryPath} onChange={(event) => setRepositoryPath(event.target.value)} placeholder="docs/task.md" /><label htmlFor="repository-markdown-revision">Pinned current base revision</label><input id="repository-markdown-revision" value={repositoryRevision} onChange={(event) => setRepositoryRevision(event.target.value)} placeholder="Current checkout (automatic)" /><p className="task-muted">Leave revision blank to pin the current checkout automatically. An explicit revision must equal its current Git HEAD. AOR reads and sanitizes the file during task preparation.</p><Button onClick={addRepositorySource} disabled={!canAddRepository}>Add repository file</Button></div>; }
+function PasteSourcePanel({ pastedText, setPastedText }) { return <div className="task-inline-markdown" id="task-source-paste-panel"><label htmlFor="task-markdown">Paste Markdown into the Task brief</label><textarea id="task-markdown" aria-label="Paste Markdown" rows="10" value={pastedText} onChange={(event) => setPastedText(event.target.value)} placeholder="# Context" /><p className="task-muted">Pasted text is added to the Task request and is not stored as a separate file.</p></div>; }
+const SOURCE_MODE_PANELS = { upload: UploadSourcePanel, repository: RepositorySourcePanel, paste: PasteSourcePanel };
 
 export function MarkdownSourceDialog({ selectedSources = [], initialSources = [], sourceSubmissionId = null, openerElementRef, onClose, onAdd }) {
   const [mode, setMode] = useState("upload");
   const [sources, setSources] = useState(() => initialSources);
   const [removedSourceIds, setRemovedSourceIds] = useState([]);
-  const [activeSourceId, setActiveSourceId] = useState(initialSources[0]?.source_id ?? selectedSources[0]?.source_id ?? null);
+  const [activeSourceId, setActiveSourceId] = useState(firstNonNullish(initialSources[0]?.source_id, selectedSources[0]?.source_id, null));
   const [repositoryPath, setRepositoryPath] = useState("");
   const [repositoryRevision, setRepositoryRevision] = useState("");
   const [pastedText, setPastedText] = useState("");
@@ -263,6 +261,7 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
     && !allSources.some((source) => source.kind === "repository-markdown" && (source.reference?.project_relative_path ?? source.preview?.project_relative_path) === repositoryPath.trim());
 
   const addFiles = (fileList) => addMarkdownFiles({ fileList, allSources, attachmentBytes, setError, setSources, setActiveSourceId });
+  const SourcePanel = SOURCE_MODE_PANELS[mode];
 
   function addRepositorySource() {
     if (!canAddRepository) return;
@@ -285,13 +284,7 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
       <div className="task-source-tabs" role="tablist" aria-label="Markdown source type">{SOURCE_TABS.map((tab, index) => <button {...getTabProps(tab, index)} key={tab.id} id={`task-source-tab-${tab.id}`} type="button" role="tab" aria-selected={mode === tab.id} aria-controls={selectedTab?.id === tab.id ? tab.controls : undefined} className={mode === tab.id ? "is-selected" : ""} onClick={() => setMode(tab.id)}>{tab.label}</button>)}</div>
       <div className="task-source-overlay__grid">
         <div className="task-source-input-pane">
-          {mode === "upload" ? <label className={`task-dropzone${dragActive ? " is-drag-active" : ""}`} id="task-source-upload-panel" onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }} onDragOver={(event) => { event.preventDefault(); setDragActive(true); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDragActive(false); }} onDrop={(event) => { event.preventDefault(); setDragActive(false); void addFiles(event.dataTransfer.files); }}>
-            <span className="task-dropzone__icon"><Icon name="upload" /></span><strong>Drop .md files here</strong>
-            <span><input aria-label="Upload Markdown" id="task-markdown-upload" type="file" accept=".md,text/markdown" multiple onChange={(event) => { void addFiles(event.target.files); event.target.value = ""; }} />Choose files</span>
-            <small>Up to 10 sources · 1 MiB per file · 5 MiB total uploads</small>
-          </label> : null}
-          {mode === "repository" ? <div className="task-repository-form" id="task-source-repository-panel"><label htmlFor="repository-markdown-path">Project-relative Markdown path</label><input id="repository-markdown-path" value={repositoryPath} onChange={(event) => setRepositoryPath(event.target.value)} placeholder="docs/task.md" /><label htmlFor="repository-markdown-revision">Pinned current base revision</label><input id="repository-markdown-revision" value={repositoryRevision} onChange={(event) => setRepositoryRevision(event.target.value)} placeholder="Current checkout (automatic)" /><p className="task-muted">Leave revision blank to pin the current checkout automatically. An explicit revision must equal its current Git HEAD. AOR reads and sanitizes the file during task preparation.</p><Button onClick={addRepositorySource} disabled={!canAddRepository}>Add repository file</Button></div> : null}
-          {mode === "paste" ? <div className="task-inline-markdown" id="task-source-paste-panel"><label htmlFor="task-markdown">Paste Markdown into the Task brief</label><textarea id="task-markdown" aria-label="Paste Markdown" rows="10" value={pastedText} onChange={(event) => setPastedText(event.target.value)} placeholder="# Context" /><p className="task-muted">Pasted text is added to the Task request and is not stored as a separate file.</p></div> : null}
+          <SourcePanel dragActive={dragActive} setDragActive={setDragActive} addFiles={addFiles} repositoryPath={repositoryPath} setRepositoryPath={setRepositoryPath} repositoryRevision={repositoryRevision} setRepositoryRevision={setRepositoryRevision} canAddRepository={canAddRepository} addRepositorySource={addRepositorySource} pastedText={pastedText} setPastedText={setPastedText} />
           {error ? <p className="task-inline-alert" role="alert">{error}</p> : null}
           <h3>Source list ({allSources.length})</h3>
           <div className="task-source-list">{allSources.map((source) => {

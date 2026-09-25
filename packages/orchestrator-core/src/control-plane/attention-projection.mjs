@@ -2,19 +2,27 @@ import { createHash } from "node:crypto";
 
 import { readFlowEvidenceGraph, readFlowProjection } from "./flow-projections.mjs";
 import { readNextActionReport } from "./read-artifact-readers.mjs";
+import { asStringArray as strings, firstNonNullish } from "../shared/value-normalization.mjs";
 
 const RELEVANT_FAMILY = /(interaction|decision|assessment|verification|quality-repair|policy|run-control|runtime-harness|review-report)/u;
 const RESOLVED_STATUS = new Set(["accepted", "answered", "approve", "approved", "closed", "completed", "pass", "passed", "resolved", "succeeded", "success"]);
 const RUNNING_STATUS = new Set(["active", "canceling", "running", "silent-running", "starting", "waiting-input"]);
 const UPCOMING_STATUS = new Set(["planned", "pending", "queued", "upcoming"]);
 const DANGER_STATUS = new Set(["blocked", "budget-exhausted", "deny", "denied", "error", "fail", "failed", "rejected"]);
+const STATE_BY_STATUS = new Map([
+  ...[...RESOLVED_STATUS].map((status) => [status, "resolved"]),
+  ...[...RUNNING_STATUS].map((status) => [status, "running"]),
+  ...[...UPCOMING_STATUS].map((status) => [status, "upcoming"]),
+]);
+const SEVERITY_BY_STATE = new Map([
+  ["needs-attention", "warning"],
+  ["running", "information"],
+  ["upcoming", "information"],
+  ["resolved", "neutral"],
+]);
 
 function text(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function strings(value) {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()) : [];
 }
 
 function normalizeStatus(value) {
@@ -22,17 +30,11 @@ function normalizeStatus(value) {
 }
 
 function itemState(status) {
-  if (RESOLVED_STATUS.has(status)) return "resolved";
-  if (RUNNING_STATUS.has(status)) return "running";
-  if (UPCOMING_STATUS.has(status)) return "upcoming";
-  return "needs-attention";
+  return STATE_BY_STATUS.get(status) ?? "needs-attention";
 }
 
 function itemSeverity(status, state) {
-  if (DANGER_STATUS.has(status)) return "danger";
-  if (state === "needs-attention") return "warning";
-  if (state === "running" || state === "upcoming") return "information";
-  return "neutral";
+  return DANGER_STATUS.has(status) ? "danger" : SEVERITY_BY_STATE.get(state) ?? "neutral";
 }
 
 function stableItemId(flowId, family, ref) {
@@ -97,7 +99,7 @@ export function readAttentionProjection(options) {
     .sort(compareItems);
   const latestSourceAt = items.map((item) => item.updated_at).filter(Boolean).sort().at(-1) ?? null;
   return {
-    project_id: graph?.project_id ?? nextAction?.project_id ?? null,
+    project_id: firstNonNullish(graph?.project_id, nextAction?.project_id, null),
     flow_id: flow.flow_id,
     initialized: true,
     read_only: true,

@@ -3,24 +3,7 @@ import path from "node:path";
 
 import { applyReadModelLimit } from "./read-artifact-readers.mjs";
 import { createProjectReadContext } from "./project-context.mjs";
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
+import { asFiniteNumber as asNumber, asRecord, asString, asStringArray } from "../shared/value-normalization.mjs";
 
 export function listParentRunProjections(options = {}) {
   const init = createProjectReadContext(options);

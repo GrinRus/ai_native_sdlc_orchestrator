@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { normalizeIdentifierFragment as normalizeForId } from "../../../contracts/src/index.mjs";
 
 import {
   buildMissingArtifactDisplaySummary,
@@ -21,55 +22,19 @@ import { readRunEvents } from "./live-event-stream.mjs";
 import { loadValidatedIntakePacket } from "../intake-packet-discovery.mjs";
 import { resolveLogicalEvidenceRef } from "../aor-home.mjs";
 import { buildFlowPresentation } from "./flow-path.mjs";
+import { asRecord, asString, asStringArray, uniqueTrimmedStrings as uniqueStrings, firstNonNullish } from "../shared/value-normalization.mjs";
 
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/u;
 const READ_ONLY_INSPECTION_INTENTS = new Set(["analyze", "explain", "review", "validate"]);
+const TRACE_EVENT_TYPE_BY_FAMILY = new Map([
+  ["step-result", "step-result"],
+  ["runtime-harness-report", "runtime-harness-decision"],
+  ["delivery-manifest", "delivery-release-artifact"],
+  ["release-packet", "delivery-release-artifact"],
+  ["delivery-plan", "delivery-release-artifact"],
+]);
 
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-function blockerLabel(value) { if (typeof value === "string" && value.trim().length > 0) return value.trim(); const blocker = asRecord(value); return asString(blocker.summary) ?? asString(blocker.code) ?? asString(blocker.message); } function blockerLabels(value) { return Array.isArray(value) ? value.map(blockerLabel).filter(Boolean) : []; }
-/**
- * @param {unknown[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return Array.from(
-    new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0).map((value) => value.trim())),
-  );
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function normalizeForId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
-}
+function blockerLabel(value) { if (typeof value === "string" && value.trim().length > 0) return value.trim(); const blocker = asRecord(value); return firstNonNullish(asString(blocker.summary), asString(blocker.code), asString(blocker.message)); } function blockerLabels(value) { return Array.isArray(value) ? value.map(blockerLabel).filter(Boolean) : []; }
 
 /**
  * @param {string} filePath
@@ -298,10 +263,7 @@ function resolveWritebackPolicy(body, report) {
   const bodyPolicy = asRecord(missionScope.writeback_policy);
   const boundedExecution = asRecord(report?.bounded_execution);
   const mode =
-    asString(bodyPolicy.mode) ??
-    asString(missionScope.delivery_mode) ??
-    asString(boundedExecution.requested_delivery_mode) ??
-    "no-write";
+    firstNonNullish(asString(bodyPolicy.mode), asString(missionScope.delivery_mode), asString(boundedExecution.requested_delivery_mode), "no-write");
   return {
     mode,
     upstream_writes_default: bodyPolicy.upstream_writes_default === true ? true : false,
@@ -328,10 +290,7 @@ function resolveFollowUpSourceHandoffRef(body) {
   const featureRequest = asRecord(body.feature_request);
   const requestDocument = asRecord(featureRequest.request_document);
   return (
-    asString(coverageFollowUp.follow_up_source_handoff_ref) ??
-    asString(coverageFollowUp.source_handoff_ref) ??
-    asString(coverageFollowUp.handoff_ref) ??
-    asString(requestDocument.follow_up_source_handoff_ref)
+    firstNonNullish(asString(coverageFollowUp.follow_up_source_handoff_ref), asString(coverageFollowUp.source_handoff_ref), asString(coverageFollowUp.handoff_ref), asString(requestDocument.follow_up_source_handoff_ref))
   );
 }
 
@@ -590,7 +549,7 @@ export function listFlowProjections(options = {}) {
   return {
     initialized: init.initialized,
     project_id: init.projectId,
-    selected_flow_id: selectedInWindow?.flow_id ?? limitedFlows[0]?.flow_id ?? null,
+    selected_flow_id: firstNonNullish(selectedInWindow?.flow_id, limitedFlows[0]?.flow_id, null),
     active_flow_ids: limitedFlows.filter((flow) => flow.status === "active").map((flow) => flow.flow_id),
     completed_flow_ids: limitedFlows.filter((flow) => flow.status === "completed").map((flow) => flow.flow_id),
     flows: limitedFlows,
@@ -625,9 +584,7 @@ export function readFlowProjection(options) {
  */
 function resolveDocumentRunId(document) {
   return (
-    asString(document.run_id) ??
-    asString(asRecord(document.runtime_harness).run_id) ??
-    asString(asRecord(document.closure_state).run_id)
+    firstNonNullish(asString(document.run_id), asString(asRecord(document.runtime_harness).run_id), asString(asRecord(document.closure_state).run_id))
   );
 }
 
@@ -649,11 +606,7 @@ function resolveDocumentRunRefs(document) {
  */
 function resolveDocumentStatus(document) {
   return (
-    asString(document.status) ??
-    asString(document.overall_status) ??
-    asString(document.overall_decision) ??
-    asString(document.decision) ??
-    asString(asRecord(document.delivery_gate).status)
+    firstNonNullish(asString(document.status), asString(document.overall_status), asString(document.overall_decision), asString(document.decision), asString(asRecord(document.delivery_gate).status))
   );
 }
 
@@ -770,12 +723,7 @@ function buildEvidenceNode(entry, preferredRef) {
     run_ids: resolveDocumentRunRefs(document),
     target_flow_id: asString(document.target_flow_id),
     summary:
-      asString(displaySummary.description) ??
-      asString(document.request_summary) ??
-      asString(document.summary) ??
-      asString(document.title) ??
-      asString(document.reason) ??
-      null,
+      firstNonNullish(asString(displaySummary.description), asString(document.request_summary), asString(document.summary), asString(document.title), asString(document.reason), null),
     display_summary: Object.keys(displaySummary).length > 0 ? displaySummary : null,
   };
 }
@@ -914,12 +862,7 @@ function buildTraceItemsForEntry(entry) {
               ? "delivery-release-artifact"
               : family,
       summary:
-        asString(displaySummary.description) ??
-        asString(document.request_summary) ??
-        asString(document.summary) ??
-        asString(document.reason) ??
-        asString(document.decision) ??
-        null,
+        firstNonNullish(asString(displaySummary.description), asString(document.request_summary), asString(document.summary), asString(document.reason), asString(document.decision), null),
       display_summary: Object.keys(displaySummary).length > 0 ? displaySummary : null,
     },
   ];
@@ -949,12 +892,7 @@ function inferFamilyFromEvidenceRef(ref) {
  * @returns {string}
  */
 function traceEventTypeForFamily(family) {
-  if (family === "step-result") return "step-result";
-  if (family === "runtime-harness-report") return "runtime-harness-decision";
-  if (family === "delivery-manifest" || family === "release-packet" || family === "delivery-plan") {
-    return "delivery-release-artifact";
-  }
-  return family;
+  return TRACE_EVENT_TYPE_BY_FAMILY.get(family) ?? family;
 }
 
 /**

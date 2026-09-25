@@ -5,12 +5,13 @@ import { resolveAdapterMatrix } from "../../adapter-sdk/src/index.mjs";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
 import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
 import { resolveProjectRepoScope } from "./repo-scope.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
+import { asRecord, asRecordArray, uniqueNonEmptyStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
   ".ts": "typescript",
@@ -54,31 +55,12 @@ const ARCHITECTURE_CONTRACT_REFS = Object.freeze([
  * @param {string} filePath
  * @returns {string}
  */
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
 function toProjectRelativeOrAbsolutePath(projectRoot, filePath) {
   const relative = path.relative(projectRoot, filePath).replace(/\\/g, "/");
   if (relative && !relative.startsWith("../") && !path.isAbsolute(relative)) {
     return relative;
   }
   return filePath;
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
 }
 
 /**
@@ -212,28 +194,8 @@ function resolveFeatureTraceability(options) {
   };
 }
 
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
 function asStringArray(value) {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry)).map(asRecord) : [];
-}
-
-/**
- * @param {unknown[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values.filter((entry) => typeof entry === "string" && entry.length > 0))];
 }
 
 /**

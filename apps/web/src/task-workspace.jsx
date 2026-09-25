@@ -5,6 +5,8 @@ import { TaskInteractionPanel } from "./task-interaction-panel.jsx";
 import { MarkdownSourceDialog } from "./task-markdown-source-dialog.jsx";
 import { taskAcceptanceCriteria, taskOutcome, taskScopeIsPublished, taskScopeLabel, taskScopePaths } from "./task-projection-content.js";
 import { Button, EmptyState, Icon, useRovingTabs } from "./ui/components.jsx";
+import { WORK_TYPE_TO_STEP } from "../../../packages/contracts/src/task-work-type.mjs";
+import { firstNonNullish } from "../../../packages/contracts/src/value-normalization.mjs";
 
 const SCREENS = [
   ["home", "Tasks Home"],
@@ -26,14 +28,6 @@ const SIDE_NAV = [
 
 const NEW_TASK_DRAFT_ID = "__new-task-draft__";
 const PROJECT_DEFAULT_ROUTE_OPTION = "__project_default__";
-
-const WORK_TYPE_TO_STEP = Object.freeze({
-  analyze: "discovery",
-  explain: "research",
-  review: "review",
-  "document-change": "implement",
-  "code-change": "implement",
-});
 
 function executionStepFor(task) {
   const publishedStep = String(task?.runner_selection?.step ?? "").trim();
@@ -82,8 +76,12 @@ function readinessLabel(readiness) {
   }[readiness] || "Status unavailable";
 }
 
+function taskDeliveryModeValue(task) {
+  return String(firstNonNullish(task?.prepared_contract?.delivery_mode, task?.normalization?.delivery_mode, task?.writeback_policy?.mode, "")).trim();
+}
+
 function deliveryMode(task) {
-  const value = String(task?.prepared_contract?.delivery_mode ?? task?.normalization?.delivery_mode ?? task?.writeback_policy?.mode ?? "").trim();
+  const value = taskDeliveryModeValue(task);
   return {
     "no-write": "No-write",
     "patch-only": "Patch only",
@@ -94,7 +92,7 @@ function deliveryMode(task) {
 }
 
 function deliveryModeDescription(task) {
-  const value = String(task?.prepared_contract?.delivery_mode ?? task?.normalization?.delivery_mode ?? task?.writeback_policy?.mode ?? "").trim();
+  const value = taskDeliveryModeValue(task);
   return {
     "no-write": "This Task produces analysis and evidence without writing repository changes.",
     "patch-only": "Changes are captured as patch evidence; upstream writes remain off.",
@@ -107,12 +105,11 @@ function deliveryModeDescription(task) {
 function RouteDetails({ route, selection }) {
   if (!route && !selection) return null;
   const capabilities = Array.isArray(route?.required_capabilities) ? route.required_capabilities : [];
-  const source = selection?.source === "task-override"
-    ? "Task override"
-    : selection?.source === "project-default" ? "Project default" : "Task preparation";
+  const source = { "task-override": "Task override", "project-default": "Project default" }[selection?.source] ?? "Task preparation";
+  const readiness = selection?.readiness ?? route?.readiness;
   const rows = [
     ["Selection", source],
-    ["Readiness", selection?.readiness ? readinessLabel(selection.readiness) : route?.readiness ? readinessLabel(route.readiness) : null],
+    ["Readiness", readiness ? readinessLabel(readiness) : null],
     ["Readiness revision", selection?.readiness_revision ?? route?.readiness_revision],
     ["Runner", route?.runner || route?.adapter],
     ["Adapter", route?.adapter],
@@ -131,13 +128,18 @@ function RouteDetails({ route, selection }) {
 }
 
 function preparationRecovery(runner) {
+  const readiness = runner?.readiness;
+  if (!readiness || readiness === "ready") return null;
   const adapterKey = String(runner?.adapter ?? "").replace(/[^a-z0-9]/giu, "_").toUpperCase();
-  if (runner?.readiness === "runner-missing") return `Install ${preparationRunnerLabel(runner)} or set AOR_RUNNER_COMMAND_${adapterKey} for the local app, then check again.`;
-  if (runner?.readiness === "auth-missing") return `Sign in to ${preparationRunnerLabel(runner)} and set AOR_AUTH_READY_${adapterKey}=true for the local app, then check again.`;
-  if (runner?.readiness === "stale") return "Check this runner again before preparing the task.";
-  if (runner?.readiness === "unconfigured" || runner?.readiness === "unknown") return "Check this runner before preparing the task.";
-  if (runner?.readiness && runner.readiness !== "ready") return `Resolve ${readinessLabel(runner.readiness).toLowerCase()} for this route before preparing the task.`;
-  return null;
+  const recoveryByReadiness = {
+    "runner-missing": `Install ${preparationRunnerLabel(runner)} or set AOR_RUNNER_COMMAND_${adapterKey} for the local app, then check again.`,
+    "auth-missing": `Sign in to ${preparationRunnerLabel(runner)} and set AOR_AUTH_READY_${adapterKey}=true for the local app, then check again.`,
+    stale: "Check this runner again before preparing the task.",
+    unconfigured: "Check this runner before preparing the task.",
+    unknown: "Check this runner before preparing the task.",
+  };
+  return recoveryByReadiness[readiness]
+    ?? `Resolve ${readinessLabel(readiness).toLowerCase()} for this route before preparing the task.`;
 }
 
 function approvedRunnerOptions(executionProfile, step, runnerSelection) {
@@ -166,8 +168,8 @@ function taskStatusTone(task) { return { paused: "warning", canceling: "warning"
 
 function taskRuntimeControls(task) {
   const status = task?.run_state?.status;
-  if (status === "paused") return { action: "resume", canStop: true };
-  return { action: !status || status === "running" ? "pause" : null, canStop: !status || ["running", "paused"].includes(status) };
+  const control = { paused: { action: "resume", canStop: true }, running: { action: "pause", canStop: true } }[status];
+  return control ?? { action: status ? null : "pause", canStop: !status };
 }
 
 function taskCanOpenReview(task) {
@@ -202,7 +204,7 @@ function taskHasCompletionProof(task) {
     && task?.completion?.status === "complete"
     && task?.completion?.verification_status === "pass"
     && task?.completion?.delivery_status === "pass"
-    && Boolean(String(task?.completion?.patch_ref ?? task?.completion?.delivery_manifest_ref ?? "").trim())
+    && Boolean(String(firstNonNullish(task?.completion?.patch_ref, task?.completion?.delivery_manifest_ref, "")).trim())
     && completionEvidenceRefs(task).length > 0;
 }
 
@@ -227,7 +229,7 @@ function taskDestination(task) {
   if (["review", "request_review", "task.review"].includes(actionId)) return "review";
   if (task.status === "prepared" || task.status === "draft") return "prepared";
   if (task.status === "active" || task.status === "running") {
-    const step = String(task.current_step ?? task.current_step_label ?? "").toLowerCase();
+    const step = String(firstNonNullish(task.current_step, task.current_step_label, "")).toLowerCase();
     if (step.includes("review")) return "review";
     return "active";
   }
@@ -275,7 +277,7 @@ function LifecyclePath({ task, variant = "default" }) {
   return <ol className={`task-lifecycle task-lifecycle--${variant}`} aria-label="Lifecycle progress">
     {steps.map((step, index) => {
       const id = String(step?.id ?? `step-${index + 1}`);
-      const label = String(step?.label ?? step?.title ?? id);
+      const label = String(firstNonNullish(step?.label, step?.title, id));
       const rawState = String(step?.state ?? "upcoming").toLowerCase();
       const state = ["complete", "completed", "done", "passed"].includes(rawState) ? "complete" : rawState === "current" ? "current" : "upcoming";
       return <li key={id} data-state={state} aria-current={state === "current" ? "step" : undefined}>
@@ -879,7 +881,27 @@ export function TaskWorkspace({ project, tasks = [], operatorRequests = [], inte
     partial: ["partial", "Partial"],
     offline: ["offline", "Offline"],
   }[connectionState] ?? ["unknown", "Status unavailable"];
-  const screenTitle = screen === "new" ? "New task" : screen === "sources" ? "Tasks" : screen === "prepared" ? "Prepared task" : screen === "active" ? "Active task" : screen === "review" ? taskTitle(selectedTask) : screen === "complete" ? taskTitle(selectedTask) : screen === "attention" ? "Attention" : "Tasks";
+  const screenTitle = ({ new: "New task", sources: "Tasks", prepared: "Prepared task", active: "Active task", review: taskTitle(selectedTask), complete: taskTitle(selectedTask), attention: "Attention" })[screen] || "Tasks";
+  const newTaskScreen = <NewTaskScreen outcome={outcome} setOutcome={setOutcome} selectedSources={sourceItems} onAddSources={(opener) => { sourceOpenerRef.current = opener; setScreen("sources"); }} onPrepare={prepareTask} onCancel={() => { setPendingSources([]); setSourceContinuation({ submissionId: null, sourceIds: [] }); if (pendingPreparation) { onStopFollowingPreparation?.(); onRefresh?.(); } setScreen("home"); }} executionProfile={executionProfile} preparationRunnerOptions={preparationRunnerOptions} preparationRouteId={preparationRouteId} onSelectPreparationRunner={(routeId) => setPreparationRunnerChoice({ projectId: executionProfile?.project_id ?? null, routeId })} onCheckPreparationRunner={onCheckPreparationRunner} onInitializeRunnerProfile={onInitializeRunnerProfile} preparationRunnerReady={preparationRunnerReady} actionBusy={actionBusy} preparing={preparingTask} pendingPreparation={pendingPreparation} hidden={screen !== "new"} />;
+  const completionScreenByProof = new Map([
+    [true, <CompletionScreen task={selectedTask} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} onOpenInspector={() => setInspectorOpen("completion")} onBackToTasks={backToTasks} actionBusy={actionBusy} />],
+    [false, <div className="task-review-state task-review-state--error" role="alert"><strong>Closure evidence is not complete.</strong><p>The server has not published verification and delivery proof for this task yet.</p><Button onClick={() => setScreen("review")}>Back to review</Button></div>],
+  ]).get(taskHasCompletionProof(selectedTask));
+  const screenContent = {
+    home: <TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={startNewTask} project={project} />,
+    new: newTaskScreen,
+    sources: <>{newTaskScreen}<div className="task-home-underlay"><TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={() => setScreen("new")} project={project} /></div><MarkdownSourceDialog selectedSources={retainedTaskSources} initialSources={pendingSources} sourceSubmissionId={sourceContinuation.submissionId} openerElementRef={sourceOpenerRef} onClose={() => setScreen("new")} onAdd={addMarkdownSources} /></>,
+    prepared: <PreparedScreen task={preparedTask} selectedSources={sourceItems} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} runnerSelection={runnerSelection} projectDefaultSelection={profileSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} onCheckRunner={onCheckExecutionRunner} actionBusy={actionBusy} actionError={actionError} onEdit={() => editTask(preparedTask)} onStart={async (action) => { if (!action) return; const result = await onTaskAction?.(preparedTask, action, { expected_revision: preparedTask?.revision, expected_selection_revision: preparedTask?.runner_selection?.selection_revision ?? 0 }); if (result) setScreen("active"); }} />,
+    active: <ActiveScreen task={selectedTask} project={project} interactions={selectedInteractions} onAnswerInteraction={onAnswerInteraction} runnerSelection={runnerSelection} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} onReview={() => setScreen("review")} onOpenInspector={() => setInspectorOpen("runtime")} />,
+    attention: <AttentionScreen tasks={tasks} selectedTask={attentionTask} interactions={attentionInteractions} onAnswerInteraction={onAnswerInteraction} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onSelect={chooseTask} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} onEditTask={editTask} onOpenReview={() => setScreen("review")} actionBusy={actionBusy} />,
+    review: <ReviewScreen task={selectedTask} reviewState={reviewState} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} onSelectPath={(path) => void refreshTaskReview(path)} onRetry={() => void refreshTaskReview(reviewState.data?.selected_path)} onReviewDecision={(decision, reason) => onReviewDecision?.(selectedTask, decision, reason)} onOpenInspector={() => setInspectorOpen("review")} onBackToTasks={backToTasks} actionBusy={actionBusy} />,
+    complete: completionScreenByProof,
+  };
+  const inspectorContent = new Map([
+    ["runtime", <RuntimeInspector task={selectedTask} />],
+    ["completion", <CompletionInspector task={selectedTask} actionBusy={actionBusy} onBackToTasks={backToTasks} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} />],
+    ["review", <ReviewInspector task={selectedTask} review={selectedTask?.review} reviewData={reviewState.data} note={reviewNote} setNote={setReviewNote} />],
+  ]).get(inspectorOpen);
 
   return <section className={`task-workspace-shell aor-ui aor-density-relaxed task-workspace-shell--${screen}${navCollapsed ? " task-workspace-shell--nav-collapsed" : ""}`} aria-label="Task Workspace — server-owned Task projection" data-screen={screen}>
     <aside className="task-workspace__sidebar">
@@ -900,18 +922,10 @@ export function TaskWorkspace({ project, tasks = [], operatorRequests = [], inte
         <div className="task-workspace__top-actions">{["home", "active", "attention", "prepared"].includes(screen) ? <label className="task-search" htmlFor="task-search-input"><Glyph name="search" /><input id="task-search-input" name="task-search" aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>/</kbd></label> : null}{["home", "active", "attention", "prepared"].includes(screen) ? <select id="task-filter" name="task-filter" aria-label="Filter tasks" className="task-filter" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All tasks</option><option value="attention">Open</option><option value="active">Active</option><option value="ready">Ready</option><option value="completed">Completed</option></select> : null}<span className={`task-connection-badge task-connection-badge--${connectionStatus[0]}`} role="status" aria-label={`AOR data connection: ${connectionStatus[1]}`} title={`AOR data connection: ${connectionStatus[1]}`}><Glyph name="signal" />{connectionStatus[1]}</span><span className="task-safe-badge"><Glyph name="shield" />{deliveryMode(selectedTask)}</span><button type="button" className="task-top-icon task-top-icon--utility" aria-label="Help" onClick={() => setHelpOpen(true)}><Glyph name="help" /></button><Button variant="primary" onClick={startNewTask} disabled={pendingPreparation} title={pendingPreparation ? "Wait for task preparation to finish or return to the task queue." : undefined}><Glyph name="plus" />New task<kbd aria-hidden="true">N</kbd></Button><button type="button" className="task-top-icon task-top-icon--keyboard" aria-label="Open command palette" onClick={() => document.querySelector('[aria-label="Search tasks"]')?.focus()}><kbd>⌘</kbd></button></div>
       </header>
       <main className="task-workspace__body">
-        {screen === "home" ? <TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={startNewTask} project={project} /> : null}
-        {screen === "new" || screen === "sources" ? <NewTaskScreen outcome={outcome} setOutcome={setOutcome} selectedSources={sourceItems} onAddSources={(opener) => { sourceOpenerRef.current = opener; setScreen("sources"); }} onPrepare={prepareTask} onCancel={() => { setPendingSources([]); setSourceContinuation({ submissionId: null, sourceIds: [] }); if (pendingPreparation) { onStopFollowingPreparation?.(); onRefresh?.(); } setScreen("home"); }} executionProfile={executionProfile} preparationRunnerOptions={preparationRunnerOptions} preparationRouteId={preparationRouteId} onSelectPreparationRunner={(routeId) => setPreparationRunnerChoice({ projectId: executionProfile?.project_id ?? null, routeId })} onCheckPreparationRunner={onCheckPreparationRunner} onInitializeRunnerProfile={onInitializeRunnerProfile} preparationRunnerReady={preparationRunnerReady} actionBusy={actionBusy} preparing={preparingTask} pendingPreparation={pendingPreparation} hidden={screen !== "new"} /> : null}
-        {screen === "sources" ? <><div className="task-home-underlay"><TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={() => setScreen("new")} project={project} /></div><MarkdownSourceDialog selectedSources={retainedTaskSources} initialSources={pendingSources} sourceSubmissionId={sourceContinuation.submissionId} openerElementRef={sourceOpenerRef} onClose={() => setScreen("new")} onAdd={addMarkdownSources} /></> : null}
-        {screen === "prepared" ? <PreparedScreen task={preparedTask} selectedSources={sourceItems} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} runnerSelection={runnerSelection} projectDefaultSelection={profileSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} onCheckRunner={onCheckExecutionRunner} actionBusy={actionBusy} actionError={actionError} onEdit={() => editTask(preparedTask)} onStart={async (action) => { if (!action) return; const result = await onTaskAction?.(preparedTask, action, { expected_revision: preparedTask?.revision, expected_selection_revision: preparedTask?.runner_selection?.selection_revision ?? 0 }); if (result) setScreen("active"); }} /> : null}
-        {screen === "active" ? <ActiveScreen task={selectedTask} project={project} interactions={selectedInteractions} onAnswerInteraction={onAnswerInteraction} runnerSelection={runnerSelection} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} onReview={() => setScreen("review")} onOpenInspector={() => setInspectorOpen("runtime")} /> : null}
-        {screen === "attention" ? <AttentionScreen tasks={tasks} selectedTask={attentionTask} interactions={attentionInteractions} onAnswerInteraction={onAnswerInteraction} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onSelect={chooseTask} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} onEditTask={editTask} onOpenReview={() => setScreen("review")} actionBusy={actionBusy} /> : null}
-        {screen === "review" ? <ReviewScreen task={selectedTask} reviewState={reviewState} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} onSelectPath={(path) => void refreshTaskReview(path)} onRetry={() => void refreshTaskReview(reviewState.data?.selected_path)} onReviewDecision={(decision, reason) => onReviewDecision?.(selectedTask, decision, reason)} onOpenInspector={() => setInspectorOpen("review")} onBackToTasks={backToTasks} actionBusy={actionBusy} /> : null}
-        {screen === "complete" && taskHasCompletionProof(selectedTask) ? <CompletionScreen task={selectedTask} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} onOpenInspector={() => setInspectorOpen("completion")} onBackToTasks={backToTasks} actionBusy={actionBusy} /> : null}
-        {screen === "complete" && !taskHasCompletionProof(selectedTask) ? <div className="task-review-state task-review-state--error" role="alert"><strong>Closure evidence is not complete.</strong><p>The server has not published verification and delivery proof for this task yet.</p><Button onClick={() => setScreen("review")}>Back to review</Button></div> : null}
+        {screenContent[screen]}
       </main>
     </div>
-    <Dialog open={Boolean(inspectorOpen)} onClose={() => setInspectorOpen(null)} labelledBy="task-mobile-inspector-title" className="task-inspector-drawer" backdropClassName="task-inspector-backdrop"><header><h2 id="task-mobile-inspector-title">{inspectorOpen === "runtime" ? "Task details" : inspectorOpen === "completion" ? "Closure details" : "Review details"}</h2><button type="button" className="task-plain-icon" aria-label="Close details" onClick={() => setInspectorOpen(null)}><Glyph name="close" /></button></header>{inspectorOpen === "runtime" ? <RuntimeInspector task={selectedTask} /> : inspectorOpen === "completion" ? <CompletionInspector task={selectedTask} actionBusy={actionBusy} onBackToTasks={backToTasks} onFollowUp={() => onTaskAction?.(selectedTask, "follow-up", { request_text: `Follow up on ${taskTitle(selectedTask)}.` })} /> : <ReviewInspector task={selectedTask} review={selectedTask?.review} reviewData={reviewState.data} note={reviewNote} setNote={setReviewNote} />}</Dialog>
+    <Dialog open={Boolean(inspectorOpen)} onClose={() => setInspectorOpen(null)} labelledBy="task-mobile-inspector-title" className="task-inspector-drawer" backdropClassName="task-inspector-backdrop"><header><h2 id="task-mobile-inspector-title">{({ runtime: "Task details", completion: "Closure details" })[inspectorOpen] || "Review details"}</h2><button type="button" className="task-plain-icon" aria-label="Close details" onClick={() => setInspectorOpen(null)}><Glyph name="close" /></button></header>{inspectorContent}</Dialog>
     <EvidenceIndexDialog open={evidenceIndexOpen} tasks={tasks} onClose={() => setEvidenceIndexOpen(false)} onOpenTask={chooseTask} />
     <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
   </section>;

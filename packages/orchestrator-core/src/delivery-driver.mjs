@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, normalizeIdentifierFragment as normalizeForId, validateContractDocument } from "../../contracts/src/index.mjs";
 import { materializeLearningLoopArtifacts } from "../../observability/src/index.mjs";
 
 import { runDeliveryMode } from "./delivery-mode-runners.mjs";
@@ -13,42 +13,9 @@ import { assertExactDeliveryDiff } from "./delivery-integrity.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 import { boundedDerivedId } from "./shared/bounded-derived-id.mjs";
 import { collectRepositoryOutputRefs, executeIndependentRepositoryDeliveries, resolveIndependentRepositoryTargets } from "./multi-repo-delivery-execution.mjs";
+import { asObject as asRecord, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
-}
 
 /**
  * @param {string} value
@@ -164,14 +131,6 @@ function summarizeDiffTotalsForPaths(diffStats, changedPaths) {
     }),
     { files: 0, added: 0, deleted: 0 },
   );
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function normalizeForId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 /**

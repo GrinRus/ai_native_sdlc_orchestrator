@@ -1,3 +1,5 @@
+import { asRecord, asString, asStringArray, asBoolean, firstNonNullish } from "../../contracts/src/value-normalization.mjs";
+
 export const PLANNER_METRIC_NAMES = Object.freeze([
   "clean_close_rate",
   "retry_rate",
@@ -10,46 +12,8 @@ const RETRY_RUNTIME_DECISIONS = new Set(["retry"]);
 const REPAIR_RUNTIME_DECISIONS = new Set(["repair"]);
 const OPEN_INCIDENT_STATUSES = new Set(["open", "recertify", "hold"]);
 
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>[]}
- */
 function asRecordArray(value) {
   return Array.isArray(value) ? value.map(asRecord).filter((entry) => Object.keys(entry).length > 0) : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function asBoolean(value) {
-  return value === true;
 }
 
 /**
@@ -145,7 +109,7 @@ function artifactRefs(artifacts) {
 function auditRefs(audits) {
   return uniqueSorted(
     audits
-      .map((audit) => asString(audit.artifact_ref) ?? asString(audit.file) ?? asString(asRecord(audit.document).audit_id))
+      .map((audit) => firstNonNullish(asString(audit.artifact_ref), asString(audit.file), asString(asRecord(audit.document).audit_id)))
       .filter((value) => value),
   );
 }

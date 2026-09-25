@@ -9,7 +9,7 @@ import { derivePublicId, loadContractFile, validateContractDocument, validatePub
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { appendRunEvent } from "./control-plane/live-event-stream.mjs";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
 import { evaluateAuditReleaseHold } from "./audit-release-hold.mjs";
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
 import { compileStepContext } from "./context-compiler.mjs";
@@ -22,6 +22,7 @@ import {
   filterRunnerOwnedStatePaths,
   listChangedPaths,
 } from "./shared/mission-scope.mjs";
+import { readJsonFileOrNull as readJsonFile } from "./shared/json-files.mjs";
 import {
   classifyRuntimeStepOutcome,
   materializeRuntimeHarnessReport,
@@ -43,6 +44,8 @@ import {
   normalizeRuntimeAgentInteractionPolicy,
   writeRuntimePermissionDecisionAudit,
 } from "./runtime-permission-policy.mjs";
+import { asObject as asRecord, asRecordArray, asString, asStringArray, firstNonNullish } from "./shared/value-normalization.mjs";
+import { resolveDurationSeconds } from "./shared/timing.mjs";
 
 const STEP_CLASS_TO_RESULT_CLASS = Object.freeze({
   discovery: "artifact",
@@ -69,23 +72,6 @@ const STEP_ARCHITECTURE_CONTRACT_REFS = Object.freeze([
 ]);
 const DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS = 180_000;
 const CONTEXT_BUDGET_WARN_RATIO = 0.8;
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
 
 /**
  * @param {string} value
@@ -178,36 +164,6 @@ function packetNameFromRef(packetRef) {
 }
 
 /**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
-    : [];
-}
-
-/**
- * @param {string} filePath
- * @returns {Record<string, unknown> | null}
- */
-function readJsonFile(filePath) {
-  try {
-    return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
-  } catch {
-    return null;
-  }
-}
-
-/**
  * @param {string | null | undefined} filePath
  * @param {Record<string, unknown>} patch
  * @returns {Record<string, unknown> | null}
@@ -246,29 +202,8 @@ function appendProviderHeartbeatEvent(options) {
   });
 }
 
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
 function uniqueStrings(value) {
   return [...new Set(asStringArray(value))];
-}
-
-/**
- * @param {unknown} startedAt
- * @param {unknown} finishedAt
- * @returns {number | null}
- */
-function resolveDurationSeconds(startedAt, finishedAt) {
-  if (typeof startedAt !== "string" || typeof finishedAt !== "string") {
-    return null;
-  }
-  const startedMs = Date.parse(startedAt);
-  const finishedMs = Date.parse(finishedAt);
-  if (!Number.isFinite(startedMs) || !Number.isFinite(finishedMs) || finishedMs < startedMs) {
-    return null;
-  }
-  return Math.round(((finishedMs - startedMs) / 1000) * 1000) / 1000;
 }
 
 /**
@@ -281,14 +216,6 @@ function diffChangedPaths(before, after) {
   return after.filter((changedPath) => !beforeSet.has(changedPath));
 }
 
-/**
- * @param {string} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
-}
 /**
  * @param {string} projectRoot
  * @param {string} sourceRef
@@ -424,7 +351,7 @@ function resolveRuntimePermissionRequest(options) {
   const externalRunner = asRecord(options.adapterOutput.external_runner);
   return {
     interaction_type: "permission_request",
-    adapter_id: asString(adapter.adapter_id) ?? asString(options.adapterOutput.provider_adapter) ?? "unknown",
+    adapter_id: firstNonNullish(asString(adapter.adapter_id), asString(options.adapterOutput.provider_adapter), "unknown"),
     runner_family: asString(profile.runner_family) ?? null,
     permission_mode: asString(externalRunner.permission_mode) ?? null,
     permission_mode_source: asString(externalRunner.permission_mode_source) ?? null,
@@ -583,11 +510,9 @@ function applyRunScopedRuntimePermissionGrant(options) {
     decision: "auto_approve",
     rule_id: "runtime-permission.auto-approve.approve-for-run-grant",
     reason: "Matching run-scoped operator approval grant was found for this permission request.",
-    approval_scope: asString(grant.grantDecision.approval_scope) ?? asString(options.runtimePermissionDecision.approval_scope) ?? "step-coarse",
+    approval_scope: firstNonNullish(asString(grant.grantDecision.approval_scope), asString(options.runtimePermissionDecision.approval_scope), "step-coarse"),
     approval_resume_mode:
-      asString(grant.grantDecision.approval_resume_mode) ??
-      asString(options.runtimePermissionDecision.approval_resume_mode) ??
-      "restricted",
+      firstNonNullish(asString(grant.grantDecision.approval_resume_mode), asString(options.runtimePermissionDecision.approval_resume_mode), "restricted"),
     grant_ref: grant.grantRef,
   };
 }

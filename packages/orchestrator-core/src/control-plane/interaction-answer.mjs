@@ -9,6 +9,7 @@ import { resumeRunJobAfterInput } from "../run-job.mjs";
 import { appendRunEvent } from "./live-event-stream.mjs";
 import { toRequestedInteractionEventSummary } from "./interaction-projection.mjs";
 import { listStepResults, toEvidenceRef } from "./read-artifact-readers.mjs";
+import { asRecord, asRecordArray, asString, asStringArray, uniqueNonBlankStrings as uniqueStrings } from "../shared/value-normalization.mjs";
 
 export class InteractionAnswerError extends Error {
   /**
@@ -24,32 +25,16 @@ export class InteractionAnswerError extends Error {
   }
 }
 
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim());
-}
+const OPERATOR_DECISION_BY_VALUE = new Map([
+  ["approve_once", "approve_once"],
+  ["approve_for_run", "approve_for_run"],
+  ["deny", "deny"],
+]);
+const RUNTIME_PERMISSION_DECISION_BY_OPERATOR = new Map([
+  ["approve_once", "user_approved"],
+  ["approve_for_run", "user_approved"],
+  ["deny", "user_denied"],
+]);
 
 /**
  * @param {string} value
@@ -115,24 +100,6 @@ function findUnresolvedInteraction(options) {
 }
 
 /**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0)));
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
-    : [];
-}
-
-/**
  * @param {unknown} value
  * @returns {Record<string, unknown> | null}
  */
@@ -147,11 +114,7 @@ function optionalRecord(value) {
  * @returns {"approve_once" | "approve_for_run" | "deny" | null}
  */
 function normalizeOperatorDecision(value) {
-  const normalized = asString(value);
-  if (normalized === "approve_once" || normalized === "approve_for_run" || normalized === "deny") {
-    return normalized;
-  }
-  return null;
+  return OPERATOR_DECISION_BY_VALUE.get(asString(value) ?? "") ?? null;
 }
 
 /**
@@ -159,13 +122,7 @@ function normalizeOperatorDecision(value) {
  * @returns {"user_approved" | "user_denied" | null}
  */
 function runtimePermissionDecisionValue(decision) {
-  if (decision === "approve_once" || decision === "approve_for_run") {
-    return "user_approved";
-  }
-  if (decision === "deny") {
-    return "user_denied";
-  }
-  return null;
+  return RUNTIME_PERMISSION_DECISION_BY_OPERATOR.get(decision ?? "") ?? null;
 }
 
 /**

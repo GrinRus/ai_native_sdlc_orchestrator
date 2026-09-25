@@ -4,8 +4,8 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 31,
-    "source_manifest_sha256": "402772f549f1522588f562471734457136b58c38e25db7577ee1e9962046431a"
+    "source_file_count": 34,
+    "source_manifest_sha256": "9e391c7e08e8525baa782004168cc96ffe751d6fc38742fa41bcce1dfc155eec"
   },
   "files": {
     "canonical-values.mjs": "5daafd2f2fccd296cdcccb878b1f1ec8d132f631aed64420e2d3aa50fbf6d4ac",
@@ -34,11 +34,14 @@
     "runtime-harness-validation.mjs": "75cd2ee07e4f72ebb36261160e97eeb16e99b0d4d3a8075d0136bd65e44189df",
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
-    "structured-task-plan.mjs": "6f6fc9c052a9806d69c285b206fc191dd9431a2eee8b4986036e1c371e21436a",
+    "structured-task-plan.mjs": "7c21f14d82df36d666fb7539d0ca95fbf6467633e1c9b4e92895218156a401d9",
     "task-contract-families.mjs": "4f597213e5f234a8a70113155ceb26521335d8155944d6b93b159f60d0283e09",
+    "task-markdown-source.mjs": "d74a99c2682ac43449761e2b9a061d4a0b86b54b8f2d51cfe2e1bdee8220fe7b",
     "task-projection-validation.mjs": "7aaaa7de067a36800f444720e37be5d1ddbd2d057e613d910587a2da9469ecf2",
+    "task-work-type.mjs": "e26d5685e64df9c21609af0cc0d791d7403b68abeb97393929cafdafaa77f8eb",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",
-    "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
+    "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c",
+    "value-normalization.mjs": "fda04a19ae6366a5458db0cc20276efc00862f3bb2e86add662fe509f1b805ed"
   },
   "contract_families": [
     {

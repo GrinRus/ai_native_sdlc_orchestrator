@@ -2,61 +2,27 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { hasNonEmptyPermissionDenials } from "../../adapter-sdk/src/permission-denials.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
-import { toLogicalEvidenceRef } from "./aor-home.mjs";
+import { toProjectEvidenceRef as toEvidenceRef } from "./aor-home.mjs";
 import {
   collectMissionChangeEvidence,
   filterMeaningfulCodeChangedPaths,
   filterNonBootstrapChangedPaths,
 } from "./shared/mission-scope.mjs";
 import { boundedDerivedId } from "./shared/bounded-derived-id.mjs";
+import { asFiniteNumber as asNumber, asRecord, asRecordArray, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
+import { resolveDurationSeconds } from "./shared/timing.mjs";
+import { listJsonFilesByModificationTime as listJsonFiles, readJsonFileOrNull as readJsonFile } from "./shared/json-files.mjs";
 const RUNTIME_HARNESS_DECISIONS = new Set(["pass", "retry", "repair", "escalate", "block", "fail"]);
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? /** @type {Record<string, unknown>} */ (value)
-    : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
-    : [];
-}
+const STRICTNESS_PROFILE_BY_MISSION_TYPE = new Map([
+  ["code-changing", "strict-code-changing"],
+  ["release", "strict-release"],
+  ["docs-only", "soft-docs"],
+  ["no-write-rehearsal", "soft-no-write"],
+  ["asset-certification", "asset-certification"],
+]);
 
 /**
  * @param {unknown} value
@@ -64,49 +30,6 @@ function asRecordArray(value) {
  */
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
-}
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function hasNonEmptyPermissionDenials(value) {
-  if (Array.isArray(value)) {
-    return value.some((entry) => hasNonEmptyPermissionDenials(entry));
-  }
-
-  const record = asRecord(value);
-  const entries = Object.entries(record);
-  if (entries.length === 0) {
-    return false;
-  }
-
-  const permissionDenials = record.permission_denials;
-  if (Array.isArray(permissionDenials) && permissionDenials.length > 0) {
-    return true;
-  }
-
-  return entries.some(([, entry]) => hasNonEmptyPermissionDenials(entry));
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))];
-}
-
-/**
- * @param {string} filePath
- * @returns {Record<string, unknown> | null}
- */
-function readJsonFile(filePath) {
-  try {
-    return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -152,15 +75,6 @@ function isRunTokenBoundary(value) {
 
 /**
  * @param {string} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
-function toEvidenceRef(projectRoot, filePath) {
-  return toLogicalEvidenceRef({ projectRoot, filePath });
-}
-
-/**
- * @param {string} projectRoot
  * @param {string} ref
  * @returns {string | null}
  */
@@ -186,38 +100,6 @@ function evidenceRefForLoadedFile(projectRoot, filePath, ref) {
 }
 
 /**
- * @param {string} dirPath
- * @returns {string[]}
- */
-function listJsonFiles(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-  return fs
-    .readdirSync(dirPath)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => path.join(dirPath, entry))
-    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
-}
-
-/**
- * @param {unknown} startedAt
- * @param {unknown} finishedAt
- * @returns {number | null}
- */
-function resolveDurationSeconds(startedAt, finishedAt) {
-  if (typeof startedAt !== "string" || typeof finishedAt !== "string") {
-    return null;
-  }
-  const startedMs = Date.parse(startedAt);
-  const finishedMs = Date.parse(finishedAt);
-  if (!Number.isFinite(startedMs) || !Number.isFinite(finishedMs) || finishedMs < startedMs) {
-    return null;
-  }
-  return Math.round(((finishedMs - startedMs) / 1000) * 1000) / 1000;
-}
-
-/**
  * @param {unknown} decision
  * @param {"pass" | "retry" | "repair" | "escalate" | "block" | "fail"} fallback
  * @returns {"pass" | "retry" | "repair" | "escalate" | "block" | "fail"}
@@ -233,12 +115,7 @@ function normalizeDecision(decision, fallback) {
  * @returns {string}
  */
 export function strictnessProfileForMissionType(missionType) {
-  if (missionType === "code-changing") return "strict-code-changing";
-  if (missionType === "release") return "strict-release";
-  if (missionType === "docs-only") return "soft-docs";
-  if (missionType === "no-write-rehearsal") return "soft-no-write";
-  if (missionType === "asset-certification") return "asset-certification";
-  return "unknown";
+  return STRICTNESS_PROFILE_BY_MISSION_TYPE.get(missionType) ?? "unknown";
 }
 
 /**
@@ -583,7 +460,7 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   if (existingDecision || existingOutcome || asString(stepResult.failure_class)) {
     const fallbackDecision = stepStatus === "passed" ? "pass" : adapterStatus === "blocked" ? "block" : "repair";
     return {
-      failureClass: asString(stepResult.failure_class) ?? failureKind ?? "unknown",
+      failureClass: firstNonNullish(asString(stepResult.failure_class), failureKind, "unknown"),
       decision: normalizeDecision(existingDecision, fallbackDecision),
       missionOutcome: existingOutcome ?? (stepStatus === "passed" ? "satisfied" : "not_satisfied"),
     };

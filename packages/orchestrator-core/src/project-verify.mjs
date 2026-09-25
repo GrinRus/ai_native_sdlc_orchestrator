@@ -9,6 +9,7 @@ import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 import { captureCheckoutSnapshot, compareCheckoutSnapshots, isSupportedWorkspaceMode } from "./workspace-isolation.mjs";
 import { finalizeVerificationWorkspaceIsolation, resolveVerificationWorkspaceIsolation } from "./verification-workspace-isolation.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
+import { asRecord, asRecordArray, asStringArray } from "./shared/value-normalization.mjs";
 const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze", "validate", "verify", "stop"]);
 const DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 const MIN_VERIFICATION_COMMAND_TIMEOUT_MS = 1000;
@@ -49,22 +50,9 @@ const COMMAND_GROUP_TIMEOUT_CLASS_DEFAULT_MS = Object.freeze({
 const COMMAND_GROUP_OUTCOME_VALUES = Object.freeze(["no-tests", "missing-tool", "not-applicable", "broken-baseline"]);
 
 /**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
  * @param {Record<string, unknown>} profile
  * @returns {Array<{ repoId: string, command: string }>}
  */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
 
 /**
  * @param {unknown} value
@@ -72,16 +60,6 @@ function asStringArray(value) {
  */
 function asNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
-}
-
-/**
- * @param {unknown} value
- * @returns {Array<Record<string, unknown>>}
- */
-function asRecordArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry)).map((entry) => asRecord(entry))
-    : [];
 }
 
 /**

@@ -1,14 +1,5 @@
 import { buildCorrectionGuidance, extractStructuredCandidate } from "./structured-candidate.mjs";
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
+import { asRecord, asStringArray } from "./shared/value-normalization.mjs";
 
 /**
  * Normalize a semantic evaluator candidate after structural plan validation.

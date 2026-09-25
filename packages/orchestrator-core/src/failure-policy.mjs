@@ -1,6 +1,4 @@
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? value : {};
-}
+import { asObject as asRecord } from "./shared/value-normalization.mjs";
 
 function strings(value) {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, normalizeIdentifierFragment as normalizeForId, validateContractDocument } from "../../contracts/src/index.mjs";
 import { writeJsonAtomic } from "../../observability/src/index.mjs";
 
 import { executeRoutedStep } from "./step-execution-engine.mjs";
@@ -15,6 +15,7 @@ import {
   resolveOperatorRequestIdempotencyKey,
   withOperatorRequestTransaction,
 } from "./operator-request-transaction.mjs";
+import { asString, asStringArray, uniqueNonBlankStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 export const OPERATOR_REQUEST_INTENTS = Object.freeze([
   "analyze",
@@ -76,32 +77,6 @@ export class OperatorRequestError extends Error {
 }
 
 /**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function normalizeForId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
-}
-
-/**
  * @param {string} value
  * @returns {string}
  */
@@ -125,14 +100,6 @@ function toEvidenceRef(projectRoot, filePath) {
  */
 function toOperatorRequestPacketRef(projectRoot, filePath) {
   return `packet://operator-request@${toEvidenceRef(projectRoot, filePath)}`;
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return [...new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0))];
 }
 
 /**

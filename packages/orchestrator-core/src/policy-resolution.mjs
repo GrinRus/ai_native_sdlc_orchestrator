@@ -6,40 +6,7 @@ import {
   SUPPORTED_STEP_CLASSES,
   resolveRouteForStep,
 } from "../../provider-routing/src/route-resolution.mjs";
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
+import { asFiniteNumber as asNumber, asObject as asRecord, asString, asStringArray, firstNonNullish } from "./shared/value-normalization.mjs";
 
 /**
  * @param {unknown} value
@@ -358,7 +325,7 @@ function resolveStepPolicyForStepWithRegistry(options) {
   const writebackOverride = asString(asRecord(policyEntry.profile.writeback_policy).mode);
   const writebackFromRoute = asString(routeConstraints.writeback_mode);
   const writebackFromProject = asString(writebackPolicy.default_delivery_mode);
-  const resolvedWritebackMode = writebackOverride ?? writebackFromRoute ?? writebackFromProject;
+  const resolvedWritebackMode = firstNonNullish(writebackOverride, writebackFromRoute, writebackFromProject);
   if (!resolvedWritebackMode) {
     throw new Error(
       `Policy resolution failed for step '${options.stepClass}': missing write-back mode in policy override, route constraints, and writeback_policy.default_delivery_mode.`,

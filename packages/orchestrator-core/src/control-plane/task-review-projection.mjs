@@ -6,26 +6,13 @@ import { resolveLogicalEvidenceRef } from "../aor-home.mjs";
 import { createProjectReadContext } from "./project-context.mjs";
 import { listDeliveryManifests, listStepResults } from "./read-artifact-readers.mjs";
 import { readTaskProjection } from "./task-projections.mjs";
+import { asRecord, asString, asStringArray, firstNonNullish } from "../shared/value-normalization.mjs";
 
 const MAX_FILES = 200;
 const MAX_DIFF_ROWS = 2_000;
 const MAX_PATCH_BYTES = 512 * 1024;
 const MAX_RENDERED_BYTES = 64 * 1024;
 const MAX_ROW_LENGTH = 4_000;
-
-function asRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
-}
-
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim())
-    : [];
-}
 
 function uniqueStrings(values) {
   return [...new Set(values.filter(Boolean))];
@@ -387,7 +374,7 @@ export function readTaskReviewProjection(options = {}) {
   const allPaths = uniqueStrings([...declaredPaths, ...parsed.files.map((file) => file.path)]).slice(0, MAX_FILES);
   const internalFiles = allPaths.map((filePath) => parsedByPath.get(filePath) ?? emptyParsedFile(filePath));
   const files = internalFiles.map((file) => publicFileSummary(file, manifestStats.get(file.path)));
-  const effectivePath = selectedPath ?? files[0]?.path ?? null;
+  const effectivePath = firstNonNullish(selectedPath, files[0]?.path, null);
   const internalSelected = internalFiles.find((file) => file.path === effectivePath) ?? null;
   const selectedFile = internalSelected
     ? {

@@ -7,6 +7,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { captureDeliveryDiff } from "./delivery-integrity.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 import { resolveEvidenceReference } from "./aor-home.mjs";
+import { asFiniteNumber as asNumber, asObject as asRecord, asString, asStringArray, uniqueNonEmptyStrings as uniqueStrings } from "./shared/value-normalization.mjs";
 
 export const CANONICAL_DELIVERY_MODES = Object.freeze([
   "no-write",
@@ -17,22 +18,6 @@ export const CANONICAL_DELIVERY_MODES = Object.freeze([
 
 const DELIVERY_MODE_VALUES = new Set(CANONICAL_DELIVERY_MODES);
 const RERUN_PACKET_BOUNDARIES = new Set(["delivery-manifest", "release-packet"]);
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
 
 function verifyIntegrationMaterialization(integrationReport, options) {
   const reportFileValue = asString(integrationReport.filePath);
@@ -63,32 +48,6 @@ function verifyIntegrationMaterialization(integrationReport, options) {
   } catch {
     return false;
   }
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function asNumber(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {string[]} values
- * @returns {string[]}
- */
-function uniqueStrings(values) {
-  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
 }
 
 function lockEvidenceRefs(refs, executionRoot, runtimeLayout, projectId, workspaceProjectId = projectId) {

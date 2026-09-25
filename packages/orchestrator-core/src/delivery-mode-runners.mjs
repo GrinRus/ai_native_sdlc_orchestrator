@@ -1,31 +1,9 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { normalizeIdentifierFragment as normalizeForId } from "../../contracts/src/index.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
-
-/**
- * @param {unknown} value
- * @returns {Record<string, unknown>}
- */
-function asRecord(value) {
-  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
-}
-
-/**
- * @param {unknown} value
- * @returns {string | null}
- */
-function asString(value) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function normalizeForId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-}
+import { asObject as asRecord, asString } from "./shared/value-normalization.mjs";
 
 /**
  * @param {{ cwd: string, args: string[] }} options
