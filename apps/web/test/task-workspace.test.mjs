@@ -8,6 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("Task Workspace exposes all eight server-owned screens and safe Markdown preview", () => {
   const source = fs.readFileSync(path.join(root, "src/task-workspace.jsx"), "utf8");
+  const runnerSource = fs.readFileSync(path.join(root, "src/task-runner-summary.jsx"), "utf8");
   const askAorSource = fs.readFileSync(path.join(root, "src/task-ask-aor-panel.jsx"), "utf8");
   const markdownSource = fs.readFileSync(path.join(root, "src/task-markdown-source-dialog.jsx"), "utf8");
   const dialogSource = fs.readFileSync(path.join(root, "src/dialog.jsx"), "utf8");
@@ -44,7 +45,7 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(dialogSource, /aria-modal="true"/u);
   assert.match(source, /approvedRunnerOptions/u);
   assert.match(source, /onSelectRunner/u);
-  assert.match(source, /No approved execution route is published/u);
+  assert.match(runnerSource, /No approved execution route is published/u);
   assert.match(source, /item\.message \|\| item\.consequence/u);
   assert.match(source, /HelpDialog/u);
   assert.match(source, /setHelpOpen\(true\)/u);

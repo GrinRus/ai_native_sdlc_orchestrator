@@ -3,6 +3,7 @@ import { Dialog } from "./dialog.jsx";
 import { AskAorPanel, hasUnfinishedOperatorRequestForTask } from "./task-ask-aor-panel.jsx";
 import { TaskInteractionPanel } from "./task-interaction-panel.jsx";
 import { TaskPrimaryActionControl } from "./task-primary-action-control.jsx";
+import { ExecutionRunnerSummary, PreparationRunnerSummary } from "./task-runner-summary.jsx";
 import { MarkdownSourceDialog } from "./task-markdown-source-dialog.jsx";
 import { TaskSteeringControl } from "./task-steering-control.jsx";
 import { taskAcceptanceCriteria, taskOutcome, taskScopeIsPublished, taskScopeLabel, taskScopePaths } from "./task-projection-content.js";
@@ -29,7 +30,6 @@ const SIDE_NAV = [
 ];
 
 const NEW_TASK_DRAFT_ID = "__new-task-draft__";
-const PROJECT_DEFAULT_ROUTE_OPTION = "__project_default__";
 
 function executionStepFor(task) {
   const publishedStep = String(task?.runner_selection?.step ?? "").trim();
@@ -42,40 +42,6 @@ function interactionsForTask(task, interactionsByRun) {
     for (const interaction of interactionsByRun?.[runId] ?? []) interactions.set(interaction.interaction_id, interaction);
   }
   return [...interactions.values()];
-}
-
-function routeDisplayLabel(route) {
-  const routeId = String(route?.route_id ?? "").trim();
-  if (!routeId) return "Runner not selected";
-  const name = routeId.replace(/^route\.[^.]+\./u, "").replaceAll("-", " ");
-  const provider = String(route?.provider ?? "").trim();
-  return provider && provider !== "none" ? `${name} · ${provider}` : name;
-}
-
-function executionRouteOptionLabel(route) {
-  const label = routeDisplayLabel(route);
-  return route?.readiness ? `${label} · ${readinessLabel(route.readiness)}` : label;
-}
-
-function preparationRunnerLabel(route) {
-  const labels = { "codex-cli": "Codex CLI", "claude-code": "Claude Code", "qwen-code": "Qwen Code" };
-  return labels[route?.adapter] || route?.adapter || routeDisplayLabel(route);
-}
-
-function readinessLabel(readiness) {
-  return {
-    ready: "Ready",
-    unconfigured: "Check required",
-    unknown: "Not checked",
-    stale: "Check again",
-    "runner-missing": "Runner missing",
-    "auth-missing": "Auth not confirmed",
-    "model-unsupported": "Model unavailable",
-    "capability-mismatch": "Capability mismatch",
-    "policy-denied": "Not approved",
-    unavailable: "Unavailable",
-    blocked: "Blocked",
-  }[readiness] || "Status unavailable";
 }
 
 function taskDeliveryModeValue(task) {
@@ -102,46 +68,6 @@ function deliveryModeDescription(task) {
     "fork-first-pr": "Delivery uses a fork-first pull request after explicit approval.",
     "fork-first": "Delivery uses a fork-first pull request after explicit approval.",
   }[value] || "The server has not published this Task's delivery policy.";
-}
-
-function RouteDetails({ route, selection }) {
-  if (!route && !selection) return null;
-  const capabilities = Array.isArray(route?.required_capabilities) ? route.required_capabilities : [];
-  const source = { "task-override": "Task override", "project-default": "Project default" }[selection?.source] ?? "Task preparation";
-  const readiness = selection?.readiness ?? route?.readiness;
-  const rows = [
-    ["Selection", source],
-    ["Readiness", readiness ? readinessLabel(readiness) : null],
-    ["Readiness revision", selection?.readiness_revision ?? route?.readiness_revision],
-    ["Runner", route?.runner || route?.adapter],
-    ["Adapter", route?.adapter],
-    ["Provider", route?.provider],
-    ["Execution mode", route?.mode],
-    ["Requested model", route?.requested_model],
-    ["Effective model", route?.effective_model],
-    ["Requested reasoning", route?.requested_reasoning_effort],
-    ["Effective reasoning", route?.effective_reasoning_effort],
-    ["Route class", route?.route_class],
-    ["Risk tier", route?.risk_tier],
-    ["Required capabilities", capabilities.length ? capabilities.join(", ") : "None published"],
-    ["Qualification", route?.qualification],
-  ];
-  return <details className="task-route-details"><summary>Route details</summary><dl>{rows.filter(([, value]) => value !== undefined && value !== null && value !== "").map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>;
-}
-
-function preparationRecovery(runner) {
-  const readiness = runner?.readiness;
-  if (!readiness || readiness === "ready") return null;
-  const adapterKey = String(runner?.adapter ?? "").replace(/[^a-z0-9]/giu, "_").toUpperCase();
-  const recoveryByReadiness = {
-    "runner-missing": `Install ${preparationRunnerLabel(runner)} or set AOR_RUNNER_COMMAND_${adapterKey} in the environment that starts the local AOR app. Restart the app, then check again.`,
-    "auth-missing": `AOR does not inspect ${preparationRunnerLabel(runner)}'s credential store. If you have signed in, set AOR_AUTH_READY_${adapterKey}=true in the environment that starts the local AOR app. Restart the app, then check again.`,
-    stale: "Check this runner again before preparing the task.",
-    unconfigured: "Check this runner before preparing the task.",
-    unknown: "Check this runner before preparing the task.",
-  };
-  return recoveryByReadiness[readiness]
-    ?? `Resolve ${readinessLabel(readiness).toLowerCase()} for this route before preparing the task.`;
 }
 
 function approvedRunnerOptions(executionProfile, step, runnerSelection) {
@@ -310,81 +236,6 @@ function SourceRow({ source, onRemove, detailed = false }) {
   </div>;
 }
 
-function RunSummary({ task, runnerSelection, projectDefaultSelection = null, title = "Run with", runnerOptions = [], runnerStep = "implement", runnerSelectionEnabled = false, selectionNoteOverride = null, onSelectRunner, onCheckRunner, actionBusy = false }) {
-  const runner = runnerSelection?.route_id || "Runner not selected";
-  const readiness = runnerSelection?.readiness || "unknown";
-  const model = runnerSelection?.effective_model || runnerSelection?.requested_model || "Not published";
-  const reasoning = runnerSelection?.effective_reasoning_effort || runnerSelection?.requested_reasoning_effort || "Not published";
-  const runnerLabel = routeDisplayLabel({ route_id: runner, provider: runnerSelection?.provider });
-  const selectedRouteId = String(runnerSelection?.route_id ?? "");
-  const projectDefaultLabel = projectDefaultSelection?.route_id
-    ? routeDisplayLabel(projectDefaultSelection)
-    : "not configured";
-  const selectedRoute = runnerOptions.find((option) => option.route_id === selectedRouteId) ?? projectDefaultSelection;
-  const selectedValue = runnerSelection?.source === "task-override" ? selectedRouteId : PROJECT_DEFAULT_ROUTE_OPTION;
-  const canSelectRunner = Boolean(onSelectRunner) && runnerSelectionEnabled && runnerOptions.length > 0 && !actionBusy;
-  const runnerSelect = <select aria-label="Runner" value={selectedValue} disabled={!canSelectRunner} onChange={(event) => onSelectRunner?.(task, runnerStep, event.target.value === PROJECT_DEFAULT_ROUTE_OPTION ? null : event.target.value)}>
-    <option value={PROJECT_DEFAULT_ROUTE_OPTION}>Project default · {projectDefaultLabel}</option>
-    {runnerOptions.map((option) => <option key={option.route_id} value={option.route_id}>{executionRouteOptionLabel(option)}</option>)}
-  </select>;
-  const selectionNote = selectionNoteOverride || (runnerSelectionEnabled && runnerOptions.length
-    ? "Choose a Task override or follow the project default. Check the selected route before starting."
-    : "No approved execution route is published for this project yet.");
-  if (title === "Runner & safety") {
-    return <section className="task-run-summary task-run-summary--prepared" aria-label="Runner readiness">
-      <h2>{title}</h2>
-      <div className="task-runner-card"><span className="task-runner-card__icon"><Glyph name="terminal" /></span><div><strong>{runnerLabel}</strong><span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></div><span className="task-runner-card__check" aria-hidden="true">{readiness === "ready" ? "✓" : "!"}</span></div>
-      <label className="task-change-runner">Change runner{runnerSelect}</label>
-      {onCheckRunner ? <div className="task-preparation-runner__actions"><Button onClick={() => onCheckRunner(runnerStep, selectedRouteId)} disabled={actionBusy || !selectedRouteId} busy={actionBusy}>Check runner</Button></div> : null}
-      {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
-      <p className="task-control-note">{selectionNote}</p>
-      <RouteDetails route={selectedRoute} selection={runnerSelection} />
-      <dl className="task-runner-details"><div><dt>Model</dt><dd>{model}</dd></div><div><dt>Reasoning</dt><dd>{reasoning}</dd></div><div><dt>Safety</dt><dd>{deliveryMode(task)}</dd></div></dl>
-      <p className="task-safety"><Glyph name="evidence" />No upstream writes</p>
-    </section>;
-  }
-  return <section className="task-run-summary" aria-label="Runner readiness">
-    <h2>{title}</h2>
-    <div className="task-run-field task-run-field--runner"><span>Runner</span>{runnerSelect}<span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></div>
-    {runnerSelection?.unavailable_reason ? <p className="task-inline-alert" role="alert">{runnerSelection.unavailable_reason} {runnerSelection.recovery_action}</p> : null}
-    <p className="task-control-note">{selectionNote}</p>
-    <RouteDetails route={selectedRoute} selection={runnerSelection} />
-    <div className="task-run-field"><span>Model / effort</span><select aria-label="Model and reasoning effort" value={`${model} · ${reasoning}`} disabled onChange={() => {}}><option>{model} · {reasoning}</option></select></div>
-    <div className="task-run-field"><span>Safety</span><select aria-label="Safety mode" value={deliveryMode(task)} disabled onChange={() => {}}><option>{deliveryMode(task)}</option></select></div>
-    <p className="task-safety"><Glyph name="evidence" />No upstream writes</p>
-    <small className="task-provider-note">Readiness checks do not start a runner. The selected route runs when the task reaches this step.</small>
-  </section>;
-}
-
-function PreparationRunnerSummary({ executionProfile, runnerOptions = [], selectedRouteId = "", onSelect, onCheck, onInitialize, actionBusy = false }) {
-  const initialized = executionProfile?.initialized === true;
-  const canInitialize = Number.isInteger(executionProfile?.revision);
-  const runner = runnerOptions.find((option) => option.route_id === selectedRouteId) ?? null;
-  const readiness = runner?.readiness ?? "unknown";
-  const ready = initialized && runner?.readiness === "ready";
-  return <section id="task-preparation-runner" className="task-run-summary task-run-summary--preparation" aria-label="Task preparation runner">
-    <h2>Prepare with</h2>
-    {initialized ? runnerOptions.length ? <>
-      <label className="task-run-field task-run-field--runner"><span>AI runner</span><select aria-label="Task preparation runner" value={selectedRouteId} disabled={actionBusy} onChange={(event) => onSelect?.(event.target.value)}>
-        {runnerOptions.map((option) => <option key={option.route_id} value={option.route_id}>{preparationRunnerLabel(option)} · {readinessLabel(option.readiness)}</option>)}
-      </select><span className={`task-readiness task-readiness--${readiness}`}><span className="task-readiness__dot" aria-hidden="true" />{readinessLabel(readiness)}</span></label>
-      <div className="task-preparation-runner__actions"><Button onClick={() => onCheck?.(selectedRouteId)} disabled={actionBusy || !selectedRouteId} busy={actionBusy}>Check runner</Button></div>
-      {!ready ? <p className="task-inline-alert" role="status">{preparationRecovery(runner) || "Select and check a task-preparation runner before creating the task."}</p> : null}
-      <p className="task-control-note">This runner prepares the brief in read-only mode. The task's execution route is selected separately.</p>
-      <RouteDetails route={runner} selection={{ source: "task-preparation", readiness, readiness_revision: runner?.readiness_revision }} />
-      {runner?.requested_model ? <dl className="task-runner-details"><div><dt>Model</dt><dd>{runner.effective_model || runner.requested_model}</dd></div>{runner.effective_reasoning_effort || runner.requested_reasoning_effort ? <div><dt>Reasoning</dt><dd>{runner.effective_reasoning_effort || runner.requested_reasoning_effort}</dd></div> : null}<div><dt>Runner</dt><dd>{preparationRunnerLabel(runner)}</dd></div></dl> : null}
-      <p className="task-safety"><Glyph name="evidence" />No repository writes during preparation</p>
-    </> : <>
-      <p className="task-control-note">No approved task-preparation routes are published for this project.</p>
-      <p className="task-inline-alert" role="status">Review the project's route configuration before preparing a task.</p>
-    </> : <>
-      <p className="task-control-note">Set up the project's local AOR runner profile to choose a task-preparation runner.</p>
-      <p className="task-safety"><Glyph name="evidence" />Profile data is stored under AOR Home</p>
-      <div className="task-preparation-runner__actions"><Button variant="primary" onClick={onInitialize} disabled={!canInitialize || actionBusy} busy={actionBusy}>Set up runner profile</Button></div>
-    </>}
-  </section>;
-}
-
 function TaskMeta({ task, project }) {
   const runner = task?.runner_selection?.route_id || "Runner not selected";
   return <dl className="task-meta">
@@ -529,7 +380,7 @@ function PreparedScreen({ task, selectedSources, runnerSelection, projectDefault
   const scopePublished = taskScopeIsPublished(task);
   const scopePaths = taskScopePaths(task);
   const staleSources = selectedSources.filter((source) => source?.stale === true);
-  return <div className="task-prepared-layout"><div className="task-prepared-main"><section className="task-prepared-section"><h2>{taskTitle(task)}</h2>{preparationPending ? <p className="task-control-note" role="status">Task preparation is running on the server. This view updates automatically.</p> : null}<h3>Outcome</h3><p>{taskOutcome(task) || "The server has not published the prepared outcome yet."}</p><h3>Acceptance</h3><ul className="task-check-list">{acceptance.length ? acceptance.map((item, index) => <li key={`${item}-${index}`}>{item}</li>) : <li className="task-muted">Acceptance criteria will appear after server preparation.</li>}</ul></section><section className="task-prepared-section"><h3>Scope</h3><p>{taskScopeLabel(task) || "Bounded scope has not been published yet."}</p></section><section className="task-prepared-section"><h3>Sources</h3>{selectedSources.length ? selectedSources.map((source) => <div className="task-prepared-source" key={source.source_id}><Glyph name="file" /><span>{source?.preview?.filename || source?.preview?.project_relative_path || sourceKindLabel(source?.kind)}</span><span>{sourceKindLabel(source?.kind)}</span><strong className={source?.stale ? "is-stale" : ""}>{source?.stale ? "Stale" : "Current"}</strong></div>) : <p className="task-muted">No external sources attached.</p>}</section>{staleSources.length ? <p className="task-inline-alert" role="alert">{task?.primary_action?.reason || "Remove stale repository sources and add their current snapshots before starting this Task."}</p> : null}<LifecyclePath task={task} variant="wide" /><AskAorPanel task={task} operatorRequests={operatorRequests} operatorRequestsAvailable={operatorRequestsAvailable} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></div><aside className="task-prepared-inspector"><RunSummary task={task} runnerSelection={runnerSelection} projectDefaultSelection={projectDefaultSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={canSelectRunner} selectionNoteOverride={preparationPending ? "Runner selection becomes available after task preparation." : null} onSelectRunner={onSelectRunner} onCheckRunner={preparationPending ? null : onCheckRunner} actionBusy={actionBusy} title="Runner & safety" /><div className="task-readiness-checks"><p>{runnerSelection?.readiness === "ready" ? "✓" : "!"} Runner {runnerSelection?.readiness === "ready" ? "ready" : "status not confirmed"}</p><p>{staleSources.length ? "! Sources stale" : selectedSources.length ? "✓ Sources current" : "! Sources not attached"}</p><p>{scopePublished ? "✓" : "!"} Scope {scopePaths.length ? "bounded" : scopePublished ? "published" : "not published"}</p><p>✓ No upstream writes</p></div>{actionError ? <p className="task-inline-alert" role="alert">{actionError}</p> : null}<div className="task-inspector-actions"><Button onClick={onEdit} disabled={actionBusy || preparationPending}>Edit task</Button><Button variant="primary" onClick={() => onStart?.(startAction)} busy={actionBusy} disabled={!startAvailable}>{actionBusy ? "Starting task…" : startAction ? "Start task" : preparationPending ? "Preparing task…" : "Waiting for server action"}</Button></div>{preparationPending ? <p className="task-control-note" role="status">The server has accepted this task and is still preparing it. Runner selection and Start will be available after preparation.</p> : !serverOwned ? <p className="task-control-note" role="status">This Task is not server-owned yet. Start is unavailable until the server publishes a prepared Task.</p> : serverOwned && !startAction ? <p className="task-control-note" role="status">{primaryAction.reason || "The server has not published a runnable action for this Task."}</p> : null}</aside></div>;
+  return <div className="task-prepared-layout"><div className="task-prepared-main"><section className="task-prepared-section"><h2>{taskTitle(task)}</h2>{preparationPending ? <p className="task-control-note" role="status">Task preparation is running on the server. This view updates automatically.</p> : null}<h3>Outcome</h3><p>{taskOutcome(task) || "The server has not published the prepared outcome yet."}</p><h3>Acceptance</h3><ul className="task-check-list">{acceptance.length ? acceptance.map((item, index) => <li key={`${item}-${index}`}>{item}</li>) : <li className="task-muted">Acceptance criteria will appear after server preparation.</li>}</ul></section><section className="task-prepared-section"><h3>Scope</h3><p>{taskScopeLabel(task) || "Bounded scope has not been published yet."}</p></section><section className="task-prepared-section"><h3>Sources</h3>{selectedSources.length ? selectedSources.map((source) => <div className="task-prepared-source" key={source.source_id}><Glyph name="file" /><span>{source?.preview?.filename || source?.preview?.project_relative_path || sourceKindLabel(source?.kind)}</span><span>{sourceKindLabel(source?.kind)}</span><strong className={source?.stale ? "is-stale" : ""}>{source?.stale ? "Stale" : "Current"}</strong></div>) : <p className="task-muted">No external sources attached.</p>}</section>{staleSources.length ? <p className="task-inline-alert" role="alert">{task?.primary_action?.reason || "Remove stale repository sources and add their current snapshots before starting this Task."}</p> : null}<LifecyclePath task={task} variant="wide" /><AskAorPanel task={task} operatorRequests={operatorRequests} operatorRequestsAvailable={operatorRequestsAvailable} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></div><aside className="task-prepared-inspector"><ExecutionRunnerSummary task={task} safetyMode={deliveryMode(task)} runnerSelection={runnerSelection} projectDefaultSelection={projectDefaultSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={canSelectRunner} selectionNoteOverride={preparationPending ? "Runner selection becomes available after task preparation." : null} onSelectRunner={onSelectRunner} onCheckRunner={preparationPending ? null : onCheckRunner} actionBusy={actionBusy} /><div className="task-readiness-checks"><p>{runnerSelection?.readiness === "ready" ? "✓" : "!"} Runner {runnerSelection?.readiness === "ready" ? "ready" : "status not confirmed"}</p><p>{staleSources.length ? "! Sources stale" : selectedSources.length ? "✓ Sources current" : "! Sources not attached"}</p><p>{scopePublished ? "✓" : "!"} Scope {scopePaths.length ? "bounded" : scopePublished ? "published" : "not published"}</p><p>✓ No upstream writes</p></div>{actionError ? <p className="task-inline-alert" role="alert">{actionError}</p> : null}<div className="task-inspector-actions"><Button onClick={onEdit} disabled={actionBusy || preparationPending}>Edit task</Button><Button variant="primary" onClick={() => onStart?.(startAction)} busy={actionBusy} disabled={!startAvailable}>{actionBusy ? "Starting task…" : startAction ? "Start task" : preparationPending ? "Preparing task…" : "Waiting for server action"}</Button></div>{preparationPending ? <p className="task-control-note" role="status">The server has accepted this task and is still preparing it. Runner selection and Start will be available after task preparation.</p> : !serverOwned ? <p className="task-control-note" role="status">This Task is not server-owned yet. Start is unavailable until the server publishes a prepared Task.</p> : serverOwned && !startAction ? <p className="task-control-note" role="status">{primaryAction.reason || "The server has not published a runnable action for this Task."}</p> : null}</aside></div>;
 }
 
 function RuntimeInspector({ task }) {
