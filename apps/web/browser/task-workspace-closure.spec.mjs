@@ -155,7 +155,10 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.route(new RegExp(`/api/projects/${state.project_id}/operator-requests(?:/[^/]+/actions)?$`, "u"), async (route) => {
     if (route.request().method() === "POST") {
       operatorRequestRunCount += 1;
-      operatorRequests = operatorRequests.map((entry) => ({ ...entry, document: { ...entry.document, status: "completed", updated_at: new Date().toISOString(), result_refs: ["evidence://operator-request/result"] } }));
+      const requestId = new URL(route.request().url()).pathname.split("/").at(-2);
+      operatorRequests = operatorRequests.map((entry) => entry.document.request_id === requestId
+        ? { ...entry, document: { ...entry.document, status: "completed", updated_at: new Date().toISOString(), result_refs: ["evidence://operator-request/result"] } }
+        : entry);
       await route.fulfill({ contentType: "application/json", body: JSON.stringify({ operator_request_run: { status: "completed" } }) });
       return;
     }
@@ -176,11 +179,20 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
       tasks[taskIndex] = { ...task, run_state: { ...task.run_state, status: payload.action === "pause" ? "paused" : "running" } };
     }
     if (payload.action === "request") {
+      const requestId = payload.request_text === "Inspect this bounded change."
+        ? "operator-request-ask-aor"
+        : "operator-request-revision";
+      if (requestId === "operator-request-ask-aor") {
+        operatorRequests = [{
+          operator_request_ref: "packet://operator-request@evidence://reports/operator-request-ask-aor-older.json",
+          document: { request_id: "operator-request-ask-aor-older", target_flow_id: "flow.closure", status: "run-pending", request_summary: "Earlier interrupted request.", target_refs: ["evidence://closure"], updated_at: "2026-01-01T00:00:00.000Z" },
+        }, ...operatorRequests];
+      }
       operatorRequests = [{
-        operator_request_ref: "packet://operator-request@evidence://reports/operator-request-ask-aor.json",
-        document: { request_id: "operator-request-ask-aor", target_flow_id: "flow.closure", status: "run-pending", request_summary: payload.request_text, target_refs: ["evidence://closure"], updated_at: new Date().toISOString() },
-      }];
-      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ action: "request", operator_request: { request_id: "operator-request-ask-aor", status: "run-pending" } }) });
+        operator_request_ref: `packet://operator-request@evidence://reports/${requestId}.json`,
+        document: { request_id: requestId, target_flow_id: "flow.closure", status: "run-pending", request_summary: payload.request_text, target_refs: ["evidence://closure"], updated_at: new Date().toISOString() },
+      }, ...operatorRequests];
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ action: "request", operator_request: { request_id: requestId, status: "run-pending" } }) });
       return;
     }
     await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ action: payload.action, readback: { durable: true, task_id: tasks.at(-1).task_id, new_intent_submission_id: "intent.follow-up" } }) });
@@ -282,11 +294,18 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await sendAskAorRequest.focus();
   await expect(sendAskAorRequest).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByText("Latest request waiting to resume: Inspect this bounded change.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unfinished request waiting to resume: Inspect this bounded change. Resume it before sending another request.", { exact: true })).toBeVisible();
+  await expect(sendAskAorRequest).toBeDisabled();
   expect(actionPayloads.at(-1)).toEqual({ action: "request", request_text: "Inspect this bounded change." });
   await page.getByRole("button", { name: "Resume request", exact: true }).click();
-  await expect(page.getByText("Latest request completed: Inspect this bounded change.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unfinished request waiting to resume: Earlier interrupted request. Resume it before sending another request.", { exact: true })).toBeVisible();
+  await expect(sendAskAorRequest).toBeDisabled();
   expect(operatorRequestRunCount).toBe(1);
+  await page.getByRole("button", { name: "Resume request", exact: true }).click();
+  await expect(page.getByText("Latest request completed: Earlier interrupted request.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume request", exact: true })).toHaveCount(0);
+  await expect(sendAskAorRequest).toBeEnabled();
+  expect(operatorRequestRunCount).toBe(2);
   await expect(page.getByRole("tab", { name: "Activity", exact: true })).toBeVisible();
   const activeTabReferences = await page.locator('[role="tablist"][aria-label="Task activity sections"] [role="tab"]').evaluateAll((tabs) => tabs.map((tab) => {
     const controls = tab.getAttribute("aria-controls");
@@ -358,7 +377,9 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByRole("button", { name: "Failed task" }).click();
   await page.getByLabel("Task guidance").fill("");
   await page.getByRole("button", { name: "Request revision", exact: true }).click();
-  await expect(page.getByText("Latest request waiting to resume: Request a bounded revision.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unfinished request waiting to resume: Request a bounded revision. Resume it before sending another request.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Request revision", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Request retry", exact: true })).toBeDisabled();
   expect(actionPayloads.at(-1)).toEqual({ action: "request", expected_revision: 3, request_text: "Request a bounded revision." });
 
   await page.setViewportSize({ width: 390, height: 844 });
