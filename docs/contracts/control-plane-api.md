@@ -135,8 +135,10 @@ Flow lineage:
   The Task action returns `200` with completed run evidence or `202` with the
   durable pending status and recovery action.
   `review-quality-repair` reruns review for the repair run named by the current
-  server-published structured operation; the client cannot redirect it to a
-  different run.
+  server-published structured operation. The repair implementation and
+  post-repair QA Task actions likewise execute only their published `run start`
+  operation, including its run ID, target step, and evidence refs; clients
+  cannot redirect these actions through request flags.
   The accepted action ids, permissions, payload requirements, and lifecycle
   dispatch are published by the canonical [Task action catalog](task-action-catalog.md)
   rather than a transport-local allowlist. Every response includes a

@@ -6,7 +6,7 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
 import { runProjectionCoordinator } from "./operator-projection-services.mjs";
 import { asRecord, asString, asStringArray, uniqueTrimmedStrings as uniqueStrings, firstNonNullish } from "./shared/value-normalization.mjs";
-import { operatorControlForAction } from "./next-action-operator-control.mjs";
+import { operatorControlForAction, selectApprovedHandoffRef, selectPromotionEvidenceRefs } from "./next-action-operator-control.mjs";
 import { listJsonFilesByModificationTime as listJsonFiles, readJsonFileOrNull as readJsonFile } from "./shared/json-files.mjs";
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
 const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
@@ -17,48 +17,6 @@ const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
  */
 function shellQuote(value) {
   return /^[A-Za-z0-9_./:@=-]+$/u.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-/**
- * @param {string} ref
- * @returns {boolean}
- */
-function isHandoffEvidenceRef(ref) {
-  const normalized = ref.toLowerCase();
-  return normalized.includes("handoff") && (normalized.includes("/artifacts/") || normalized.includes("artifact"));
-}
-
-/**
- * @param {string} ref
- * @returns {boolean}
- */
-function isPrioritizedPromotionEvidenceRef(ref) {
-  const normalized = ref.toLowerCase();
-  return (
-    normalized.includes("execution-readiness") ||
-    (normalized.includes("step-result") && normalized.includes("implement")) ||
-    normalized.startsWith("packet://spec@")
-  );
-}
-
-/**
- * @param {string[]} evidenceRefs
- * @returns {string | null}
- */
-function selectApprovedHandoffRef(evidenceRefs) {
-  const candidates = evidenceRefs.filter((ref) => isHandoffEvidenceRef(ref));
-  return candidates.find((ref) => path.isAbsolute(ref)) ?? candidates[0] ?? null;
-}
-
-/**
- * @param {string[]} evidenceRefs
- * @param {string | null} approvedHandoffRef
- * @returns {string[]}
- */
-function selectPromotionEvidenceRefs(evidenceRefs, approvedHandoffRef) {
-  const nonHandoffRefs = evidenceRefs.filter((ref) => ref !== approvedHandoffRef);
-  const prioritized = nonHandoffRefs.filter((ref) => isPrioritizedPromotionEvidenceRef(ref));
-  return (prioritized.length > 0 ? uniqueStrings(prioritized) : uniqueStrings(nonHandoffRefs)).slice(0, 6);
 }
 
 /**
