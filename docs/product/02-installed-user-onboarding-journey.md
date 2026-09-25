@@ -132,6 +132,11 @@ request list cannot be loaded. Use `aor request status` and
 `aor request run` for the equivalent headless inspection and recovery path.
 W71-S08 owns durable create-and-run recovery and review/completion continuity.
 Task activity, checks, changes, and evidence remain scoped to the selected Task.
+When its durable run state is `running` or `paused`, the active Task also
+offers **Steer the active run**. The operator chooses a target step class and
+may provide direction text or an approval reference; project policy still
+controls whether the steering action is allowed. This run-control action is
+separate from Ask AOR, which creates a durable operator request.
 
 Runtime-initiated `requested_interaction` questions use `aor run answer` or
 `POST /api/projects/:projectId/interactions/answers`. Task Workspace has no

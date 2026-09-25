@@ -5,6 +5,7 @@ import { TaskInteractionPanel } from "./task-interaction-panel.jsx";
 import { MarkdownSourceDialog } from "./task-markdown-source-dialog.jsx";
 import { taskAcceptanceCriteria, taskOutcome, taskScopeIsPublished, taskScopeLabel, taskScopePaths } from "./task-projection-content.js";
 import { Button, EmptyState, Icon, useRovingTabs } from "./ui/components.jsx";
+import { STEP_CLASS_VALUES } from "../../../packages/contracts/src/step-class-values.mjs";
 import { WORK_TYPE_TO_STEP } from "../../../packages/contracts/src/task-work-type.mjs";
 import { firstNonNullish } from "../../../packages/contracts/src/value-normalization.mjs";
 
@@ -532,13 +533,85 @@ function RuntimeInspector({ task }) {
   return <div className="task-runtime-inspector__content"><h3>Task contract</h3><dl><div><dt>Outcome</dt><dd>{taskOutcome(task) || "Not published"}</dd></div><div><dt>Scope</dt><dd>{taskScopeLabel(task) || "Not published"}</dd></div><div><dt>Acceptance</dt><dd>{acceptance.length ? `${acceptance.length} criteria` : "Not published"}</dd></div><div><dt>Run health</dt><dd><TaskStatus task={task} compact /></dd></div><div><dt>Elapsed</dt><dd>{task?.metrics?.elapsed || "Not reported"}</dd></div><div><dt>Budget</dt><dd>{task?.budget?.remaining || "Not reported"}</dd></div><div><dt>Freshness</dt><dd className="task-freshness">{task?.updated_at ? `Updated ${taskAge(task.updated_at)} ago` : "Unknown"}</dd></div></dl></div>;
 }
 
+function createTaskSteeringCommandId() {
+  const randomId = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `task-steer-${randomId}`;
+}
+
+function TaskSteeringControl({ task, onTaskAction, actionBusy }) {
+  const [targetStep, setTargetStep] = useState("");
+  const [reason, setReason] = useState("");
+  const [approvalRef, setApprovalRef] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const commandIdRef = useRef(null);
+  const runStatus = String(task?.run_state?.status ?? "");
+  if (!["running", "paused"].includes(runStatus)) return null;
+
+  function resetAttempt() {
+    commandIdRef.current = null;
+    setSuccessMessage("");
+  }
+
+  async function submitSteering(event) {
+    event.preventDefault();
+    if (!targetStep || actionBusy) return;
+    const nextCommandId = commandIdRef.current ?? createTaskSteeringCommandId();
+    commandIdRef.current = nextCommandId;
+    setSuccessMessage("");
+    const trimmedReason = reason.trim();
+    const trimmedApprovalRef = approvalRef.trim();
+    const result = await onTaskAction?.(task, "steer", {
+      target_step: targetStep,
+      command_id: nextCommandId,
+      ...(trimmedReason ? { reason: trimmedReason } : {}),
+      ...(trimmedApprovalRef ? { approval_ref: trimmedApprovalRef } : {}),
+    });
+    if (result) {
+      setSuccessMessage(`Steering sent to ${targetStep}.`);
+      setReason("");
+      setApprovalRef("");
+      commandIdRef.current = null;
+    }
+  }
+
+  return <details className="task-ask-panel task-run-steering">
+    <summary>Steer the active run</summary>
+    <p>Choose a target step and send direction to this run. Project policy may require an approval reference.</p>
+    <form className="task-run-steering__form" onSubmit={(event) => void submitSteering(event)}>
+      <label htmlFor="task-steering-target-step">Target step class
+        <select id="task-steering-target-step" value={targetStep} onChange={(event) => { setTargetStep(event.target.value); resetAttempt(); }} required>
+          <option value="">Choose a step class</option>
+          {STEP_CLASS_VALUES.map((stepClass) => <option value={stepClass} key={stepClass}>{stepClass}</option>)}
+        </select>
+      </label>
+      <label htmlFor="task-steering-reason">Direction (optional)
+        <textarea id="task-steering-reason" rows="3" value={reason} onChange={(event) => { setReason(event.target.value); resetAttempt(); }} placeholder="What should the run focus on?" />
+      </label>
+      <label htmlFor="task-steering-approval-ref">Approval reference (if required by project policy)
+        <input id="task-steering-approval-ref" value={approvalRef} onChange={(event) => { setApprovalRef(event.target.value); resetAttempt(); }} placeholder="evidence://…" />
+      </label>
+      <div className="task-run-steering__actions">
+        <Button type="submit" variant="primary" busy={actionBusy} disabled={actionBusy || !targetStep}>Send steering</Button>
+      </div>
+    </form>
+    {successMessage ? <p className="task-ask-status" role="status">{successMessage}</p> : null}
+  </details>;
+}
+
 function ActiveScreen({ task, project, interactions, onAnswerInteraction, operatorRequests, operatorRequestsAvailable, operatorRequestText, setOperatorRequestText, onTaskAction, onResumeOperatorRequest, actionBusy, onReview, onOpenInspector }) {
   const [tab, setTab] = useState("activity");
   const [stopConfirm, setStopConfirm] = useState(false);
+  const [stopApprovalRef, setStopApprovalRef] = useState("");
   const activity = Array.isArray(task?.activity) ? task.activity : [];
   const runtimeControls = taskRuntimeControls(task);
   const request = (action, payload) => onTaskAction?.(task, action, payload);
-  return <div className="task-active-layout"><div className="task-active-main"><header className="task-active-heading"><div><h2>{taskTitle(task)}</h2><TaskStatus task={task} /></div><div className="task-inline-actions"><button type="button" className="task-inspector-trigger" onClick={onOpenInspector}><Glyph name="evidence" />Task details</button>{runtimeControls.action ? <Button onClick={() => request(runtimeControls.action)} disabled={actionBusy}><Glyph name={runtimeControls.action === "resume" ? "play" : "pause"} />{runtimeControls.action === "resume" ? "Resume" : "Pause"}</Button> : null}{runtimeControls.canStop ? <Button variant="destructive" onClick={() => setStopConfirm(true)} disabled={actionBusy}><Glyph name="stop" />Stop</Button> : null}</div></header><TaskMeta task={task} project={project} /><TaskInteractionPanel interactions={interactions} onSubmit={onAnswerInteraction} busy={actionBusy} /><LifecyclePath task={task} variant="wide" /><TaskTabList label="Task activity sections" className="task-detail-tabs" tabs={[{ id: "activity", tabId: "task-active-tab-activity", label: "Activity", controls: "task-active-panel-activity" }, { id: "changes", tabId: "task-active-tab-changes", label: "Changes", count: task?.review?.changed_paths?.length ?? 0, controls: "task-active-panel-changes" }, { id: "checks", tabId: "task-active-tab-checks", label: "Checks", controls: "task-active-panel-checks" }, { id: "evidence", tabId: "task-active-tab-evidence", label: "Evidence", count: task?.evidence_refs?.length ?? 0, controls: "task-active-panel-evidence" }]} selected={tab} onSelect={(nextTab) => { setTab(nextTab); if (nextTab === "changes") onReview?.(); }} /><ActiveTabPanel id="activity" hidden={tab !== "activity"}>{activity.length ? <ul>{activity.map((entry, index) => <li key={`${entry?.id ?? "activity"}-${index}`}><Glyph name="activity" /><span>{entry?.summary || entry?.label || "Recorded activity"}</span><time>{entry?.occurred_at ? taskAge(entry.occurred_at) : "—"}</time></li>)}</ul> : <p className="task-muted">No durable activity has been published for this Task yet.</p>}</ActiveTabPanel><ActiveTabPanel id="changes" hidden={tab !== "changes"}><p>{task?.review?.changed_paths?.length ? "Recorded changes are ready for review." : "No changed paths have been published yet."}</p><Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open changes</Button></ActiveTabPanel><ActiveTabPanel id="checks" hidden={tab !== "checks"}><ul><li><Glyph name="check" /><span>Verification</span><strong>{task?.review?.verification_status || "pending"}</strong></li><li><Glyph name="check" /><span>Delivery</span><strong>{task?.review?.delivery_status || "pending"}</strong></li></ul></ActiveTabPanel><ActiveTabPanel id="evidence" hidden={tab !== "evidence"}><p>{task?.evidence_refs?.length ? "Durable evidence is attached to this task." : "No evidence has been recorded yet."}</p>{task?.evidence_refs?.length ? <ul>{task.evidence_refs.map((ref) => <li key={ref}><Glyph name="file" /><code>{ref}</code></li>)}</ul> : null}<Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open review evidence</Button></ActiveTabPanel><AskAorPanel task={task} operatorRequests={operatorRequests} operatorRequestsAvailable={operatorRequestsAvailable} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></div><aside className="task-runtime-inspector"><RuntimeInspector task={task} /></aside>{stopConfirm ? <div className="task-inline-alert" role="alert"><strong>Stop this task?</strong><p>This requests a durable cancellation and may discard in-flight work.</p><div className="task-inline-actions"><Button onClick={() => setStopConfirm(false)}>Keep running</Button><Button variant="destructive" onClick={() => { setStopConfirm(false); request("cancel"); }} disabled={actionBusy}>Stop task</Button></div></div> : null}</div>;
+  async function confirmStop() {
+    const approvalRef = stopApprovalRef.trim();
+    const result = await request("cancel", approvalRef ? { approval_ref: approvalRef } : {});
+    if (result) { setStopConfirm(false); setStopApprovalRef(""); }
+  }
+  return <div className="task-active-layout"><div className="task-active-main"><header className="task-active-heading"><div><h2>{taskTitle(task)}</h2><TaskStatus task={task} /></div><div className="task-inline-actions"><button type="button" className="task-inspector-trigger" onClick={onOpenInspector}><Glyph name="evidence" />Task details</button>{runtimeControls.action ? <Button onClick={() => request(runtimeControls.action)} disabled={actionBusy}><Glyph name={runtimeControls.action === "resume" ? "play" : "pause"} />{runtimeControls.action === "resume" ? "Resume" : "Pause"}</Button> : null}{runtimeControls.canStop ? <Button variant="destructive" onClick={() => setStopConfirm(true)} disabled={actionBusy}><Glyph name="stop" />Stop</Button> : null}</div></header><TaskMeta task={task} project={project} /><TaskInteractionPanel interactions={interactions} onSubmit={onAnswerInteraction} busy={actionBusy} /><TaskSteeringControl task={task} onTaskAction={onTaskAction} actionBusy={actionBusy} /><LifecyclePath task={task} variant="wide" /><TaskTabList label="Task activity sections" className="task-detail-tabs" tabs={[{ id: "activity", tabId: "task-active-tab-activity", label: "Activity", controls: "task-active-panel-activity" }, { id: "changes", tabId: "task-active-tab-changes", label: "Changes", count: task?.review?.changed_paths?.length ?? 0, controls: "task-active-panel-changes" }, { id: "checks", tabId: "task-active-tab-checks", label: "Checks", controls: "task-active-panel-checks" }, { id: "evidence", tabId: "task-active-tab-evidence", label: "Evidence", count: task?.evidence_refs?.length ?? 0, controls: "task-active-panel-evidence" }]} selected={tab} onSelect={(nextTab) => { setTab(nextTab); if (nextTab === "changes") onReview?.(); }} /><ActiveTabPanel id="activity" hidden={tab !== "activity"}>{activity.length ? <ul>{activity.map((entry, index) => <li key={`${entry?.id ?? "activity"}-${index}`}><Glyph name="activity" /><span>{entry?.summary || entry?.label || "Recorded activity"}</span><time>{entry?.occurred_at ? taskAge(entry.occurred_at) : "—"}</time></li>)}</ul> : <p className="task-muted">No durable activity has been published for this Task yet.</p>}</ActiveTabPanel><ActiveTabPanel id="changes" hidden={tab !== "changes"}><p>{task?.review?.changed_paths?.length ? "Recorded changes are ready for review." : "No changed paths have been published yet."}</p><Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open changes</Button></ActiveTabPanel><ActiveTabPanel id="checks" hidden={tab !== "checks"}><ul><li><Glyph name="check" /><span>Verification</span><strong>{task?.review?.verification_status || "pending"}</strong></li><li><Glyph name="check" /><span>Delivery</span><strong>{task?.review?.delivery_status || "pending"}</strong></li></ul></ActiveTabPanel><ActiveTabPanel id="evidence" hidden={tab !== "evidence"}><p>{task?.evidence_refs?.length ? "Durable evidence is attached to this task." : "No evidence has been recorded yet."}</p>{task?.evidence_refs?.length ? <ul>{task.evidence_refs.map((ref) => <li key={ref}><Glyph name="file" /><code>{ref}</code></li>)}</ul> : null}<Button onClick={onReview} disabled={!task?.review?.changed_paths?.length}>Open review evidence</Button></ActiveTabPanel><AskAorPanel task={task} operatorRequests={operatorRequests} operatorRequestsAvailable={operatorRequestsAvailable} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} /></div><aside className="task-runtime-inspector"><RuntimeInspector task={task} /></aside>{stopConfirm ? <div className="task-inline-alert" role="alert"><strong>Stop this task?</strong><p>This requests a durable cancellation and may discard in-flight work.</p><label className="task-stop-approval">Approval reference (if required by project policy)<input value={stopApprovalRef} onChange={(event) => setStopApprovalRef(event.target.value)} placeholder="evidence://…" /></label><div className="task-inline-actions"><Button onClick={() => { setStopConfirm(false); setStopApprovalRef(""); }}>Keep running</Button><Button variant="destructive" onClick={() => void confirmStop()} disabled={actionBusy}>Stop task</Button></div></div> : null}</div>;
 }
 
 function AttentionScreen({ tasks, selectedTask, interactions, onAnswerInteraction, operatorRequests, operatorRequestsAvailable, operatorRequestText, setOperatorRequestText, onSelect, onTaskAction, onResumeOperatorRequest, onEditTask, onOpenReview, actionBusy }) {
