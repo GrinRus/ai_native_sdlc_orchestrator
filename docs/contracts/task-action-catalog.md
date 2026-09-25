@@ -28,6 +28,10 @@ approval, review, delivery, release, learning, repair, inspection, and
 completion paths. New primary actions must be added here first, then covered by
 catalog parity tests and the S14 UI wiring handoff.
 
+`review-quality-repair` reruns review against the completed repair run selected
+by the current server-published action. The API consumes its structured
+`operator_control.operation`; callers do not choose or copy the run ID.
+
 A successful `follow-up` response includes the full durable readback of the
 completed source Task and `new_intent_submission_id`. Clients use that
 submission ID to follow the new Task projection through preparation; they do

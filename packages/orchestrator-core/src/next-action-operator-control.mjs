@@ -3,7 +3,7 @@ const REGISTRY = Object.freeze({
   "spec-build": ["mutation", "Build specification evidence", "spec build"],
   "plan-create": ["mutation", "Create task plan", "plan create"],
   "review-run": ["mutation", "Run review checks", "review run"],
-  "review-quality-repair": ["mutation", "Review repaired execution", "review run"],
+  "review-quality-repair": ["mutation", "Review repaired execution", "review run", ".repair"],
   "delivery-prepare": ["mutation", "Prepare no-write delivery evidence", "deliver prepare"],
   "release-prepare": ["mutation", "Prepare release evidence", "release prepare"],
   "learning-handoff": ["mutation", "Create learning handoff", "learning handoff"],
@@ -31,11 +31,11 @@ function text(value) { return typeof value === "string" && value.trim() ? value.
 export function operatorControlForAction(primaryAction, missionState, closureState) {
   const definition = REGISTRY[text(primaryAction.action_id)];
   if (!definition) return { category: "unavailable", label: "Action unavailable", availability: "blocked", operation: null, target_surface: null, requires_confirmation: false };
-  const [category, label, command] = definition;
+  const [category, label, command, runIdSuffix = ""] = definition;
   const runId = text(closureState.run_id);
   const flags = {};
   if (command === "discovery run" && text(missionState.intake_packet_ref)) flags["input-packet"] = missionState.intake_packet_ref;
-  if (["review run", "learning handoff"].includes(command) && runId) flags["run-id"] = runId;
+  if (["review run", "learning handoff"].includes(command) && runId) flags["run-id"] = `${runId}${runIdSuffix}`;
   if (["deliver prepare", "release prepare"].includes(command)) { if (runId) flags["run-id"] = runId; flags.mode = text(missionState.delivery_mode) ?? "no-write"; }
   const operation = command && (!['review run', 'learning handoff'].includes(command) || runId) ? { command, flags } : null;
   return { category, label, availability: operation || category !== "mutation" ? "ready" : "blocked", operation, target_surface: category === "evidence" ? "evidence" : category === "workbench" ? "journey" : "cockpit", requires_confirmation: ["deliver prepare", "release prepare", "learning handoff"].includes(command) };

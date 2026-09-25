@@ -720,6 +720,7 @@ export async function handleTaskAction({ request, response, params, registry, ru
         if (["action", "expected_revision", "expected_selection_revision", "command_id", "request_text", "allowed_paths", "intent_type"].includes(key)) continue;
         if (value !== undefined) flags[key] = value;
       }
+      if (action === "review-quality-repair") flags["run-id"] = task.primary_action?.operator_control?.operation?.command === definition.lifecycle_command ? asString(task.primary_action.operator_control.operation.flags?.["run-id"]) : undefined;
       const lifecycle = runLifecycleCommand({
         ...runtimeOptions,
         cwd: runtimeOptions.cwd ?? runtimeOptions.projectRef,

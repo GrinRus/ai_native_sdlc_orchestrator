@@ -33,6 +33,7 @@ const entries = [
   { action_id: "spec-build", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "spec build", payload: {}, requires_confirmation: false },
   { action_id: "plan-create", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "plan create", payload: {}, requires_confirmation: false },
   { action_id: "review-run", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "review run", payload: {}, requires_confirmation: false },
+  { action_id: "review-quality-repair", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "review run", payload: {}, requires_confirmation: false },
   { action_id: "delivery-prepare", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "deliver prepare", payload: {}, requires_confirmation: true },
   { action_id: "release-prepare", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "release prepare", payload: {}, requires_confirmation: true },
   { action_id: "learning-handoff", category: "mutation", permission: "mutate", dispatch: "lifecycle", lifecycle_command: "learning handoff", payload: {}, requires_confirmation: true },
