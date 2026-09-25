@@ -465,6 +465,30 @@ export async function handleTaskAction({ request, response, params, registry, ru
     return;
   }
   try {
+    const durableReadback = (result = null, status = null) => {
+      const tasks = listTaskProjections({
+        ...runtimeOptions,
+        registry,
+        projectId: params.projectId,
+        intentSubmissions: listIntentSubmissions({ registry, projectId: params.projectId }).submissions,
+      });
+      const refreshed = tasks.tasks.find((candidate) => candidate.task_id === task.task_id)
+        ?? (result?.flow_id ? tasks.tasks.find((candidate) => candidate.flow_id === result.flow_id) : null)
+        ?? task;
+      return {
+        durable: true,
+        task: refreshed,
+        task_id: refreshed.task_id,
+        intent_submission_ref: refreshed.intent_submission_ref ?? null,
+        mission_id: refreshed.mission_id ?? null,
+        flow_id: refreshed.flow_id ?? result?.flow_id ?? null,
+        run_ids: refreshed.run_ids ?? [],
+        revision: refreshed.revision ?? null,
+        state: refreshed.status_detail ?? refreshed.status ?? null,
+        evidence_refs: refreshed.evidence_refs ?? [],
+        ...(status ? { result_status: status } : {}),
+      };
+    };
     if (task.completed_read_only === true && action !== "follow-up") {
       sendError(response, 409, "task.completed_read_only", "Completed Tasks are immutable; create a follow-up Intent instead.");
       return;
@@ -491,34 +515,14 @@ export async function handleTaskAction({ request, response, params, registry, ru
         task_id: task.task_id,
         action,
         intent_submission: result.submission,
-        readback: { durable: true, task_id: task.task_id, new_intent_submission_id: result.submission.submission_id, follow_up: true },
+        readback: {
+          ...durableReadback(null, "accepted"),
+          new_intent_submission_id: result.submission.submission_id,
+          follow_up: true,
+        },
       });
       return;
     }
-    const durableReadback = (result = null, status = null) => {
-      const tasks = listTaskProjections({
-        ...runtimeOptions,
-        registry,
-        projectId: params.projectId,
-        intentSubmissions: listIntentSubmissions({ registry, projectId: params.projectId }).submissions,
-      });
-      const refreshed = tasks.tasks.find((candidate) => candidate.task_id === task.task_id)
-        ?? (result?.flow_id ? tasks.tasks.find((candidate) => candidate.flow_id === result.flow_id) : null)
-        ?? task;
-      return {
-        durable: true,
-        task: refreshed,
-        task_id: refreshed.task_id,
-        intent_submission_ref: refreshed.intent_submission_ref ?? null,
-        mission_id: refreshed.mission_id ?? null,
-        flow_id: refreshed.flow_id ?? result?.flow_id ?? null,
-        run_ids: refreshed.run_ids ?? [],
-        revision: refreshed.revision ?? null,
-        state: refreshed.status_detail ?? refreshed.status ?? null,
-        evidence_refs: refreshed.evidence_refs ?? [],
-        ...(status ? { result_status: status } : {}),
-      };
-    };
     if (definition.dispatch === "intent.select-runner" || definition.dispatch === "intent.reset-runner") {
       const submissionId = asString(task.lineage?.intent_submission_id);
       if (!submissionId || task.status !== "prepared") {

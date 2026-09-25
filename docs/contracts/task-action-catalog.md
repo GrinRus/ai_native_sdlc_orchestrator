@@ -28,6 +28,11 @@ approval, review, delivery, release, learning, repair, inspection, and
 completion paths. New primary actions must be added here first, then covered by
 catalog parity tests and the S14 UI wiring handoff.
 
+A successful `follow-up` response includes the full durable readback of the
+completed source Task and `new_intent_submission_id`. Clients use that
+submission ID to follow the new Task projection through preparation; they do
+not infer a new Task ID from the source Task.
+
 `select-runner` and `reset-runner` are available only for a prepared,
 intent-backed Task. They use the submission lock and require both the displayed
 normalization `expected_revision` and `expected_selection_revision`. Selecting
