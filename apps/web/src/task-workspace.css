@@ -221,6 +221,7 @@
 .task-screen-footer .aor-button { min-width: 122px; min-height: 48px; border-radius: 5px; }
 
 .task-home-underlay { min-height: calc(100vh - 94px); filter: saturate(.92); }
+.task-source-backdrop { display: block; padding: 0; background: transparent; }
 .task-source-overlay { position: fixed; z-index: 5; inset: 0 0 0 clamp(420px, 33vw, 540px); overflow: auto; background: color-mix(in srgb, var(--task-canvas) 97%, transparent); }
 .task-source-overlay__content { min-height: 100%; padding: 30px 38px 100px; background: var(--task-canvas); box-shadow: -8px 0 24px rgb(23 37 44 / 7%); }
 .task-source-overlay__content > header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20px; }

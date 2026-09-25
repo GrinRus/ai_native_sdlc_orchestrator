@@ -358,34 +358,15 @@ function TaskApp() {
     });
   }
 
-  async function initializeRunnerProfile() {
-    if (!apiProjectBase || !executionProfile || !Number.isInteger(executionProfile.revision) || busy) return null;
+  async function runExecutionProfileAction(action, route = {}) {
+    const revision = executionProfile?.revision;
+    if (!apiProjectBase || !Number.isInteger(revision) || busy || (action === "check" && (!route.step || !route.route_id))) return null;
     setBusy(true); setError("");
     try {
       const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
         method: "POST",
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ action: "initialize", expected_revision: executionProfile.revision }),
-      });
-      if (result?.execution_profile) setExecutionProfile(result.execution_profile);
-      await refresh({ silent: true });
-      return result;
-    } catch (setupError) {
-      const message = setupError instanceof Error ? setupError.message : String(setupError);
-      await refresh({ silent: true });
-      setError(message);
-      return null;
-    } finally { setBusy(false); }
-  }
-
-  async function checkPreparationRunner(routeId) {
-    if (!apiProjectBase || !executionProfile || !Number.isInteger(executionProfile.revision) || !routeId || busy) return null;
-    setBusy(true); setError("");
-    try {
-      const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ action: "check", step: "discovery", route_id: routeId, expected_revision: executionProfile.revision }),
+        body: JSON.stringify({ action, ...route, expected_revision: revision }),
       });
       if (result?.execution_profile) setExecutionProfile(result.execution_profile);
       await refresh({ silent: true });
@@ -398,25 +379,9 @@ function TaskApp() {
     } finally { setBusy(false); }
   }
 
-  async function checkExecutionRunner(step, routeId) {
-    if (!apiProjectBase || !executionProfile || !Number.isInteger(executionProfile.revision) || !step || !routeId || busy) return null;
-    setBusy(true); setError("");
-    try {
-      const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ action: "check", step, route_id: routeId, expected_revision: executionProfile.revision }),
-      });
-      if (result?.execution_profile) setExecutionProfile(result.execution_profile);
-      await refresh({ silent: true });
-      return result;
-    } catch (checkError) {
-      const message = checkError instanceof Error ? checkError.message : String(checkError);
-      await refresh({ silent: true });
-      setError(message);
-      return null;
-    } finally { setBusy(false); }
-  }
+  function initializeRunnerProfile() { return runExecutionProfileAction("initialize"); }
+  function checkPreparationRunner(routeId) { return runExecutionProfileAction("check", { step: "discovery", route_id: routeId }); }
+  function checkExecutionRunner(step, routeId) { return runExecutionProfileAction("check", { step, route_id: routeId }); }
 
   async function selectProject(projectId) {
     setProjectDialogOpen(false); setSelectedTaskId(null); setTasks([]);

@@ -496,9 +496,9 @@ function ActiveTabPanel({ id, children, hidden = false }) {
   return <div id={`task-active-panel-${id}`} role="tabpanel" aria-labelledby={`task-active-tab-${id}`} tabIndex="0" hidden={hidden} className="task-activity-panel">{children}</div>;
 }
 
-function NewTaskScreen({ outcome, setOutcome, selectedSources, onAddSources, onPrepare, onCancel, executionProfile, preparationRunnerOptions, preparationRouteId, onSelectPreparationRunner, onCheckPreparationRunner, onInitializeRunnerProfile, preparationRunnerReady, actionBusy = false, preparing = false, pendingPreparation = false }) {
+function NewTaskScreen({ outcome, setOutcome, selectedSources, onAddSources, onPrepare, onCancel, executionProfile, preparationRunnerOptions, preparationRouteId, onSelectPreparationRunner, onCheckPreparationRunner, onInitializeRunnerProfile, preparationRunnerReady, actionBusy = false, preparing = false, pendingPreparation = false, hidden = false }) {
   const staleSources = selectedSources.filter((source) => source?.stale === true);
-  return <div className="task-form-layout">
+  return <div className="task-form-layout" hidden={hidden}>
     <div className="task-form-main">
       <header className="task-form-intro"><span className="task-kicker">Task · Prepare</span><h2>Define the outcome</h2><p>AOR will turn this brief into a bounded, reviewable task before anything runs.</p></header>
       {pendingPreparation ? <p className="task-control-note" role="status">The task request was accepted. Waiting for the server to publish its Task; this page will check again automatically.</p> : null}
@@ -775,18 +775,6 @@ export function TaskWorkspace({ project, tasks = [], operatorRequests = [], inte
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pendingPreparation, screen, selectedTask]);
 
-  useEffect(() => {
-    if (screen !== "new" || !sourceOpenerRef.current) return undefined;
-    const frame = window.requestAnimationFrame(() => {
-      const target = sourceOpenerRef.current?.isConnected
-        ? sourceOpenerRef.current
-        : [...document.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Add Markdown");
-      if (target && typeof target.focus === "function") target.focus();
-      sourceOpenerRef.current = null;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [screen]);
-
   async function refreshTaskReview(path = null) {
     if (!selectedTask?.task_id || !loadTaskReview) {
       setReviewState({ status: "ready", data: { availability: "unavailable", files: [], selected_file: null, read_only: true }, error: "" });
@@ -913,8 +901,8 @@ export function TaskWorkspace({ project, tasks = [], operatorRequests = [], inte
       </header>
       <main className="task-workspace__body">
         {screen === "home" ? <TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={startNewTask} project={project} /> : null}
-        {screen === "new" ? <NewTaskScreen outcome={outcome} setOutcome={setOutcome} selectedSources={sourceItems} onAddSources={(opener) => { sourceOpenerRef.current = opener; setScreen("sources"); }} onPrepare={prepareTask} onCancel={() => { setPendingSources([]); setSourceContinuation({ submissionId: null, sourceIds: [] }); if (pendingPreparation) { onStopFollowingPreparation?.(); onRefresh?.(); } setScreen("home"); }} executionProfile={executionProfile} preparationRunnerOptions={preparationRunnerOptions} preparationRouteId={preparationRouteId} onSelectPreparationRunner={(routeId) => setPreparationRunnerChoice({ projectId: executionProfile?.project_id ?? null, routeId })} onCheckPreparationRunner={onCheckPreparationRunner} onInitializeRunnerProfile={onInitializeRunnerProfile} preparationRunnerReady={preparationRunnerReady} actionBusy={actionBusy} preparing={preparingTask} pendingPreparation={pendingPreparation} /> : null}
-        {screen === "sources" ? <><div className="task-home-underlay"><TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={() => setScreen("new")} project={project} /></div><MarkdownSourceDialog selectedSources={retainedTaskSources} initialSources={pendingSources} sourceSubmissionId={sourceContinuation.submissionId} openerRef={sourceOpenerRef} onClose={() => setScreen("new")} onAdd={addMarkdownSources} /></> : null}
+        {screen === "new" || screen === "sources" ? <NewTaskScreen outcome={outcome} setOutcome={setOutcome} selectedSources={sourceItems} onAddSources={(opener) => { sourceOpenerRef.current = opener; setScreen("sources"); }} onPrepare={prepareTask} onCancel={() => { setPendingSources([]); setSourceContinuation({ submissionId: null, sourceIds: [] }); if (pendingPreparation) { onStopFollowingPreparation?.(); onRefresh?.(); } setScreen("home"); }} executionProfile={executionProfile} preparationRunnerOptions={preparationRunnerOptions} preparationRouteId={preparationRouteId} onSelectPreparationRunner={(routeId) => setPreparationRunnerChoice({ projectId: executionProfile?.project_id ?? null, routeId })} onCheckPreparationRunner={onCheckPreparationRunner} onInitializeRunnerProfile={onInitializeRunnerProfile} preparationRunnerReady={preparationRunnerReady} actionBusy={actionBusy} preparing={preparingTask} pendingPreparation={pendingPreparation} hidden={screen !== "new"} /> : null}
+        {screen === "sources" ? <><div className="task-home-underlay"><TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} onNewTask={() => setScreen("new")} project={project} /></div><MarkdownSourceDialog selectedSources={retainedTaskSources} initialSources={pendingSources} sourceSubmissionId={sourceContinuation.submissionId} openerElementRef={sourceOpenerRef} onClose={() => setScreen("new")} onAdd={addMarkdownSources} /></> : null}
         {screen === "prepared" ? <PreparedScreen task={preparedTask} selectedSources={sourceItems} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} runnerSelection={runnerSelection} projectDefaultSelection={profileSelection} runnerOptions={runnerOptions} runnerStep={runnerStep} runnerSelectionEnabled={runnerSelectionEnabled} onSelectRunner={onSelectRunner} onCheckRunner={onCheckExecutionRunner} actionBusy={actionBusy} actionError={actionError} onEdit={() => editTask(preparedTask)} onStart={async (action) => { if (!action) return; const result = await onTaskAction?.(preparedTask, action, { expected_revision: preparedTask?.revision, expected_selection_revision: preparedTask?.runner_selection?.selection_revision ?? 0 }); if (result) setScreen("active"); }} /> : null}
         {screen === "active" ? <ActiveScreen task={selectedTask} project={project} interactions={selectedInteractions} onAnswerInteraction={onAnswerInteraction} runnerSelection={runnerSelection} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} actionBusy={actionBusy} onReview={() => setScreen("review")} onOpenInspector={() => setInspectorOpen("runtime")} /> : null}
         {screen === "attention" ? <AttentionScreen tasks={tasks} selectedTask={attentionTask} interactions={attentionInteractions} onAnswerInteraction={onAnswerInteraction} operatorRequests={operatorRequests} operatorRequestText={operatorRequestText} setOperatorRequestText={setOperatorRequestText} onSelect={chooseTask} onTaskAction={onTaskAction} onResumeOperatorRequest={onResumeOperatorRequest} onEditTask={editTask} onOpenReview={() => setScreen("review")} actionBusy={actionBusy} /> : null}

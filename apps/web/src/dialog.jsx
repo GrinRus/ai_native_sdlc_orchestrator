@@ -9,7 +9,7 @@ const FOCUSABLE = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
-export function Dialog({ open, onClose, labelledBy, className = "", backdropClassName = "", children }) {
+export function Dialog({ open, onClose, labelledBy, openerElementRef, className = "", backdropClassName = "", children }) {
   const dialogRef = useRef(null);
   const openerRef = useRef(null);
   const onCloseRef = useRef(onClose);
@@ -17,7 +17,7 @@ export function Dialog({ open, onClose, labelledBy, className = "", backdropClas
 
   useEffect(() => {
     if (!open || typeof document === "undefined") return undefined;
-    openerRef.current = document.activeElement;
+    openerRef.current = openerElementRef?.current?.isConnected ? openerElementRef.current : document.activeElement;
     const dialog = dialogRef.current;
     const backdrop = dialog?.parentElement;
     const siblings = backdrop?.parentElement
@@ -62,7 +62,7 @@ export function Dialog({ open, onClose, labelledBy, className = "", backdropClas
       const opener = openerRef.current;
       if (opener?.isConnected && typeof opener.focus === "function") opener.focus();
     };
-  }, [open]);
+  }, [open, openerElementRef]);
 
   if (!open) return null;
   return (

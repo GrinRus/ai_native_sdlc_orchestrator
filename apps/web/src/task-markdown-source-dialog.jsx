@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { sanitizeMarkdownPreview } from "../../../packages/contracts/src/markdown-sanitization.mjs";
+import { Dialog } from "./dialog.jsx";
 import { Button, Icon, useRovingTabs } from "./ui/components.jsx";
 
 const MAX_SOURCE_COUNT = 10;
@@ -114,12 +115,130 @@ function sourceBytes(source) {
   return Number(source?.preview?.byte_length) || 0;
 }
 
+function repositorySource(relativePath, revision) {
+  return {
+    schema_version: 1,
+    source_id: `draft.repository.${relativePath}`,
+    kind: "repository-markdown",
+    immutable: true,
+    stale: false,
+    preview: { project_relative_path: relativePath, pinned_base_revision: revision || null, media_type: "text/markdown" },
+    reference: { project_relative_path: relativePath, pinned_base_revision: revision || null },
+  };
+}
+
 function formatBytes(value) {
   if (value < 1024) return `${value} B`;
   return `${(value / 1024).toFixed(value >= 10 * 1024 ? 0 : 1)} KB`;
 }
 
-export function MarkdownSourceDialog({ selectedSources = [], initialSources = [], sourceSubmissionId = null, openerRef, onClose, onAdd }) {
+async function addMarkdownFiles({ fileList, allSources, attachmentBytes, setError, setSources, setActiveSourceId }) {
+  setError("");
+  const files = Array.from(fileList ?? []);
+  if (!globalThis.crypto?.subtle) {
+    setError("This browser cannot create a secure source digest. Reopen the local Task Workspace and try again.");
+    return;
+  }
+  if (allSources.length + files.length > MAX_SOURCE_COUNT) {
+    setError(`A Task can include at most ${MAX_SOURCE_COUNT} sources.`);
+    return;
+  }
+  let nextBytes = attachmentBytes;
+  const additions = [];
+  for (const file of files) {
+    if (!/\.md$/iu.test(file.name)) {
+      setError(`${file.name || "This file"} must use the .md extension.`);
+      return;
+    }
+    let content;
+    let fileBytes;
+    try {
+      fileBytes = await file.arrayBuffer();
+      content = new TextDecoder("utf-8", { fatal: true }).decode(fileBytes);
+    } catch {
+      setError(`${file.name} is not valid UTF-8 text or could not be read.`);
+      return;
+    }
+    if (content.includes("\u0000")) {
+      setError(`${file.name} must not contain NUL bytes.`);
+      return;
+    }
+    const byteLength = fileBytes.byteLength;
+    if (byteLength > MAX_FILE_BYTES) {
+      setError(`${file.name} exceeds the 1 MiB per-file limit.`);
+      return;
+    }
+    nextBytes += byteLength;
+    if (nextBytes > MAX_UPLOAD_BYTES) {
+      setError("Uploaded Markdown snapshots exceed the 5 MiB total limit.");
+      return;
+    }
+    let digestBytes;
+    try {
+      digestBytes = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
+    } catch {
+      setError(`${file.name} could not be verified. Choose another file.`);
+      return;
+    }
+    const digest = Array.from(new Uint8Array(digestBytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    if ([...allSources, ...additions].some((source) => source.digest === `sha256:${digest}`)) continue;
+    const name = file.name.replace(/[\\/]/gu, "_");
+    additions.push({
+      schema_version: 1,
+      source_id: `draft.upload.${digest}`,
+      kind: "upload-snapshot",
+      immutable: true,
+      stale: false,
+      digest: `sha256:${digest}`,
+      preview: { filename: name, media_type: "text/markdown", byte_length: byteLength, sanitized_markdown: sanitizeMarkdownPreview(content) },
+      attachment: { name, content },
+    });
+  }
+  if (additions.length) {
+    setSources((current) => [...current, ...additions]);
+    setActiveSourceId(additions.at(-1).source_id);
+  }
+}
+
+function saveMarkdownSources({ mode, canAddRepository, repositoryPath, repositoryRevision, sources, pastedText, retainedSources, setError, onAdd }) {
+  const sourceIds = retainedSources.map((entry) => entry.source_id);
+  if (mode === "repository" && repositoryPath.trim()) {
+    if (!canAddRepository) {
+      setError("Choose a new, project-relative .md path and pin a full commit id when required.");
+      return;
+    }
+    const source = repositorySource(safeProjectRelativePath(repositoryPath), repositoryRevision.trim());
+    onAdd?.({ sources: [...sources, source], pastedText: "", sourceIds });
+  } else if (mode === "paste") {
+    if (pastedText.trim()) onAdd?.({ sources, pastedText: pastedText.trim(), sourceIds });
+  } else {
+    onAdd?.({ sources, pastedText: "", sourceIds });
+  }
+}
+
+function sourceDialogPresentation({ mode, pastedText, activeSource, sourceSubmissionId, sources, allSources, canAddRepository, repositoryPath }) {
+  const previewText = mode === "paste"
+    ? sanitizeMarkdownPreview(pastedText)
+    : activeSource?.kind === "upload-snapshot"
+      ? activeSource.preview?.sanitized_markdown || ""
+      : activeSource?.kind === "repository-markdown"
+        ? activeSource.preview?.sanitized_markdown || "AOR reads and sanitizes this connected repository file during preparation."
+        : "Choose a Markdown source to preview.";
+  const selectedTab = SOURCE_TABS.find((tab) => tab.id === mode);
+  const saveDisabled = mode === "paste"
+    ? !pastedText.trim()
+    : mode === "repository" && repositoryPath.trim()
+      ? !canAddRepository
+      : allSources.length === 0;
+  const addLabel = mode === "paste"
+    ? "Add to task brief"
+    : sourceSubmissionId
+      ? `Keep ${allSources.length} source${allSources.length === 1 ? "" : "s"}`
+      : `Add ${sources.length} source${sources.length === 1 ? "" : "s"}`;
+  return { previewText, selectedTab, saveDisabled, addLabel };
+}
+
+export function MarkdownSourceDialog({ selectedSources = [], initialSources = [], sourceSubmissionId = null, openerElementRef, onClose, onAdd }) {
   const [mode, setMode] = useState("upload");
   const [sources, setSources] = useState(() => initialSources);
   const [removedSourceIds, setRemovedSourceIds] = useState([]);
@@ -130,9 +249,6 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
   const [previewTab, setPreviewTab] = useState("preview");
   const [error, setError] = useState("");
   const [dragActive, setDragActive] = useState(false);
-  const dialogRef = useRef(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
   const { getTabProps } = useRovingTabs({ tabs: SOURCE_TABS, selected: mode, onSelect: setMode });
   const { getTabProps: getPreviewTabProps } = useRovingTabs({ tabs: PREVIEW_TABS, selected: previewTab, onSelect: setPreviewTab });
   const retainedSources = selectedSources.filter((source) => !removedSourceIds.includes(source.source_id));
@@ -146,134 +262,13 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
     && allSources.length < MAX_SOURCE_COUNT
     && !allSources.some((source) => source.kind === "repository-markdown" && (source.reference?.project_relative_path ?? source.preview?.project_relative_path) === repositoryPath.trim());
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return undefined;
-    const opener = openerRef?.current?.isConnected ? openerRef.current : document.activeElement;
-    const siblings = Array.from(dialog.parentElement?.children ?? []).filter((element) => element !== dialog);
-    siblings.forEach((element) => {
-      element.inert = true;
-      element.setAttribute("aria-hidden", "true");
-    });
-    const focusable = () => Array.from(dialog.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"));
-    focusable()[0]?.focus();
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-      } else if (event.key === "Tab") {
-        const items = focusable();
-        const first = items[0];
-        const last = items.at(-1);
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last?.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    dialog.addEventListener("keydown", onKeyDown);
-    return () => {
-      dialog.removeEventListener("keydown", onKeyDown);
-      siblings.forEach((element) => {
-        element.inert = false;
-        element.removeAttribute("aria-hidden");
-      });
-      if (opener?.isConnected && typeof opener.focus === "function") opener.focus();
-    };
-  }, [openerRef]);
-
-  async function addFiles(fileList) {
-    setError("");
-    const files = Array.from(fileList ?? []);
-    if (!globalThis.crypto?.subtle) {
-      setError("This browser cannot create a secure source digest. Reopen the local Task Workspace and try again.");
-      return;
-    }
-    if (allSources.length + files.length > MAX_SOURCE_COUNT) {
-      setError(`A Task can include at most ${MAX_SOURCE_COUNT} sources.`);
-      return;
-    }
-    let nextBytes = attachmentBytes;
-    const additions = [];
-    for (const file of files) {
-      if (!/\.md$/iu.test(file.name)) {
-        setError(`${file.name || "This file"} must use the .md extension.`);
-        return;
-      }
-      if (file.size > MAX_FILE_BYTES) {
-        setError(`${file.name} exceeds the 1 MiB per-file limit.`);
-        return;
-      }
-      let content;
-      let fileBytes;
-      try {
-        fileBytes = await file.arrayBuffer();
-        content = new TextDecoder("utf-8", { fatal: true }).decode(fileBytes);
-      } catch {
-        setError(`${file.name} is not valid UTF-8 text or could not be read.`);
-        return;
-      }
-      if (content.includes("\u0000")) {
-        setError(`${file.name} must not contain NUL bytes.`);
-        return;
-      }
-      const byteLength = fileBytes.byteLength;
-      if (byteLength > MAX_FILE_BYTES) {
-        setError(`${file.name} exceeds the 1 MiB per-file limit.`);
-        return;
-      }
-      nextBytes += byteLength;
-      if (nextBytes > MAX_UPLOAD_BYTES) {
-        setError("Uploaded Markdown snapshots exceed the 5 MiB total limit.");
-        return;
-      }
-      let digestBytes;
-      try {
-        digestBytes = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
-      } catch {
-        setError(`${file.name} could not be verified. Choose another file.`);
-        return;
-      }
-      const digest = Array.from(new Uint8Array(digestBytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
-      if ([...allSources, ...additions].some((source) => source.digest === `sha256:${digest}`)) continue;
-      const name = file.name.replace(/[\\/]/gu, "_");
-      additions.push({
-        schema_version: 1,
-        source_id: `draft.upload.${digest}`,
-        kind: "upload-snapshot",
-        immutable: true,
-        stale: false,
-        digest: `sha256:${digest}`,
-        preview: { filename: name, media_type: "text/markdown", byte_length: byteLength, sanitized_markdown: sanitizeMarkdownPreview(content) },
-        attachment: { name, content },
-      });
-    }
-    if (additions.length) {
-      setSources((current) => [...current, ...additions]);
-      setActiveSourceId(additions.at(-1).source_id);
-    }
-  }
+  const addFiles = (fileList) => addMarkdownFiles({ fileList, allSources, attachmentBytes, setError, setSources, setActiveSourceId });
 
   function addRepositorySource() {
     if (!canAddRepository) return;
     const relativePath = safeProjectRelativePath(repositoryPath);
     const revision = repositoryRevision.trim();
-    if (!validPinnedRevision(revision)) {
-      setError("Pinned base revision must be a full Git commit id.");
-      return;
-    }
-    const source = {
-      schema_version: 1,
-      source_id: `draft.repository.${relativePath}`,
-      kind: "repository-markdown",
-      immutable: true,
-      stale: false,
-      preview: { project_relative_path: relativePath, pinned_base_revision: revision || null, media_type: "text/markdown" },
-      reference: { project_relative_path: relativePath, pinned_base_revision: revision || null },
-    };
+    const source = repositorySource(relativePath, revision);
     setSources((current) => [...current, source]);
     setActiveSourceId(source.source_id);
     setRepositoryPath("");
@@ -281,60 +276,12 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
     setError("");
   }
 
-  function saveSources() {
-    if (mode === "repository" && repositoryPath.trim()) {
-      if (!canAddRepository) {
-        setError("Choose a new, project-relative .md path and pin a full commit id when required.");
-        return;
-      }
-      const relativePath = safeProjectRelativePath(repositoryPath);
-      const revision = repositoryRevision.trim();
-      if (!validPinnedRevision(revision)) {
-        setError("Pinned base revision must be a full Git commit id.");
-        return;
-      }
-      const source = {
-        schema_version: 1,
-        source_id: `draft.repository.${relativePath}`,
-        kind: "repository-markdown",
-        immutable: true,
-        stale: false,
-        preview: { project_relative_path: relativePath, pinned_base_revision: revision || null, media_type: "text/markdown" },
-        reference: { project_relative_path: relativePath, pinned_base_revision: revision || null },
-      };
-      onAdd?.({ sources: [...sources, source], pastedText: "", sourceIds: retainedSources.map((entry) => entry.source_id) });
-      return;
-    }
-    if (mode === "paste") {
-      if (!pastedText.trim()) return;
-      onAdd?.({ sources, pastedText: pastedText.trim(), sourceIds: retainedSources.map((entry) => entry.source_id) });
-      return;
-    }
-    onAdd?.({ sources, pastedText: "", sourceIds: retainedSources.map((entry) => entry.source_id) });
-  }
+  const saveSources = () => saveMarkdownSources({ mode, canAddRepository, repositoryPath, repositoryRevision, sources, pastedText, retainedSources, setError, onAdd });
+  const { previewText, selectedTab, saveDisabled, addLabel } = sourceDialogPresentation({ mode, pastedText, activeSource, sourceSubmissionId, sources, allSources, canAddRepository, repositoryPath });
 
-  const previewText = mode === "paste"
-    ? sanitizeMarkdownPreview(pastedText)
-    : activeSource?.kind === "upload-snapshot"
-    ? activeSource.preview?.sanitized_markdown || ""
-    : activeSource?.kind === "repository-markdown"
-      ? activeSource.preview?.sanitized_markdown || "AOR reads and sanitizes this connected repository file during preparation."
-      : "Choose a Markdown source to preview.";
-  const selectedTab = SOURCE_TABS.find((tab) => tab.id === mode);
-  const saveDisabled = mode === "paste"
-    ? !pastedText.trim()
-    : mode === "repository" && repositoryPath.trim()
-      ? !canAddRepository
-      : allSources.length === 0;
-  const addLabel = mode === "paste"
-    ? "Add to task brief"
-    : sourceSubmissionId
-      ? `Keep ${allSources.length} source${allSources.length === 1 ? "" : "s"}`
-      : `Add ${sources.length} source${sources.length === 1 ? "" : "s"}`;
-
-  return <div ref={dialogRef} className="task-source-overlay" role="dialog" aria-modal="true" aria-label="Add Markdown source">
+  return <Dialog open onClose={onClose} labelledBy="task-source-dialog-title" openerElementRef={openerElementRef} className="task-source-overlay" backdropClassName="task-source-backdrop">
     <div className="task-source-overlay__content">
-      <header><h2>Add Markdown source</h2><button type="button" className="task-plain-icon" aria-label="Close Markdown Sources" onClick={onClose}><Icon name="close" /></button></header>
+      <header><h2 id="task-source-dialog-title">Add Markdown source</h2><button type="button" className="task-plain-icon" aria-label="Close Markdown Sources" onClick={onClose}><Icon name="close" /></button></header>
       <div className="task-source-tabs" role="tablist" aria-label="Markdown source type">{SOURCE_TABS.map((tab, index) => <button {...getTabProps(tab, index)} key={tab.id} id={`task-source-tab-${tab.id}`} type="button" role="tab" aria-selected={mode === tab.id} aria-controls={selectedTab?.id === tab.id ? tab.controls : undefined} className={mode === tab.id ? "is-selected" : ""} onClick={() => setMode(tab.id)}>{tab.label}</button>)}</div>
       <div className="task-source-overlay__grid">
         <div className="task-source-input-pane">
@@ -362,5 +309,5 @@ export function MarkdownSourceDialog({ selectedSources = [], initialSources = []
       </div>
       <footer className="task-screen-footer"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={saveSources} disabled={saveDisabled}>{addLabel}</Button></footer>
     </div>
-  </div>;
+  </Dialog>;
 }
