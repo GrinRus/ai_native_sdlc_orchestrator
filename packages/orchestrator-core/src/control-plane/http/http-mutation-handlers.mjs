@@ -49,6 +49,23 @@ const UI_LIFECYCLE_ACTIONS = new Set(["attach", "detach"]);
 const PLAN_ACTIONS = new Set(["create", "request_revision", "approve"]);
 
 /**
+ * Apply durable run control and notify the owned worker when cancellation wins.
+ * @param {Parameters<typeof applyRunControlAction>[0]} options
+ */
+function applyRunControlActionWithWorkerCancellation(options) {
+  const result = applyRunControlAction(options);
+  if (options.action === "cancel" && !result.blocked) {
+    requestRunJobCancel({
+      cwd: options.cwd,
+      projectRef: options.projectRef,
+      runtimeRoot: options.runtimeRoot,
+      runId: result.runId,
+    });
+  }
+  return result;
+}
+
+/**
  * @param {import("node:http").IncomingMessage} request
  * @param {import("node:http").ServerResponse} response
  * @returns {Promise<Record<string, unknown> | null>}
@@ -96,7 +113,7 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     }
   }
 
-  const result = applyRunControlAction({
+  const result = applyRunControlActionWithWorkerCancellation({
     ...runtimeOptions,
     action: /** @type {"start" | "pause" | "resume" | "steer" | "cancel"} */ (action),
     runId: asString(payload.run_id) ?? undefined,
@@ -112,10 +129,6 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
   });
   const runControlPayload = toRunControlResponse(result);
-
-  if (action === "cancel" && !result.blocked) {
-    requestRunJobCancel({ ...runtimeOptions, runId: result.runId });
-  }
 
   if (result.blocked) {
     sendJson(response, 409, {
@@ -733,7 +746,7 @@ export async function handleTaskAction({ request, response, params, registry, ru
       });
       return;
     }
-    const result = applyRunControlAction({
+    const result = applyRunControlActionWithWorkerCancellation({
       ...runtimeOptions,
       action,
       runId,

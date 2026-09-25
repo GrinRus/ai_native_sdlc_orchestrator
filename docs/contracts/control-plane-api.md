@@ -129,7 +129,9 @@ Flow lineage:
   request receives a fresh server-generated command id so later pause/resume
   cycles and separate steering requests are not collapsed into an earlier
   action. `steer` requires `target_step` from the shared step-class enum and
-  may include an `approval_ref` when project policy requires it.
+  may include an `approval_ref` when project policy requires it. A successful
+  `cancel` also moves the durable run job to `canceling` and wakes its worker
+  for bounded process cleanup.
   The Task action returns `200` with completed run evidence or `202` with the
   durable pending status and recovery action.
   The accepted action ids, permissions, payload requirements, and lifecycle
