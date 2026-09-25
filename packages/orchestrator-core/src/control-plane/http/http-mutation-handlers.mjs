@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { HttpRequestBodyError, asString, asStringArray, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
+import { asString, asStringArray, readMutationPayload, sendError, sendJson } from "./http-utils.mjs";
 import {
   toInteractionAnswerResponse,
   toLifecycleCommandResponse,
@@ -53,26 +53,6 @@ const PLAN_ACTIONS = new Set(["create", "request_revision", "approve"]);
  * @param {import("node:http").ServerResponse} response
  * @returns {Promise<Record<string, unknown> | null>}
  */
-async function readMutationPayload(request, response, options = {}) {
-  try {
-    return await readJsonRequestBody(request, options);
-  } catch (error) {
-    if (error instanceof HttpRequestBodyError) {
-      sendError(response, error.statusCode, error.code, error.message);
-      return null;
-    }
-    if (error instanceof Error && error.message === "invalid_json") {
-      sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
-      return null;
-    }
-    if (error instanceof Error && error.message === "invalid_payload") {
-      sendError(response, 400, "invalid_payload", "Request body must be a JSON object.");
-      return null;
-    }
-    throw error;
-  }
-}
-
 /**
  * @param {{
  *   request: import("node:http").IncomingMessage,

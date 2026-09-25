@@ -1,24 +1,10 @@
-import { HttpRequestBodyError, asString, asStringArray, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
+import { asString, asStringArray, readMutationPayload, sendError, sendJson } from "./http-utils.mjs";
 import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from "../../operator-request.mjs";
 
-async function readMutationPayload(request, response) {
-  try {
-    return await readJsonRequestBody(request);
-  } catch (error) {
-    if (error instanceof HttpRequestBodyError) {
-      sendError(response, error.statusCode, error.code, error.message);
-      return null;
-    }
-    if (error instanceof Error && error.message === "invalid_json") {
-      sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
-      return null;
-    }
-    if (error instanceof Error && error.message === "invalid_payload") {
-      sendError(response, 400, "invalid_payload", "Request body must be a JSON object.");
-      return null;
-    }
-    throw error;
-  }
+function sendOperatorRequestError(response, error) {
+  if (!(error instanceof OperatorRequestError)) return false;
+  sendError(response, error.statusCode, error.code, error.message);
+  return true;
 }
 
 export async function handleOperatorRequestCreate({ request, response, runtimeOptions }) {
@@ -49,10 +35,7 @@ export async function handleOperatorRequestCreate({ request, response, runtimeOp
       },
     });
   } catch (error) {
-    if (error instanceof OperatorRequestError) {
-      sendError(response, error.statusCode, error.code, error.message);
-      return;
-    }
+    if (sendOperatorRequestError(response, error)) return;
     throw error;
   }
 }
@@ -91,10 +74,7 @@ export async function handleOperatorRequestAction({ request, response, params, r
       },
     });
   } catch (error) {
-    if (error instanceof OperatorRequestError) {
-      sendError(response, error.statusCode, error.code, error.message);
-      return;
-    }
+    if (sendOperatorRequestError(response, error)) return;
     throw error;
   }
 }

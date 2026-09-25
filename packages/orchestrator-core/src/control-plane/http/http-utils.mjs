@@ -89,7 +89,7 @@ export function sendJson(response, statusCode, payload) {
  * @param {number} statusCode
  * @param {string} code
  * @param {string} message
- * @param {Record<string, unknown>} [options]
+ * @param {{ maxBytes?: number }} [options]
  */
 export function sendError(response, statusCode, code, message, options = {}) {
   sendJson(response, statusCode, {
@@ -161,6 +161,32 @@ export async function readJsonRequestBody(request, options = {}) {
   }
 
   return /** @type {Record<string, unknown>} */ (parsed);
+}
+
+/**
+ * @param {import("node:http").IncomingMessage} request
+ * @param {import("node:http").ServerResponse} response
+ * @param {Record<string, unknown>} [options]
+ * @returns {Promise<Record<string, unknown> | null>}
+ */
+export async function readMutationPayload(request, response, options = {}) {
+  try {
+    return await readJsonRequestBody(request, options);
+  } catch (error) {
+    if (error instanceof HttpRequestBodyError) {
+      sendError(response, error.statusCode, error.code, error.message);
+      return null;
+    }
+    if (error instanceof Error && error.message === "invalid_json") {
+      sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
+      return null;
+    }
+    if (error instanceof Error && error.message === "invalid_payload") {
+      sendError(response, 400, "invalid_payload", "Request body must be a JSON object.");
+      return null;
+    }
+    throw error;
+  }
 }
 
 /**
