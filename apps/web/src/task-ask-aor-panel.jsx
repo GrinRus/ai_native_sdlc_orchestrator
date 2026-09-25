@@ -2,10 +2,10 @@ import { Button, Icon } from "./ui/components.jsx";
 
 const RESUMABLE_REQUEST_STATUSES = new Set(["created", "run-pending", "running"]);
 
-function operatorRequestsForTask(task, operatorRequests) {
-  if (!task) return [];
+function operatorRequestStateForTask(task, operatorRequests) {
+  if (!task) return { requests: [], resumableRequest: null, visibleRequest: null };
   const taskEvidence = new Set([task.intent_submission_ref, ...(task.evidence_refs || [])].filter(Boolean));
-  return (Array.isArray(operatorRequests) ? operatorRequests : [])
+  const requests = (Array.isArray(operatorRequests) ? operatorRequests : [])
     .filter((entry) => {
       const document = entry?.document || {};
       if (document.target_flow_id !== undefined && document.target_flow_id !== null) {
@@ -17,6 +17,12 @@ function operatorRequestsForTask(task, operatorRequests) {
     })
     .sort((left, right) => String(right?.document?.updated_at ?? right?.document?.created_at ?? "")
       .localeCompare(String(left?.document?.updated_at ?? left?.document?.created_at ?? "")));
+  const resumableRequest = requests.find(isResumableOperatorRequest) ?? null;
+  return {
+    requests,
+    resumableRequest,
+    visibleRequest: resumableRequest ?? requests[0] ?? null,
+  };
 }
 
 function isResumableOperatorRequest(entry) {
@@ -24,7 +30,7 @@ function isResumableOperatorRequest(entry) {
 }
 
 export function resumableOperatorRequestForTask(task, operatorRequests) {
-  return operatorRequestsForTask(task, operatorRequests).find(isResumableOperatorRequest) ?? null;
+  return operatorRequestStateForTask(task, operatorRequests).resumableRequest;
 }
 
 export function hasUnfinishedOperatorRequestForTask(task, operatorRequests) {
@@ -33,9 +39,7 @@ export function hasUnfinishedOperatorRequestForTask(task, operatorRequests) {
 
 export function AskAorPanel({ task, operatorRequests = [], operatorRequestText, setOperatorRequestText, onTaskAction, onResumeOperatorRequest, actionBusy = false }) {
   if (!task || task.completed_read_only === true) return null;
-  const requests = operatorRequestsForTask(task, operatorRequests);
-  const resumableRequest = resumableOperatorRequestForTask(task, operatorRequests);
-  const visibleRequest = resumableRequest ?? requests[0] ?? null;
+  const { resumableRequest, visibleRequest } = operatorRequestStateForTask(task, operatorRequests);
   const requestStatus = String(visibleRequest?.document?.status ?? "");
   const resumable = Boolean(resumableRequest);
   const canRequestRetry = ["failed", "attention", "repairing"].includes(String(task.status ?? ""));
