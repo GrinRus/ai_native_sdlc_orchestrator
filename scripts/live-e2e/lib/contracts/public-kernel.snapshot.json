@@ -4,8 +4,8 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 34,
-    "source_manifest_sha256": "9e391c7e08e8525baa782004168cc96ffe751d6fc38742fa41bcce1dfc155eec"
+    "source_file_count": 35,
+    "source_manifest_sha256": "b24f9c25f488f5158249321fb6d75d41fbcb1fff3562498bb0c13308b4195c96"
   },
   "files": {
     "canonical-values.mjs": "5daafd2f2fccd296cdcccb878b1f1ec8d132f631aed64420e2d3aa50fbf6d4ac",
@@ -18,9 +18,9 @@
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "4eb2e555d57bb9624e19ffcd6328e4c65e30f74d40041ae1c9361baa0cca5f97",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "41bf8f87bec1bccce0b7c61624e8be36cae45f78975574fad486d1065f5cc871",
-    "index.d.ts": "aa257b7602222af64b4b3a5c963f8475aea9c541b1179f23ed4e531dbc0ffb3b",
-    "index.mjs": "7139b31f836d42ccfd725f777bed9ba5145401bc97915f68559ea577d8b0159b",
+    "families.mjs": "0037d1fc48edc5e6ed041afd0c4f53fc83eb014b37f1e569775b1859d8aad5d7",
+    "index.d.ts": "a04e344edcce1d990e2103d19660f30a6ce00447dfb356db6f6db675cf6d60aa",
+    "index.mjs": "fd0b9eeb27d624912aea305ccd2e1f5bca8d81ef8f54c7e29ed32a661a4fe390",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "c227966a564ab2c2c016c5de2e3f40ecc4da4f538986b617cbaf417b209a5980",
     "live-run-event-validation.mjs": "56e36d13860974e41a3a18ca91d5e477d5f4c17037ec311e498d42e057371a1b",
@@ -33,6 +33,7 @@
     "runner-output-validation.mjs": "0c7c6331858b277dcd3cb8785e9e1a308eb4f0f55a56cdb6064cb7e15b36e5d3",
     "runtime-harness-validation.mjs": "75cd2ee07e4f72ebb36261160e97eeb16e99b0d4d3a8075d0136bd65e44189df",
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
+    "step-class-values.mjs": "ed094343a937e0df9850fa79b68975bcba109516f7a3507de4cf6a0e1d38b829",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
     "structured-task-plan.mjs": "7c21f14d82df36d666fb7539d0ca95fbf6467633e1c9b4e92895218156a401d9",
     "task-contract-families.mjs": "4f597213e5f234a8a70113155ceb26521335d8155944d6b93b159f60d0283e09",

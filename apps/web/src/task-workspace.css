@@ -319,6 +319,18 @@
 .task-ask-panel p { margin: 0 0 9px; color: var(--task-muted); }
 .task-ask-panel .task-ask-status { padding: 8px 10px; border-left: 2px solid var(--task-teal); background: var(--task-teal-soft); color: var(--task-ink); }
 .task-ask-panel textarea { width: 100%; min-height: 126px; box-sizing: border-box; padding: 14px 15px 48px; border: 1px solid var(--task-line); border-radius: 5px; resize: vertical; }
+.task-run-steering summary { width: fit-content; color: var(--task-ink); font-weight: 700; cursor: pointer; }
+.task-run-steering summary:focus-visible { outline: 3px solid var(--task-teal); outline-offset: 3px; }
+.task-run-steering__form { display: grid; gap: 13px; margin-top: 9px; }
+.task-run-steering__form > label { display: grid; gap: 6px; font-size: .9rem; font-weight: 650; }
+.task-run-steering__form :is(select, input, textarea) { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--aor-task-input-border); border-radius: 5px; background: var(--task-surface); color: var(--task-ink); font: inherit; }
+.task-run-steering__form textarea { min-height: 90px; padding: 10px 12px; resize: vertical; }
+.task-run-steering__form :is(select, input, textarea):focus-visible { outline: 3px solid var(--task-teal); outline-offset: 2px; }
+.task-run-steering__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.task-run-steering__actions .aor-button { min-height: 43px; }
+.task-stop-approval { display: grid; gap: 6px; margin-block: 12px; font-size: .9rem; font-weight: 650; }
+.task-stop-approval input { width: 100%; max-width: 440px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--aor-task-input-border); border-radius: 5px; background: var(--task-surface); color: var(--task-ink); font: inherit; }
+.task-stop-approval input:focus-visible { outline: 3px solid var(--task-teal); outline-offset: 2px; }
 .task-ask-actions { position: absolute; right: 21px; bottom: 31px; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; max-width: calc(100% - 42px); }
 .task-ask-actions .aor-button { min-height: 43px; }
 .task-runtime-inspector, .task-complete-inspector { min-width: 0; padding: 35px 26px; border-inline-start: 1px solid var(--task-line); background: var(--task-surface); }

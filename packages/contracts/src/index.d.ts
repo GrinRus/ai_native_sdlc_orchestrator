@@ -185,6 +185,7 @@ export const PLAN_STATUS_VALUES: readonly string[];
 export const PLAN_SIZE_VALUES: readonly string[];
 export const TASK_TYPE_VALUES: readonly string[];
 export const CRITERION_KIND_VALUES: readonly string[];
+export const STEP_CLASS_VALUES: readonly string[];
 export function validateStructuredTaskPlan(
   document: Record<string, unknown>,
   source: string,

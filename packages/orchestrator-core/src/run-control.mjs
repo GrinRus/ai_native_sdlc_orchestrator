@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
-import { normalizeIdentifierFragment, validatePublicId } from "../../contracts/src/index.mjs";
+import { normalizeIdentifierFragment, STEP_CLASS_VALUES, validatePublicId } from "../../contracts/src/index.mjs";
 import {
   redactSensitiveValue,
   readJsonState,
@@ -241,66 +241,43 @@ function evaluateGuardrails(profile, action, approvalRef, targetStep) {
   const approvalFromRiskTier = asBoolean(riskTierPolicy.require_human_approval);
   const highRisk = HIGH_RISK_ACTIONS.has(action);
   const approvalRequired = highRisk && (approvalFromPolicy || approvalFromRiskTier);
+  const decision = {
+    action,
+    risk_tier: riskTier,
+    high_risk: highRisk,
+    approval_required: approvalRequired,
+    approval_ref: approvalRef,
+    target_step: targetStep,
+    policy_sources: {
+      approval_policy_required_for_execution: approvalFromPolicy,
+      risk_tier_requires_human_approval: approvalFromRiskTier,
+    },
+  };
+  const blocked = (code, message) => ({
+    blocked: true,
+    blocked_reason: { code, message },
+    decision,
+  });
 
   if (action === "steer" && !targetStep) {
-    return {
-      blocked: true,
-      blocked_reason: {
-        code: "scope.target_step_required",
-        message: "Steer requires '--target-step' to stay in explicit scope.",
-      },
-      decision: {
-        action,
-        risk_tier: riskTier,
-        high_risk: highRisk,
-        approval_required: approvalRequired,
-        approval_ref: approvalRef,
-        target_step: targetStep,
-        policy_sources: {
-          approval_policy_required_for_execution: approvalFromPolicy,
-          risk_tier_requires_human_approval: approvalFromRiskTier,
-        },
-      },
-    };
+    return blocked("scope.target_step_required", "Steer requires '--target-step' to stay in explicit scope.");
+  }
+
+  if (action === "steer" && !STEP_CLASS_VALUES.includes(targetStep)) {
+    return blocked(
+      "scope.target_step_invalid",
+      `Unsupported target step class '${targetStep}'. Choose one of: ${STEP_CLASS_VALUES.join(", ")}.`,
+    );
   }
 
   if (approvalRequired && !approvalRef) {
-    return {
-      blocked: true,
-      blocked_reason: {
-        code: "approval.required",
-        message: `Control action '${action}' requires '--approval-ref' by policy guardrail.`,
-      },
-      decision: {
-        action,
-        risk_tier: riskTier,
-        high_risk: highRisk,
-        approval_required: approvalRequired,
-        approval_ref: approvalRef,
-        target_step: targetStep,
-        policy_sources: {
-          approval_policy_required_for_execution: approvalFromPolicy,
-          risk_tier_requires_human_approval: approvalFromRiskTier,
-        },
-      },
-    };
+    return blocked("approval.required", `Control action '${action}' requires '--approval-ref' by policy guardrail.`);
   }
 
   return {
     blocked: false,
     blocked_reason: null,
-    decision: {
-      action,
-      risk_tier: riskTier,
-      high_risk: highRisk,
-      approval_required: approvalRequired,
-      approval_ref: approvalRef,
-      target_step: targetStep,
-      policy_sources: {
-        approval_policy_required_for_execution: approvalFromPolicy,
-        risk_tier_requires_human_approval: approvalFromRiskTier,
-      },
-    },
+    decision,
   };
 }
 

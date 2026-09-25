@@ -737,8 +737,9 @@ export async function handleTaskAction({ request, response, params, registry, ru
       ...runtimeOptions,
       action,
       runId,
-      commandId: asString(payload.command_id) ?? `task.${task.task_id}.${action}`,
+      commandId: asString(payload.command_id) ?? undefined,
       expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
+      targetStep: action === "steer" ? asString(payload.target_step) ?? undefined : undefined,
       approvalRef: asString(payload.approval_ref) ?? undefined,
       reason: asString(payload.reason) ?? `Task Workspace requested ${action}.`,
     });

@@ -26,3 +26,4 @@ export {
 } from "./structured-task-plan.mjs";
 export { loadExampleContracts } from "./example-loader.mjs";
 export { validateExampleReferences } from "./example-reference-validation.mjs";
+export { STEP_CLASS_VALUES } from "./step-class-values.mjs";

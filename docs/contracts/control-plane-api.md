@@ -115,7 +115,7 @@ Flow lineage:
   diff content;
 - `POST /api/projects/:projectId/tasks/:taskId/actions` is the Task Workspace
   mutation facade. It delegates `confirm`/`start` to the existing intent
-  CAS/idempotency boundary, `pause`/`resume`/`cancel` to server-owned
+  CAS/idempotency boundary, `pause`/`resume`/`steer`/`cancel` to server-owned
   run-control, and `retry`/`request` to idempotent bounded operator requests
   that are persisted as `run-pending` before execution through the shared
   runtime. An interrupted request remains visible in the sanitized operator
@@ -125,6 +125,11 @@ Flow lineage:
   `409 operator_request.unfinished_exists`; replay with the same idempotency
   key and inputs returns the existing request. The web surface disables
   submission while it cannot read the sanitized request list.
+  Run-control actions honor an explicit `command_id`; when omitted, each
+  request receives a fresh server-generated command id so later pause/resume
+  cycles and separate steering requests are not collapsed into an earlier
+  action. `steer` requires `target_step` from the shared step-class enum and
+  may include an `approval_ref` when project policy requires it.
   The Task action returns `200` with completed run evidence or `202` with the
   durable pending status and recovery action.
   The accepted action ids, permissions, payload requirements, and lifecycle
@@ -956,9 +961,10 @@ Detached read-model scale baseline:
 Detached mutation payload baseline:
 - run-control payload fields: `action`, `run_id`, `target_step`, `reason`,
   `approval_ref`, optional `command_id`, optional non-negative
-  `expected_revision`, and optional paired `execution_plan_ref` /
-  `execution_unit_id` for `start`; the pair is resolved against the exact
-  current approved plan and fixes task refs in run state;
+  `expected_revision`, and optional workspace-bound `start` context composed
+  of `execution_plan_ref`, `execution_unit_id`, and `workspace_set_ref` sent
+  together; the context is resolved against the exact current approved plan
+  and fixes task refs in run state;
 - run-control response reuses module parity fields: `command_id`, `revision`, `state_file`, `audit_file`, guardrail decision, transition, live event ids;
 - blocked run-control transitions return `409` with `{ error: { code, message }, run_control }` while still persisting audit and lifecycle artifacts;
 - ui lifecycle payload fields: `action`, `run_id`, `control_plane`;

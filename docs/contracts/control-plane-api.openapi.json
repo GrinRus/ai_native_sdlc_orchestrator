@@ -2911,6 +2911,7 @@
           "action": { "type": "string", "enum": ["confirm", "start", "select-runner", "reset-runner", "pause", "resume", "steer", "cancel", "retry", "request", "follow-up", "intent.resume", "discovery-run", "spec-build", "plan-create", "review-run", "delivery-prepare", "release-prepare", "learning-handoff", "mission-create", "handoff-approve", "review-decide", "inspect-active-run", "inspect-quality-repair", "fix-onboarding", "fix-delivery-blockers", "repair-mission-intake", "repair-review-gate", "resolve-review-hold", "hold-exhausted-quality-repair", "run-review-repair", "run-review-quality-repair", "run-qa-quality-repair", "qa-quality-repair", "start-new-flow", "complete-mission-intake", "closure-complete"] },
           "expected_revision": { "type": "integer", "minimum": 0 },
           "expected_selection_revision": { "type": "integer", "minimum": 0 },
+          "target_step": { "type": "string", "enum": ["artifact", "planner", "runner", "repair", "eval", "harness"] },
           "command_id": { "type": "string", "minLength": 1 },
           "request_text": { "type": "string", "minLength": 1 },
           "intent_type": { "type": "string", "enum": ["analyze", "explain", "review", "validate", "repair", "plan", "implement"] },
@@ -2922,6 +2923,7 @@
           "mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first"] },
           "input_packet": { "type": "string", "minLength": 1 }
         },
+        "allOf": [{ "if": { "properties": { "action": { "const": "steer" } }, "required": ["action"] }, "then": { "required": ["target_step"] } }],
         "additionalProperties": false
       },
       "TaskProjection": {
@@ -4311,8 +4313,17 @@
           "run_id": {
             "type": "string"
           },
+          "command_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
           "target_step": {
-            "type": "string"
+            "type": "string",
+            "enum": ["artifact", "planner", "runner", "repair", "eval", "harness"]
           },
           "reason": {
             "type": "string"
@@ -4325,8 +4336,21 @@
           },
           "execution_unit_id": {
             "type": "string"
+          },
+          "workspace_set_ref": {
+            "type": "string"
           }
         },
+        "allOf": [
+          { "if": { "properties": { "action": { "const": "steer" } }, "required": ["action"] }, "then": { "required": ["target_step"] } },
+          {
+            "if": { "anyOf": [{ "required": ["execution_plan_ref"] }, { "required": ["execution_unit_id"] }, { "required": ["workspace_set_ref"] }] },
+            "then": {
+              "required": ["action", "execution_plan_ref", "execution_unit_id", "workspace_set_ref"],
+              "properties": { "action": { "const": "start" } }
+            }
+          }
+        ],
         "additionalProperties": true
       },
       "RunControlActionResponse": {

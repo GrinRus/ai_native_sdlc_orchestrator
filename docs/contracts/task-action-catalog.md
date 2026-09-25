@@ -11,7 +11,7 @@ Each catalog entry publishes:
 - `category`: `mutation`, `workbench`, `evidence`, or `refresh`;
 - `permission`: `mutate` for state-changing actions, otherwise `read`;
 - `dispatch`: the server-owned mutation/readback boundary;
-- `payload`: field names, scalar types, and requiredness;
+- `payload`: field names, scalar types, enum values, and requiredness;
 - `requires_confirmation` and, for lifecycle actions, the canonical command.
 
 The public Task action request always contains `action`. CAS-protected actions
@@ -53,3 +53,11 @@ existing request is `created`, `run-pending`, or `running` returns
 request transaction lock; same-key replay with the same inputs still resolves
 to the existing request. The UI disables request and retry controls when the
 sanitized request list is unavailable.
+
+Task run-control actions (`pause`, `resume`, `steer`, and `cancel`) accept an
+optional `command_id`, `expected_revision`, `reason`, and `approval_ref`, in
+line with the run-control API. `steer` requires `target_step` from the shared
+`step_class` enum and uses the same guardrails as `aor run steer`. The server
+generates a fresh command id when one is omitted, so later pause/resume cycles
+and separate steering requests remain distinct. Supplying the same
+`command_id` and payload replays that specific control request.

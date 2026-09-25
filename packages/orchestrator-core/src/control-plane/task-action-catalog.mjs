@@ -6,15 +6,25 @@
  * transports never maintain a second allowlist.
  */
 
+import { STEP_CLASS_VALUES } from "../../../contracts/src/step-class-values.mjs";
+
+const optionalControlPayloadField = (type) => Object.freeze({ type, required: false });
+const runControlPayload = Object.freeze({
+  command_id: optionalControlPayloadField("string"),
+  expected_revision: optionalControlPayloadField("integer"),
+  reason: optionalControlPayloadField("string"),
+  approval_ref: optionalControlPayloadField("string"),
+});
+
 const entries = [
   { action_id: "confirm", category: "mutation", permission: "mutate", dispatch: "intent.confirm", payload: { expected_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
   { action_id: "start", category: "mutation", permission: "mutate", dispatch: "intent.start", payload: { expected_revision: { type: "integer", required: false, ui_required: true }, expected_selection_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
   { action_id: "select-runner", category: "mutation", permission: "mutate", dispatch: "intent.select-runner", payload: { route_id: { type: "string", required: true }, expected_revision: { type: "integer", required: false, ui_required: true }, expected_selection_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
   { action_id: "reset-runner", category: "mutation", permission: "mutate", dispatch: "intent.reset-runner", payload: { expected_revision: { type: "integer", required: false, ui_required: true }, expected_selection_revision: { type: "integer", required: false, ui_required: true } }, requires_confirmation: false },
-  { action_id: "pause", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { expected_revision: { type: "integer", required: false }, reason: { type: "string", required: false } }, requires_confirmation: false },
-  { action_id: "resume", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { expected_revision: { type: "integer", required: false }, reason: { type: "string", required: false } }, requires_confirmation: false },
-  { action_id: "steer", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { expected_revision: { type: "integer", required: false }, reason: { type: "string", required: true } }, requires_confirmation: false },
-  { action_id: "cancel", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { expected_revision: { type: "integer", required: false }, reason: { type: "string", required: false } }, requires_confirmation: true },
+  { action_id: "pause", category: "mutation", permission: "mutate", dispatch: "run-control", payload: runControlPayload, requires_confirmation: false },
+  { action_id: "resume", category: "mutation", permission: "mutate", dispatch: "run-control", payload: runControlPayload, requires_confirmation: false },
+  { action_id: "steer", category: "mutation", permission: "mutate", dispatch: "run-control", payload: { ...runControlPayload, target_step: Object.freeze({ type: "string", required: true, enum: STEP_CLASS_VALUES }) }, requires_confirmation: false },
+  { action_id: "cancel", category: "mutation", permission: "mutate", dispatch: "run-control", payload: runControlPayload, requires_confirmation: true },
   { action_id: "retry", category: "mutation", permission: "mutate", dispatch: "operator-request", payload: { request_text: { type: "string", required: false }, allowed_paths: { type: "string[]", required: false }, idempotency_key: { type: "string", required: false } }, requires_confirmation: false },
   { action_id: "request", category: "mutation", permission: "mutate", dispatch: "operator-request", payload: { request_text: { type: "string", required: true }, intent_type: { type: "string", required: false }, allowed_paths: { type: "string[]", required: false }, idempotency_key: { type: "string", required: false } }, requires_confirmation: false },
   { action_id: "follow-up", category: "mutation", permission: "mutate", dispatch: "follow-up", payload: { request_text: { type: "string", required: true } }, requires_confirmation: false },
@@ -59,11 +69,14 @@ export function getTaskActionDefinition(actionId) {
   return BY_ID.get(typeof actionId === "string" ? actionId.trim() : "") ?? null;
 }
 
-function validScalar(value, type) {
-  if (type === "integer") return Number.isInteger(value) && value >= 0;
-  if (type === "string") return typeof value === "string" && value.trim().length > 0;
-  if (type === "string[]") return Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim().length > 0);
-  return true;
+function validScalar(value, type, enumValues) {
+  let matchesType = true;
+  if (type === "integer") matchesType = Number.isInteger(value) && value >= 0;
+  else if (type === "string") matchesType = typeof value === "string" && value.trim().length > 0;
+  else if (type === "string[]") {
+    matchesType = Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim().length > 0);
+  }
+  return matchesType && (!Array.isArray(enumValues) || enumValues.includes(value));
 }
 
 export function validateTaskActionPayload(actionId, payload = {}) {
@@ -72,8 +85,13 @@ export function validateTaskActionPayload(actionId, payload = {}) {
   const value = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
   const fieldErrors = [];
   for (const [field, rule] of Object.entries(definition.payload)) {
-    if (rule.required && !validScalar(value[field], rule.type)) fieldErrors.push({ field, code: "required", message: `${field} is required for action '${definition.action_id}'.` });
-    else if (value[field] !== undefined && !validScalar(value[field], rule.type)) fieldErrors.push({ field, code: "invalid", message: `${field} must be a non-negative integer, non-empty string, or string array as declared by the action catalog.` });
+    const enumValues = "enum" in rule ? rule.enum : undefined;
+    const missing = value[field] === undefined || value[field] === null || value[field] === "";
+    if (rule.required && missing) {
+      fieldErrors.push({ field, code: "required", message: `${field} is required for action '${definition.action_id}'.` });
+    } else if (!missing && !validScalar(value[field], rule.type, enumValues)) {
+      fieldErrors.push({ field, code: "invalid", message: Array.isArray(enumValues) ? `${field} must be one of: ${enumValues.join(", ")}.` : `${field} must be a non-negative integer, non-empty string, or string array as declared by the action catalog.` });
+    }
   }
   return fieldErrors.length > 0
     ? { ok: false, code: "task.invalid_payload", message: `Payload does not satisfy action '${definition.action_id}'.`, definition, field_errors: fieldErrors }
