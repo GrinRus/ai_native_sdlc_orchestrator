@@ -8,7 +8,11 @@ function operatorRequestsForTask(task, operatorRequests) {
   return (Array.isArray(operatorRequests) ? operatorRequests : [])
     .filter((entry) => {
       const document = entry?.document || {};
-      if (task.flow_id && document.target_flow_id === task.flow_id) return true;
+      if (document.target_flow_id !== undefined && document.target_flow_id !== null) {
+        return typeof document.target_flow_id === "string"
+          && document.target_flow_id.length > 0
+          && document.target_flow_id === task.flow_id;
+      }
       return Array.isArray(document.target_refs) && document.target_refs.some((ref) => taskEvidence.has(ref));
     })
     .sort((left, right) => String(right?.document?.updated_at ?? right?.document?.created_at ?? "")
