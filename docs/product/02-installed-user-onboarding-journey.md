@@ -138,11 +138,17 @@ may provide direction text or an approval reference; project policy still
 controls whether the steering action is allowed. This run-control action is
 separate from Ask AOR, which creates a durable operator request.
 
-Runtime-initiated `requested_interaction` questions use `aor run answer` or
-`POST /api/projects/:projectId/interactions/answers`. Task Workspace has no
-separate Interactions Inbox or answer form. These answers remain distinct from
-operator-initiated requests; the [headless runbook](../ops/ui-attach-detach.md)
-provides the public transport examples.
+Runtime-initiated `requested_interaction` questions appear inline in the
+selected Task's active view and in Attention details when that Task is waiting
+for an answer. Non-permission questions expose a text-answer form; permission
+requests show sanitized operation details and only the decisions allowed by
+the current interaction. Submissions go through
+`POST /api/projects/:projectId/interactions/answers`; the control plane records
+the answer and owns any continuation. Task Workspace shows the resumed or
+blocked result and does not own resume logic. There is no separate Interactions
+Inbox. These answers remain distinct from operator-initiated Ask AOR requests;
+the [headless runbook](../ops/ui-attach-detach.md) provides the public CLI/API
+transport examples.
 
 The server derives Task review and completion summaries from durable Flow
 closure state. The current browser shows verification/delivery status, bounded
