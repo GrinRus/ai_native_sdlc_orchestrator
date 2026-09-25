@@ -38,6 +38,15 @@ repair for reports that still publish that action ID. These no-payload actions
 execute only their server-published structured operation, including its run ID,
 target step, and selected evidence refs.
 
+`complete-mission-intake` is a mutation. Its current Task projection publishes
+only input fields associated with the incomplete intake groups. The server
+preserves the current Mission identity, intake values, scope, delivery mode,
+and source body, then merges the submitted missing values before refreshing
+`next-action-report`. The request cannot choose the Mission ID, request file,
+scope, or delivery mode. Supported fields are `goal`, `constraint`, `kpi_name`,
+`kpi_target`, `kpi_measurement`, `dod`, `source_kind`, and `source_ref`; the UI
+asks only for fields associated with the current report's missing groups.
+
 A successful `follow-up` response includes the full durable readback of the
 completed source Task and `new_intent_submission_id`. Clients use that
 submission ID to follow the new Task projection through preparation; they do

@@ -139,6 +139,13 @@ Flow lineage:
   post-repair QA Task actions likewise execute only their published `run start`
   operation, including its run ID, target step, and evidence refs; clients
   cannot redirect these actions through request flags.
+  `complete-mission-intake` is available for incomplete Flow Tasks. Its
+  server-published payload schema contains only fields for missing product
+  intake groups. The server resolves the current intake body and Mission
+  identity, merges those values with the submitted fields, and reruns
+  `mission create`; callers cannot replace the source body, Mission ID, scope,
+  or delivery mode. A successful response returns the refreshed Task and
+  intake evidence refs.
   The accepted action ids, permissions, payload requirements, and lifecycle
   dispatch are published by the canonical [Task action catalog](task-action-catalog.md)
   rather than a transport-local allowlist. Every response includes a

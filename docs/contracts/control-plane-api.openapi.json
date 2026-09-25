@@ -2921,7 +2921,15 @@
           "decision": { "type": "string", "minLength": 1 },
           "run_id": { "type": "string", "minLength": 1 },
           "mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first"] },
-          "input_packet": { "type": "string", "minLength": 1 }
+          "input_packet": { "type": "string", "minLength": 1 },
+          "goal": { "type": "string", "minLength": 1 },
+          "constraint": { "type": "string", "minLength": 1 },
+          "kpi_name": { "type": "string", "minLength": 1 },
+          "kpi_target": { "type": "string", "minLength": 1 },
+          "kpi_measurement": { "type": "string", "minLength": 1 },
+          "dod": { "type": "string", "minLength": 1 },
+          "source_kind": { "type": "string", "enum": ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"] },
+          "source_ref": { "type": "string", "minLength": 1 }
         },
         "allOf": [{ "if": { "properties": { "action": { "const": "steer" } }, "required": ["action"] }, "then": { "required": ["target_step"] } }],
         "additionalProperties": false

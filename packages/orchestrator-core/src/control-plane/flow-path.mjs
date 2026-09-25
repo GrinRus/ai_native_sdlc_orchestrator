@@ -103,7 +103,7 @@ function publicAction(action, status) {
     permission: definition?.permission ?? "read",
     category: definition?.category ?? "unavailable",
     requires_confirmation: definition?.requires_confirmation === true,
-    payload: definition?.payload ?? {},
+    payload: action.payload ?? definition?.payload ?? {},
   };
 }
 

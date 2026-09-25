@@ -357,6 +357,11 @@ shell-command interpretation. Preparation is read-only; Start, recovery,
 review, and follow-up controls remain structured control-plane mutations with
 durable readback.
 
+An incomplete Mission Intake is recovered through the Task's current
+`complete-mission-intake` action. The server publishes fields for the missing
+intake groups, keeps the existing Mission identity and write scope, merges the
+new values into the intake body, and refreshes the next-action projection.
+
 The installed proof starts from a clean project without a surface query
 override, blocks external browser traffic, and verifies that completed Tasks
 remain immutable. Quiet Cockpit and Flow-console artifacts from W34/W63/W65 are
