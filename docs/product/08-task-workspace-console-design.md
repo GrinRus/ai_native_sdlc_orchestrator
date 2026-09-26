@@ -27,8 +27,11 @@ The default journey is:
 - **Evidence** opens a searchable project index of durable references published
   by Tasks; selecting a reference returns to its owning Task. Task-scoped
   evidence remains available inside the selected Task.
-- **Project** contains repositories, runner defaults, readiness, topology,
-  export, and destructive project-data actions.
+- **Project** opens the switcher and connection dialog for explicitly connected
+  repositories. It does not expose topology management, project-level route
+  changes, evidence export, or project-data deletion. Approved preparation and
+  execution route choices and readiness live in Task context; supported
+  project-wide configuration and data operations use the CLI/API surfaces.
 - A selected Task opens one workspace with `Activity`, `Changes`, `Checks`, and
   `Evidence` tabs. Lifecycle is a compact status path, not a second navigation.
 
@@ -38,7 +41,7 @@ The default journey is:
 |---|---|---|
 | Legacy project/Flow navigation | Tasks Home | Show user-facing Tasks; preserve `flow_id` in durable detail and URLs where required. |
 | Guided Mission intake | New Task | Ask for outcome and sources first; keep normalization and Mission creation server-owned. |
-| Execution Setup | New Task Runner and Project defaults | Expose approved choices and readiness without raw profile editing. |
+| Execution Setup | New Task preparation runner and Prepared Task route override | Expose approved Task-scoped choices and exact readiness; change project route defaults through CLI/API. |
 | Flow Cockpit | Active Task Workspace | Keep activity, controls, freshness, budget, and current safe action in one Task context. |
 | Attention mode and Interactions | Attention | Merge only the queue presentation; preserve distinct durable action contracts. |
 | Journey workbench | Task lifecycle and Activity | Use the compact lifecycle for orientation and disclose topology only when it affects work. |
