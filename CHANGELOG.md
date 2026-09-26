@@ -3,9 +3,18 @@
 All notable source-level and package changes should be summarized here for
 versioned AOR snapshots.
 
-## Unreleased
+## [Unreleased]
 
 - No unreleased changes yet.
+
+## [0.1.0-alpha.25] - 2026-09-26
+
+- Expanded Task Workspace coverage for server-published lifecycle actions,
+  durable run state, steering and cancellation, review, repair, and follow-up.
+- Made Ask AOR recovery durable and duplicate-safe while keeping request scope
+  and Task/run identity aligned.
+- Improved preparation and execution runner selection and readiness recovery,
+  and clarified the packaged UI's project checkout behavior.
 
 ## [0.1.0-alpha.24] - 2026-09-21
 
