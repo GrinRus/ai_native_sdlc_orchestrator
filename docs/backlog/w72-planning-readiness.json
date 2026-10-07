@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "wave_id": "W72",
+  "latest_wave": "W72",
+  "slice_count": 21,
+  "status_counts": {
+    "ready": 1,
+    "active": 0,
+    "blocked": 20,
+    "done": 0
+  },
+  "release_blockers": [
+    "W66-S09"
+  ],
+  "historical_snapshot_labels": [
+    "W34-S06",
+    "W57-W65",
+    "W70-S10",
+    "W71-S14"
+  ],
+  "source_documents": [
+    "docs/backlog/backlog-operating-model.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/orchestrator-epics.md",
+    "docs/backlog/slice-dependency-graph.md",
+    "docs/backlog/wave-72-implementation-slices.md",
+    "docs/product/user-story-coverage-matrix.md",
+    "docs/product/01-project-description.md",
+    "docs/product/10-iterative-task-ux.md",
+    "docs/architecture/17-iterative-task-architecture.md",
+    "docs/architecture/adr/0000-index.md",
+    "docs/research/28-swe-bench-validation-plan.md"
+  ],
+  "accepted_architecture_decisions": 19
+}

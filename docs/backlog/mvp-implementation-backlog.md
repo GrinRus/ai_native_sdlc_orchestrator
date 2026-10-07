@@ -697,6 +697,38 @@ hold/readiness state is not changed by code-only completion.
 | W71-S13 | Source-of-truth and story-evidence alignment | EPIC-0, EPIC-1, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | done | README, product/story docs, architecture/contracts, backlog/readiness, runbooks and examples | W71-S15 |
 | W71-S14 | UI-refactor integration, installed black-box closure, and freeze | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | done | merged Command Desk integration, installed browser harness, package proof, freeze/readiness | W71-S13 |
 
+## W72 slices
+
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W72-S01 | Product operating model and comprehension baseline | EPIC-0, EPIC-1, EPIC-2, EPIC-6, EPIC-7 | ready | product stories and Task Workspace definition, architecture operating model, backlog sources, baseline scenario and pilot protocol | W71-S14 |
+| W72-S17 | Iterative Task UX design and prototype validation | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | blocked | product positioning and iterative Task UX sources, screen/state inventory, existing web tokens/components, fixture prototype and formative usability evidence | W72-S01 |
+| W72-S02 | Versioned requirements, decision, and verification contracts | EPIC-0, EPIC-2, EPIC-4, EPIC-6 | blocked | contracts/docs/examples, Task/intake families, plans/handoffs, policy/budget identity, loaders/types/reference registry | W72-S01 |
+| W72-S03 | Answer reconciliation and effective intake correctness | EPIC-1, EPIC-2, EPIC-6 | blocked | intent-service, intent transactions, normalization prompt/candidate handling, intake materialization, intent CLI/API actions and tests | W72-S02, W72-S18 |
+| W72-S04 | Runtime-owned decision adoption and Start authority | EPIC-2, EPIC-3, EPIC-6 | blocked | operator-request and interaction services, shared decision materialization, intent start, handoff approvals, state transactions and audit | W72-S02, W72-S03, W72-S18 |
+| W72-S05 | Authoritative criterion verification producer | EPIC-2, EPIC-4 | blocked | project verification, Runtime Harness reconciliation, evidence storage/resolution, verification/QA reports, contract fixtures and tests | W72-S02, W72-S18 |
+| W72-S06 | Criterion-complete progress, review, and delivery closure | EPIC-2, EPIC-4, EPIC-5 | blocked | task-plan/progress services, review and QA, verification-delivery transactions, delivery/release readiness and projections | W72-S03, W72-S04, W72-S05 |
+| W72-S07 | Effective-contract context and runtime asset lifecycle | EPIC-3, EPIC-4 | blocked | context compiler and manifests, normalization/discovery/planning/implementation/review assets, runner candidates, replay/evaluation fixtures | W72-S02, W72-S04 |
+| W72-S08 | Consequence-based preparation and lifecycle readiness | EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6 | blocked | next-action/readiness, intent path and strategy policy, discovery/spec/planning/handoff consumers, review prerequisites and examples | W72-S04, W72-S06, W72-S07 |
+| W72-S09 | Bounded work, observation, and repair loop | EPIC-2, EPIC-3, EPIC-4, EPIC-6 | blocked | Runtime Harness controller, step execution, durable run jobs/control, retry/repair and interaction continuation, live projections | W72-S07, W72-S08, W72-S19 |
+| W72-S10 | Canonical headless decision and criterion actions | EPIC-2, EPIC-6 | blocked | core operator-cli, control-plane services/HTTP/SSE, server Task action catalog and projections, OpenAPI/types/examples, thin CLI/API facades | W72-S04, W72-S06, W72-S08, W72-S09, W72-S17, W72-S20 |
+| W72-S11 | Task Workspace decisions, behavior changes, and evidence | EPIC-1, EPIC-4, EPIC-6 | blocked | Task Workspace prepared/work/attention/review views, Ask AOR and interaction controls, client projections, web component/browser tests | W72-S10, W72-S17 |
+| W72-S12 | Active requirement revision and safe replan | EPIC-2, EPIC-3, EPIC-4, EPIC-6 | blocked | decision/Task revision services, execution plans and approvals, run jobs/workers/control, reservations, compiler and CLI/API/web revision actions | W72-S09, W72-S10, W72-S11 |
+| W72-S13 | Criterion-aware multirepo invalidation and integration | EPIC-2, EPIC-3, EPIC-4, EPIC-5 | blocked | parent-run scheduler, execution DAG planning, integration service/reports, workspace scope locks, aggregate verification and delivery projections | W72-S12, W72-S20 |
+| W72-S14 | Breaking replacement consistency and retired-path removal | EPIC-0, EPIC-2, EPIC-3, EPIC-6 | blocked | current contracts/assets/consumers, retired Flow lifecycle and aliases, AOR Home readers, CLI/API/web configuration, replacement runbook and fixtures | W72-S02, W72-S12, W72-S13 |
+| W72-S15 | Adversarial evaluation and human-comprehension pilot | EPIC-4, EPIC-6, EPIC-7 | blocked | harness datasets/suites/replay, evaluation and scorecards, human-pilot protocol/evidence, observability and learning/backfill proposals | W72-S07, W72-S11, W72-S13, W72-S14, W72-S17, W72-S21 |
+| W72-S16 | Installed journey acceptance and qualification freeze | EPIC-0, EPIC-1, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | blocked | installed CLI/API/web proof, package/build inputs, internal black-box journal and mission catalog, story/source alignment, replacement and qualification handoff | W72-S06, W72-S11, W72-S13, W72-S14, W72-S15 |
+| W72-S18 | Canonical Task domain and atomic filesystem publication | EPIC-0, EPIC-2, EPIC-6 | blocked | Task domain/application/infrastructure, state transactions/artifact store, AOR Home layout, Task projections, import-boundary checks | W72-S02 |
+| W72-S19 | Detached Task controller and cumulative resource budget | EPIC-2, EPIC-3, EPIC-6 | blocked | Task controller/jobs, worker claims/leases/fencing, budget ledger/reservations, adapter capability negotiation, policies and run controls | W72-S04, W72-S07, W72-S08, W72-S18 |
+| W72-S20 | Bounded unit planning, parallel scheduling, and integration | EPIC-2, EPIC-3, EPIC-4, EPIC-5 | blocked | execution plans/DAGs, unit workspace provisioning, Task scheduler/reservations, conflict locks/capacity, integration and criterion coverage | W72-S05, W72-S09, W72-S19 |
+| W72-S21 | SWE-bench case catalog and independent patch verifier | EPIC-4, EPIC-6, EPIC-7 | blocked | private maintainer case/profile registry, bounded upstream-harness integration, instance/environment manifests, patch/result adapter, criterion evidence and datasets | W72-S02, W72-S05, W72-S09 |
+
+W72 is planned work. S01 is ready after completed W71-S14; W66-S09 remains
+active, so registration does not activate another slice. S17 requires formative
+usability participants and S15 requires the later human-comprehension cohort.
+Full slice detail and expected closure evidence live in
+`docs/backlog/wave-72-implementation-slices.md`.
+
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work
 package. Agents should normally implement one slice at a time and refine only

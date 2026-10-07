@@ -1,5 +1,10 @@
 # Command Desk Task Workspace refinement
 
+Status: implemented Command Desk presentation baseline. The
+[W72 iterative Task UX direction](10-iterative-task-ux.md) extends behavior,
+decisions, and criterion proof through a separate planned design/acceptance
+boundary; this document retains the current visual foundations.
+
 ## Outcome
 
 The installed AOR web console gives an operator a calm, scannable Command Desk

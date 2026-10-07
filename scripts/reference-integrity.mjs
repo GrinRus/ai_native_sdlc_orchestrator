@@ -41,5 +41,5 @@ if (sourceOfTruth.status !== "pass") {
   process.exit(1);
 }
 console.log(
-  `source-of-truth integrity ok: ${sourceOfTruth.planning_report?.slice_count ?? 0} W71 slices, ${sourceOfTruth.evidence_tier_report?.story_count ?? 0} stories, and bidirectional indexes checked`,
+  `source-of-truth integrity ok: ${sourceOfTruth.planning_report?.slice_count ?? 0} ${sourceOfTruth.planning_report?.wave_id ?? "current-wave"} slices, ${sourceOfTruth.evidence_tier_report?.story_count ?? 0} stories, and bidirectional indexes checked`,
 );

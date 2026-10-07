@@ -8,6 +8,10 @@ in Git history and do not define the packaged surface.
 Status: implemented W70 Task Workspace product and visual baseline. W71 owns
 post-W70 runtime remediation and current integrated installed-lifecycle proof.
 
+[W72 iterative Task UX](10-iterative-task-ux.md) records the planned next
+journey and design validation. It does not replace this implemented baseline
+before W72's explicit cutover and acceptance.
+
 ## Product outcome
 
 An installed user works with one primary object: a **Task**. AOR keeps Intent,

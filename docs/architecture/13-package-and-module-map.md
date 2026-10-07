@@ -26,6 +26,16 @@ All packages listed here are package-managed workspace entries with private mani
 - `packages/observability` — live events, evidence links, and telemetry
 
 ## Expected internal module themes
+
+The [accepted W72 design](17-iterative-task-architecture.md) keeps existing
+private packages. S18 separates pure Task domain transitions, application
+command/transaction handlers, and infrastructure inside orchestrator-core.
+Domain code cannot import filesystem/process/transport/provider implementations;
+application uses explicit infrastructure ports. S19 adds the detached Task
+controller and cumulative budget ownership; S20 adapts bounded unit scheduling.
+S14 removes retired Flow-owned/compatibility paths. These are pending module
+changes, not new package dependencies or implemented exports.
+
 As the repo grows, the following internal concerns should stay visible:
 - packet materialization
 - approval management

@@ -1,9 +1,8 @@
 # ADR index
 
-This directory records accepted architecture decisions for the current AOR
-alpha boundary. ADRs here describe the implemented self-hosted CLI/API alpha
-commitments and the migration triggers for target architecture work. They do
-not by themselves claim that the target stack is active.
+This directory records implemented alpha commitments and accepted designs for
+their planned replacement. Each decision states its implementation scope;
+accepting a design does not establish that its runtime or target stack is active.
 
 ## Accepted decisions
 
@@ -18,12 +17,28 @@ not by themselves claim that the target stack is active.
 | `0021-central-aor-home-and-portable-project-config.md` | Accepted | Mutable runtime state lives under `~/.aor`; repository `.aor` is explicit portable output only. | Storage, onboarding, evidence, config export |
 | `0022-runner-output-acceptance-boundary.md` | Accepted | Strict adapter-backed execution resolves one schema before spawn and keeps process, parsing, validation, verification, and mission outcomes independent. | Runner output, provider work packet v3, adapter capability, Runtime Harness acceptance, repair |
 
-## Target-architecture relationship
+## Accepted W72 design decisions
+
+These decisions are accepted design with implementation pending. Their status
+does not promote current alpha behavior or release evidence. The
+[Task architecture and complete workshop register](../17-iterative-task-architecture.md)
+maps all 19 answers to implementing slices.
+
+| ADR | Status | Decision | Applies to |
+| --- | --- | --- | --- |
+| [0023](0023-task-authority-and-decisions.md) | Accepted design | Task authority, effective requirements, typed decisions, scoped blockers. | Task domain, adoption, revisions, CLI/API/web |
+| [0024](0024-adaptive-preparation-and-criterion-proof.md) | Accepted design | Adaptive preparation, bounded context, independent criterion proof. | Policies, compiler, verification, review |
+| [0025](0025-task-runtime-and-filesystem-publication.md) | Accepted design | Modular core, atomic filesystem publication, detached controller and bounded units. | AOR Home, execution, recovery, scheduler |
+| [0026](0026-declarative-policy-and-task-budget.md) | Accepted design | Declarative policies and capability-aware cumulative Task budgets. | Profiles, limits, reservations, projections |
+| [0027](0027-exact-result-delivery-approval.md) | Accepted design | Separate delivery permission for exact verified output. | Delivery plan/manifest and result review |
+| [0028](0028-breaking-task-model-replacement.md) | Accepted design | Complete replacement without old-model compatibility. | W72 contracts, assets, runtime, installed acceptance |
+
+## Historical target-architecture relationship
 
 The target architecture in `docs/architecture/03-technical-stack.md` still
-names TypeScript-first runtime layers, NestJS, Next.js/React, durable
-orchestration, PostgreSQL, S3-compatible evidence storage, Redis, and
-OpenTelemetry as roadmap intent. W30 does not implement those dependencies.
+records earlier TypeScript/framework/distributed-storage ideas separately from
+the accepted W72 modular Node.js/filesystem design. W72 does not require those
+new infrastructure dependencies.
 
 Future migration work should add new ADRs before changing the runtime system of
 record, transport framework, web ownership boundary, durable orchestration
