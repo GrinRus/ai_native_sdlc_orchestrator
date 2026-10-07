@@ -84,7 +84,7 @@ The authoritative planning model for implementation lives in:
 | W71 | Restore post-W70 filesystem, gate, Task-flow, state, multirepo, contract, evidence, and source-of-truth integrity while integrating the parallel Command Desk UI refactor only at final installed acceptance. | 15 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-71-implementation-slices.md` |
 | W72 | Replace the runtime with canonical Tasks, adopted decisions, criterion proof, bounded controllers/budgets/units, validated UX, and independent repository-task evaluation. | 21 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-72-implementation-slices.md` |
 
-The current roadmap contains **416 slices across 73 waves**.
+The current roadmap contains **420 slices across 73 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
