@@ -91,5 +91,15 @@ Compiled-context and external-runner contracts include context-budget evidence f
 
 Foundational and qualification references: [canonical-identifiers-and-paths.md](canonical-identifiers-and-paths.md), [canonical-path-ownership.md](canonical-path-ownership.md), [evidence-reference.md](evidence-reference.md), [state-transaction.md](state-transaction.md), [contract-loader-coverage.md](contract-loader-coverage.md), and [w66-adversarial-proof.md](w66-adversarial-proof.md).
 
-## Loader coverage
+## Planned W72 contract work
+
+The accepted design in `docs/architecture/17-iterative-task-architecture.md`
+is implemented by W72-S02 and its consumers. It requires canonical Task
+lifecycle/scoped blockers, requirement revisions, decision-record and
+criterion-verification-report families, policy snapshots, and cumulative budget
+identity. The existing schemas below/above remain the current implemented
+baseline until that slice updates docs, validators, types, examples, and
+consumers together. No new family is registered by a planning document alone.
+
+## Current loader coverage
 See `contract-loader-coverage.md` for the contract-to-loader mapping table, current limitation status, and W0-S03 reference-integrity failure shapes.

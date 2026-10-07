@@ -31,22 +31,67 @@ function copyDirectories(tempRoot, directories) {
   }
 }
 
-test("source-of-truth checks pass for the current W71 sources", () => {
+function copyBacklogFixture(t) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-source-truth-"));
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+  copyDirectories(tempRoot, ["docs/backlog"]);
+  return tempRoot;
+}
+
+test("source-of-truth checks report current W72 planning and retain W71 evidence", () => {
   const result = checkReadinessSourceOfTruth(root);
   assert.equal(result.status, "pass");
-  assert.equal(result.planning_report.slice_count, 15);
+  assert.equal(result.planning_report.wave_id, "W72");
+  assert.equal(result.planning_report.latest_wave, "W72");
+  assert.equal(result.planning_report.slice_count, 21);
+  assert.ok(result.evidence.includes("docs/backlog/w71-planning-readiness.json"));
+  assert.ok(result.evidence.includes("docs/backlog/w72-planning-readiness.json"));
   assert.equal(result.evidence_tier_report.story_count, 116);
   assert.ok(result.index_report.every((report) => report.missing.length === 0 && report.dangling.length === 0));
 });
 
-test("planning/readiness summary rejects deliberate state drift", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-source-truth-"));
-  copyDirectories(tempRoot, ["docs/backlog"]);
+test("historical W71 planning summary remains checked after W72 registration", (t) => {
+  const tempRoot = copyBacklogFixture(t);
   const summaryPath = path.join(tempRoot, "docs/backlog/w71-planning-readiness.json");
   const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
   summary.status_counts.done += 1;
   fs.writeFileSync(summaryPath, `${JSON.stringify(summary)}\n`);
   assert.match(checkPlanningSummary(tempRoot).findings.join("\n"), /status count for done/u);
+});
+
+test("current planning summary rejects false completed work", (t) => {
+  const tempRoot = copyBacklogFixture(t);
+  const summaryPath = path.join(tempRoot, "docs/backlog/w72-planning-readiness.json");
+  const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+  summary.status_counts.done += 1;
+  fs.writeFileSync(summaryPath, `${JSON.stringify(summary)}\n`);
+  assert.match(checkPlanningSummary(tempRoot).findings.join("\n"), /w72-planning-readiness\.json status count for done/u);
+});
+
+test("missing current planning summary fails even with a valid W71 snapshot", (t) => {
+  const tempRoot = copyBacklogFixture(t);
+  fs.unlinkSync(path.join(tempRoot, "docs/backlog/w72-planning-readiness.json"));
+  assert.match(checkPlanningSummary(tempRoot).findings.join("\n"), /w72-planning-readiness\.json is missing/u);
+});
+
+test("current planning summary rejects a stale wave identity", (t) => {
+  const tempRoot = copyBacklogFixture(t);
+  const summaryPath = path.join(tempRoot, "docs/backlog/w72-planning-readiness.json");
+  const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+  summary.latest_wave = "W71";
+  fs.writeFileSync(summaryPath, `${JSON.stringify(summary)}\n`);
+  assert.match(checkPlanningSummary(tempRoot).findings.join("\n"), /snapshot latest_wave=W72/u);
+});
+
+test("current roadmap count must match its actual registered slices", (t) => {
+  const tempRoot = copyBacklogFixture(t);
+  const roadmapPath = path.join(tempRoot, "docs/backlog/mvp-roadmap.md");
+  const roadmap = fs.readFileSync(roadmapPath, "utf8").replace(
+    /^(\| W72 \|[^\n]*\|) 21 \|/mu,
+    "$1 20 |",
+  );
+  fs.writeFileSync(roadmapPath, roadmap);
+  assert.match(checkPlanningSummary(tempRoot).findings.join("\n"), /Roadmap W72 row must declare 21 slices/u);
 });
 
 test("bidirectional index check rejects an unindexed public contract", () => {

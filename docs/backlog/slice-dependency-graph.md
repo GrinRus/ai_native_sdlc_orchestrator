@@ -963,6 +963,86 @@ graph TD
   W71S12 --> W71S15
   W71S15 --> W71S13
   W71S13 --> W71S14
+  W72S01["W72-S01 Product operating model and comprehension baseline"]
+  W72S17["W72-S17 Iterative Task UX design and prototype validation"]
+  W72S02["W72-S02 Versioned requirements, decision, and verification contracts"]
+  W72S03["W72-S03 Answer reconciliation and effective intake correctness"]
+  W72S04["W72-S04 Runtime-owned decision adoption and Start authority"]
+  W72S05["W72-S05 Authoritative criterion verification producer"]
+  W72S06["W72-S06 Criterion-complete progress, review, and delivery closure"]
+  W72S07["W72-S07 Effective-contract context and runtime asset lifecycle"]
+  W72S08["W72-S08 Consequence-based preparation and lifecycle readiness"]
+  W72S09["W72-S09 Bounded work, observation, and repair loop"]
+  W72S10["W72-S10 Canonical headless decision and criterion actions"]
+  W72S11["W72-S11 Task Workspace decisions, behavior changes, and evidence"]
+  W72S12["W72-S12 Active requirement revision and safe replan"]
+  W72S13["W72-S13 Criterion-aware multirepo invalidation and integration"]
+  W72S14["W72-S14 Breaking replacement consistency and retired-path removal"]
+  W72S15["W72-S15 Adversarial evaluation and human-comprehension pilot"]
+  W72S16["W72-S16 Installed journey acceptance and qualification freeze"]
+  W72S18["W72-S18 Canonical Task domain and atomic filesystem publication"]
+  W72S19["W72-S19 Detached Task controller and cumulative resource budget"]
+  W72S20["W72-S20 Bounded unit planning, parallel scheduling, and integration"]
+  W72S21["W72-S21 SWE-bench case catalog and independent patch verifier"]
+  W71S14 --> W72S01
+  W72S01 --> W72S17
+  W72S01 --> W72S02
+  W72S02 --> W72S03
+  W72S18 --> W72S03
+  W72S02 --> W72S04
+  W72S03 --> W72S04
+  W72S18 --> W72S04
+  W72S02 --> W72S05
+  W72S18 --> W72S05
+  W72S03 --> W72S06
+  W72S04 --> W72S06
+  W72S05 --> W72S06
+  W72S02 --> W72S07
+  W72S04 --> W72S07
+  W72S04 --> W72S08
+  W72S06 --> W72S08
+  W72S07 --> W72S08
+  W72S07 --> W72S09
+  W72S08 --> W72S09
+  W72S19 --> W72S09
+  W72S04 --> W72S10
+  W72S06 --> W72S10
+  W72S08 --> W72S10
+  W72S09 --> W72S10
+  W72S17 --> W72S10
+  W72S20 --> W72S10
+  W72S10 --> W72S11
+  W72S17 --> W72S11
+  W72S09 --> W72S12
+  W72S10 --> W72S12
+  W72S11 --> W72S12
+  W72S12 --> W72S13
+  W72S20 --> W72S13
+  W72S02 --> W72S14
+  W72S12 --> W72S14
+  W72S13 --> W72S14
+  W72S07 --> W72S15
+  W72S11 --> W72S15
+  W72S13 --> W72S15
+  W72S14 --> W72S15
+  W72S17 --> W72S15
+  W72S21 --> W72S15
+  W72S06 --> W72S16
+  W72S11 --> W72S16
+  W72S13 --> W72S16
+  W72S14 --> W72S16
+  W72S15 --> W72S16
+  W72S02 --> W72S18
+  W72S04 --> W72S19
+  W72S07 --> W72S19
+  W72S08 --> W72S19
+  W72S18 --> W72S19
+  W72S05 --> W72S20
+  W72S09 --> W72S20
+  W72S19 --> W72S20
+  W72S02 --> W72S21
+  W72S05 --> W72S21
+  W72S09 --> W72S21
 ```
 
 ## W0 hard dependencies
@@ -1636,6 +1716,43 @@ own the stricter terminal control proof evidence for this lane.
 | W71-S13 | W71-S15 |
 | W71-S14 | W71-S13 |
 
+## W72 hard dependencies
+
+| Slice ID | Hard dependencies |
+|---|---|
+| W72-S01 | W71-S14 |
+| W72-S17 | W72-S01 |
+| W72-S02 | W72-S01 |
+| W72-S03 | W72-S02, W72-S18 |
+| W72-S04 | W72-S02, W72-S03, W72-S18 |
+| W72-S05 | W72-S02, W72-S18 |
+| W72-S06 | W72-S03, W72-S04, W72-S05 |
+| W72-S07 | W72-S02, W72-S04 |
+| W72-S08 | W72-S04, W72-S06, W72-S07 |
+| W72-S09 | W72-S07, W72-S08, W72-S19 |
+| W72-S10 | W72-S04, W72-S06, W72-S08, W72-S09, W72-S17, W72-S20 |
+| W72-S11 | W72-S10, W72-S17 |
+| W72-S12 | W72-S09, W72-S10, W72-S11 |
+| W72-S13 | W72-S12, W72-S20 |
+| W72-S14 | W72-S02, W72-S12, W72-S13 |
+| W72-S15 | W72-S07, W72-S11, W72-S13, W72-S14, W72-S17, W72-S21 |
+| W72-S16 | W72-S06, W72-S11, W72-S13, W72-S14, W72-S15 |
+| W72-S18 | W72-S02 |
+| W72-S19 | W72-S04, W72-S07, W72-S08, W72-S18 |
+| W72-S20 | W72-S05, W72-S09, W72-S19 |
+| W72-S21 | W72-S02, W72-S05, W72-S09 |
+
+S17 requires formative usability observations before S10/S11; S15 requires
+the separate comparative human pilot. These external prerequisites are recorded
+in their wave sections. W66-S09 remains a release-only blocker and the currently
+active slice; it is not a W72 development dependency or an implicit permission
+for paid runs.
+S18-S20 own canonical Task/controller/budget/unit foundations. S21 requires
+qualified dataset/harness/image inputs, a bounded host, and actual base/gold
+checks; its outputs are a hard dependency of S15 repository-task evaluation.
+All 19 workshop decisions map to the owning wave; W72 has 21 slices and no
+old-model compatibility or migration path.
+
 ## Qualification gates
 
 The development dependency graph keeps `W66-S09` as a release-only blocker.
@@ -1653,8 +1770,9 @@ The gate records the historical deterministic W67 entry while `W66-S09` was
 blocked by an incorrect Anthropic-quota assumption. It never marks `W66-S09`
 done, clears production `audit-hold`, or creates provider qualification
 evidence. W66-S09 now uses the host's Kimi backend through the `claude-code`
-adapter alongside Codex; W68-W71 development closure uses deterministic and
-local-browser acceptance, while release qualification remains external.
+adapter alongside Codex; W68-W72 development closure keeps provider qualification
+separate. W72-S17 requires formative and W72-S15 comparative human observations; W72-S16
+prepares the changed version for fresh release qualification.
 
 ## Topological order
 1. W0-S01
@@ -2056,7 +2174,27 @@ local-browser acceptance, while release qualification remains external.
 397. W71-S15
 398. W71-S13
 399. W71-S14
-
+400. W72-S01
+401. W72-S02
+402. W72-S18
+403. W72-S03
+404. W72-S04
+405. W72-S05
+406. W72-S06
+407. W72-S07
+408. W72-S08
+409. W72-S19
+410. W72-S09
+411. W72-S20
+412. W72-S21
+413. W72-S17
+414. W72-S10
+415. W72-S11
+416. W72-S12
+417. W72-S13
+418. W72-S14
+419. W72-S15
+420. W72-S16
 W66 weak-runner remediation edges:
 
 ```mermaid
@@ -2148,6 +2286,52 @@ graph TD
   W71S12 --> W71S15[W71-S15 Live-E2E flow hotspot decomposition]
   W71S15 --> W71S13[W71-S13 Source-of-truth and story-evidence alignment]
   W71S13 --> W71S14[W71-S14 UI-refactor integration, installed black-box closure, and freeze]
+```
+
+W72 dependency edges:
+
+```mermaid
+graph TD
+  W71S14 --> W72S01[W72-S01 Product operating model and comprehension baseline]
+  W72S01 --> W72S17[W72-S17 Iterative Task UX design and prototype validation]
+  W72S01 --> W72S02[W72-S02 Versioned requirements, decision, and verification contracts]
+  W72S02 --> W72S03[W72-S03 Answer reconciliation and effective intake correctness]
+  W72S02 --> W72S04[W72-S04 Runtime-owned decision adoption and Start authority]
+  W72S03 --> W72S04
+  W72S02 --> W72S05[W72-S05 Authoritative criterion verification producer]
+  W72S03 --> W72S06[W72-S06 Criterion-complete progress, review, and delivery closure]
+  W72S05 --> W72S06
+  W72S02 --> W72S07[W72-S07 Effective-contract context and runtime asset lifecycle]
+  W72S04 --> W72S07
+  W72S04 --> W72S08[W72-S08 Consequence-based preparation and lifecycle readiness]
+  W72S06 --> W72S08
+  W72S07 --> W72S08
+  W72S07 --> W72S09[W72-S09 Bounded work, observation, and repair loop]
+  W72S08 --> W72S09
+  W72S04 --> W72S10[W72-S10 Canonical headless decision and criterion actions]
+  W72S06 --> W72S10
+  W72S08 --> W72S10
+  W72S09 --> W72S10
+  W72S17 --> W72S10
+  W72S10 --> W72S11[W72-S11 Task Workspace decisions, behavior changes, and evidence]
+  W72S17 --> W72S11
+  W72S09 --> W72S12[W72-S12 Active requirement revision and safe replan]
+  W72S10 --> W72S12
+  W72S11 --> W72S12
+  W72S12 --> W72S13[W72-S13 Criterion-aware multirepo invalidation and integration]
+  W72S02 --> W72S14[W72-S14 Explicit compatibility migration and rollback]
+  W72S12 --> W72S14
+  W72S13 --> W72S14
+  W72S07 --> W72S15[W72-S15 Adversarial evaluation and human-comprehension pilot]
+  W72S11 --> W72S15
+  W72S13 --> W72S15
+  W72S14 --> W72S15
+  W72S17 --> W72S15
+  W72S06 --> W72S16[W72-S16 Installed journey acceptance and qualification freeze]
+  W72S11 --> W72S16
+  W72S13 --> W72S16
+  W72S14 --> W72S16
+  W72S15 --> W72S16
 ```
 
 ## Planning rule

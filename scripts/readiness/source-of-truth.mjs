@@ -29,8 +29,7 @@ const RUNTIME_GUIDANCE = [
 const EVIDENCE_TIER_REGISTRY = "docs/product/story-evidence-tiers.json";
 const STORY_MATRIX = "docs/product/user-story-coverage-matrix.md";
 const W71_WAVE = "docs/backlog/wave-71-implementation-slices.md";
-const W71_ROADMAP = "docs/backlog/mvp-roadmap.md";
-const W71_SUMMARY = "docs/backlog/w71-planning-readiness.json";
+const PLANNING_ROADMAP = "docs/backlog/mvp-roadmap.md";
 
 const TIER_ORDER = ["unit", "contract", "fixture", "mocked-browser", "integrated-local", "live-provider"];
 
@@ -99,35 +98,52 @@ export function checkBidirectionalIndexes(rootDir) {
   return { findings, reports };
 }
 
-export function checkPlanningSummary(rootDir) {
+function checkWavePlanningSummary(rootDir, model, waveId) {
   const findings = [];
+  const summaryPath = `docs/backlog/${waveId.toLowerCase()}-planning-readiness.json`;
+  const waveSlices = [...model.slices.values()].filter((slice) => slice.sliceId.startsWith(`${waveId}-`));
+  const states = summarizeStates({ slices: new Map(waveSlices.map((slice) => [slice.sliceId, slice])) });
+  const roadmapRow = new RegExp(`^\\| ${waveId} \\|[^\\n]*\\| ${waveSlices.length} \\|`, "mu");
+  if (!roadmapRow.test(readText(rootDir, PLANNING_ROADMAP))) findings.push(`Roadmap ${waveId} row must declare ${waveSlices.length} slices.`);
+  if (waveId === "W71") {
+    const waveText = readText(rootDir, W71_WAVE);
+    if (waveSlices.length !== 15) findings.push("Historical W71 baseline must retain 15 slices.");
+    if (!waveText.includes("W71-S13") || !waveText.includes("W71-S14")) findings.push("W71 wave document must include S13 and S14.");
+  }
+  if (!fileExists(rootDir, summaryPath)) findings.push(`${summaryPath} is missing.`);
+  else {
+    try {
+      const summary = JSON.parse(readText(rootDir, summaryPath));
+      const checks = [
+        { valid: summary.schema_version === 1 && summary.wave_id === waveId && summary.latest_wave === waveId, message: `${summaryPath} must identify schema 1, ${waveId}, and snapshot latest_wave=${waveId}.` },
+        { valid: summary.slice_count === waveSlices.length, message: `${summaryPath} slice_count disagrees with the backlog model.` },
+        { valid: Array.isArray(summary.historical_snapshot_labels) && summary.historical_snapshot_labels.length > 0, message: `${summaryPath} must retain historical snapshot labels.` },
+      ];
+      findings.push(...checks.filter((check) => !check.valid).map((check) => check.message));
+      for (const status of ["ready", "active", "blocked", "done"]) {
+        if (summary.status_counts?.[status] !== states[status]) findings.push(`${summaryPath} status count for ${status} disagrees with the backlog model.`);
+      }
+    } catch (error) {
+      findings.push(`${summaryPath} is invalid JSON: ${error.message}`);
+    }
+  }
+  return { findings, evidence: [summaryPath], report: { wave_id: waveId, latest_wave: waveId, slice_count: waveSlices.length, status_counts: states } };
+}
+
+export function checkPlanningSummary(rootDir) {
   let model;
   try {
     model = loadBacklogModel(rootDir);
   } catch (error) {
-    return { findings: [`Backlog model could not be loaded: ${error.message}`], report: null };
+    return { findings: [`Backlog model could not be loaded: ${error.message}`], evidence: [], report: null };
   }
-  const waveSlices = [...model.slices.values()].filter((slice) => slice.sliceId.startsWith("W71-"));
-  const states = summarizeStates({ slices: new Map(waveSlices.map((slice) => [slice.sliceId, slice])) });
-  const waveText = readText(rootDir, W71_WAVE);
-  const roadmapText = readText(rootDir, W71_ROADMAP);
-  if (!roadmapText.match(/^\| W71 \|[^\n]*\| 15 \|/mu)) findings.push("Roadmap W71 row must declare 15 slices.");
-  if (!waveText.includes("W71-S13") || !waveText.includes("W71-S14")) findings.push("W71 wave document must include S13 and S14.");
-  if (!fileExists(rootDir, W71_SUMMARY)) findings.push(`${W71_SUMMARY} is missing.`);
-  else {
-    try {
-      const summary = JSON.parse(readText(rootDir, W71_SUMMARY));
-      if (summary.schema_version !== 1 || summary.wave_id !== "W71" || summary.latest_wave !== "W71") findings.push(`${W71_SUMMARY} must identify schema 1, W71, and latest_wave=W71.`);
-      if (summary.slice_count !== waveSlices.length) findings.push(`${W71_SUMMARY} slice_count disagrees with the backlog model.`);
-      for (const status of ["ready", "active", "blocked", "done"]) {
-        if (summary.status_counts?.[status] !== states[status]) findings.push(`${W71_SUMMARY} status count for ${status} disagrees with the backlog model.`);
-      }
-      if (!Array.isArray(summary.historical_snapshot_labels) || summary.historical_snapshot_labels.length === 0) findings.push(`${W71_SUMMARY} must retain historical snapshot labels.`);
-    } catch (error) {
-      findings.push(`${W71_SUMMARY} is invalid JSON: ${error.message}`);
-    }
-  }
-  return { findings, report: { wave_id: "W71", latest_wave: "W71", slice_count: waveSlices.length, status_counts: states } };
+  const latestWave = `W${path.basename(model.waveFiles.at(-1)).match(/^wave-(\d+)-/u)[1]}`;
+  const snapshots = [...new Set(["W71", latestWave])].map((waveId) => checkWavePlanningSummary(rootDir, model, waveId));
+  return {
+    findings: snapshots.flatMap((snapshot) => snapshot.findings),
+    evidence: snapshots.flatMap((snapshot) => snapshot.evidence),
+    report: snapshots.at(-1).report,
+  };
 }
 
 export function checkEvidenceTiers(rootDir) {
@@ -221,23 +237,13 @@ export function checkReadinessSourceOfTruth(rootDir) {
   const evidenceTierCheck = checkEvidenceTiers(rootDir);
   findings.push(...evidenceTierCheck.findings);
 
-  if (findings.length > 0) {
-    return {
-      id: "source-of-truth-alignment",
-      status: "fail",
-      summary: "Production readiness source-of-truth docs are inconsistent.",
-      findings,
-      evidence: [...EVIDENCE, ...RUNTIME_GUIDANCE, ...INDEX_SPECS.map((spec) => spec.index), STORY_MATRIX, EVIDENCE_TIER_REGISTRY, W71_SUMMARY],
-      index_report: indexCheck.reports,
-      planning_report: planningCheck.report,
-      evidence_tier_report: evidenceTierCheck.report,
-    };
-  }
+  const verdict = findings.length > 0
+    ? { status: "fail", summary: "Production readiness source-of-truth docs are inconsistent.", findings }
+    : { status: "pass", summary: "README, readiness source-of-truth, production gate, and release runbook align on the W66 qualification disposition." };
   return {
     id: "source-of-truth-alignment",
-    status: "pass",
-    summary: "README, readiness source-of-truth, production gate, and release runbook align on the W66 qualification disposition.",
-    evidence: [...EVIDENCE, ...RUNTIME_GUIDANCE, ...INDEX_SPECS.map((spec) => spec.index), STORY_MATRIX, EVIDENCE_TIER_REGISTRY, W71_SUMMARY],
+    ...verdict,
+    evidence: [...EVIDENCE, ...RUNTIME_GUIDANCE, ...INDEX_SPECS.map((spec) => spec.index), STORY_MATRIX, EVIDENCE_TIER_REGISTRY, ...planningCheck.evidence],
     index_report: indexCheck.reports,
     planning_report: planningCheck.report,
     evidence_tier_report: evidenceTierCheck.report,

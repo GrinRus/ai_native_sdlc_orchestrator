@@ -13,19 +13,29 @@ The accepted ADRs keep this alpha boundary explicit:
 - `docs/architecture/adr/0002-alpha-hybrid-api-transport.md` keeps the API as hybrid module plus detached HTTP/SSE transport.
 - `docs/architecture/adr/0003-alpha-detachable-web-console.md` keeps the web console optional and detachable.
 
-## Target architecture stack (roadmap intent)
+## Accepted W72 target
 
-The long-term design target remains:
+The [Task architecture](17-iterative-task-architecture.md) keeps Node.js ESM,
+existing private packages, optional React/Vite web, HTTP/SSE, and filesystem
+AOR Home. Core is a modular monolith; detached Task controllers/workers remain
+separate processes. Declarative policies, atomic publication, and recoverable
+bounded execution are the W72 implementation targets. No database, framework,
+global daemon, or new production dependency is required for this replacement.
+
+## Earlier architecture options
+
+Earlier roadmap exploration included:
 - TypeScript-first runtime layers;
 - NestJS-backed detached control-plane transport;
 - React-based operator console track beyond the current React/Vite local app baseline;
 - Temporal-style durable orchestration for long-running workflow controls.
 
-These target components are design intent, not a claim that every runtime dependency is already active in the current repository.
+These are historical options, not accepted W72 requirements. Reconsider them
+only against a concrete need through a new decision.
 
-## Storage and infrastructure (target-oriented)
+## Earlier storage and infrastructure options
 
-Planned production-oriented infrastructure surfaces include:
+Earlier production-oriented ideas included:
 - PostgreSQL for run/query state;
 - S3-compatible evidence storage;
 - Redis as optional cache/pub-sub helper (not source of truth);

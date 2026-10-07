@@ -3,6 +3,13 @@
 ## Purpose
 This is the most concrete description of how AOR should operate day to day.
 
+The [accepted W72 Task architecture](17-iterative-task-architecture.md) is the
+target replacement and records all 19 workshop decisions. The lifecycle below
+describes the implemented pre-W72 baseline. W72 gives Task primary authority,
+keeps effective requirements in intake-request, and replaces old paths without
+backward compatibility. Its slices and proof are pending; this pointer does not
+certify the target behavior.
+
 ## Core idea
 AOR is the durable SDLC control plane that coordinates:
 - project context,

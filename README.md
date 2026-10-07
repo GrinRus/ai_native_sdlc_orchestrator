@@ -1,6 +1,6 @@
 # AOR
 
-**AI-native orchestration for the full software delivery lifecycle.**
+**Bounded AI-assisted software delivery, with decisions and evidence you can inspect.**
 
 [![CI](https://github.com/GrinRus/ai_native_sdlc_orchestrator/actions/workflows/ci.yml/badge.svg)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/actions/workflows/ci.yml)
 [![npm alpha](https://img.shields.io/npm/v/%40grinrus%2Faor/alpha?label=npm%20alpha)](https://www.npmjs.com/package/@grinrus/aor)
@@ -10,6 +10,21 @@ AOR is an open-source, local-first control plane for AI-assisted software
 delivery. It coordinates existing coding runners across discovery,
 specification, planning, execution, review, QA, delivery, release, and learning
 while keeping scope, approvals, and evidence explicit.
+
+The product direction is to turn software requests into verified outcomes with
+human control over consequential decisions. [W72](docs/backlog/wave-72-implementation-slices.md)
+plans effective requirements, adaptive preparation, criterion-level proof,
+and a result/decision-focused Task Workspace. Read the
+[positioning](docs/product/01-project-description.md) and
+[target UX](docs/product/10-iterative-task-ux.md) for this planned transition;
+the installed alpha still follows its implemented Task lifecycle below.
+The [accepted architecture](docs/architecture/17-iterative-task-architecture.md)
+records 19 decisions mapped to 21 W72 slices. The replacement removes old-model
+compatibility and adds canonical Tasks, detached controllers, cumulative budgets,
+bounded units, and separate exact-result delivery approval. The
+[SWE-bench validation plan](docs/research/28-swe-bench-validation-plan.md)
+proposes an independent repository-task verifier alongside AOR-specific and
+human-comprehension checks; no benchmark results are claimed.
 
 **AOR coordinates coding agents; it does not replace them.**
 
@@ -292,15 +307,16 @@ researchers.
 | --- | --- |
 | GitHub `main` | Current source and design baseline; may contain unreleased work |
 | npm `@alpha` | Latest tagged CLI snapshot; can lag behind `main` |
-| Installed UI | Task Workspace baseline; canonical end-to-end execution proof is open in W71 |
+| Installed UI | Task Workspace baseline; W71 local acceptance recorded; W72 iterative workflow planned |
 | Production readiness | Audit hold; no general production clearance |
 | Supported operating shape | Bounded local/self-hosted use on Node.js 22.x or 26.x (`>=22 <23 || >=26 <27`) |
 
 Development acceptance and release qualification are separate. W69 and W70 are development-complete, and the Task Workspace is available through the npm
-`@alpha` channel. W71 is the current deterministic remediation wave for the
-post-W70 filesystem, Task-flow, state, multirepo, contract, evidence, and gate
-findings; it also defines the merge boundary for the parallel Command Desk UI
-refactor. W66 remains the release-qualification blocker: fresh same-commit
+`@alpha` channel. W71 deterministic remediation and installed local
+integration slices are complete. [W72](docs/backlog/wave-72-implementation-slices.md)
+is the latest planned development wave for effective requirements, adopted
+decisions, criterion verification, and bounded iterative delivery.
+W66 remains the release-qualification blocker: fresh same-commit
 required-provider evidence is incomplete, so the current disposition remains
 `audit-hold` with `release_clearance=false`.
 
@@ -404,7 +420,8 @@ Do not use AOR yet if you need:
 
 | If you want to... | Start here |
 | --- | --- |
-| Understand the product | [Project description](docs/product/01-project-description.md) |
+| Understand the product and positioning | [Project description](docs/product/01-project-description.md) |
+| Review the planned iterative Task UX | [W72 UX direction](docs/product/10-iterative-task-ux.md) |
 | Follow the installed-user path | [First-run guide](docs/ops/installed-user-first-run.md) |
 | Understand the runtime | [Orchestrator operating model](docs/architecture/12-orchestrator-operating-model.md) |
 | Inspect system contracts | [Contracts index](docs/contracts/00-index.md) |
@@ -413,10 +430,10 @@ Do not use AOR yet if you need:
 | Operate the alpha safely | [Operations index](docs/ops/00-runbook-index.md) |
 | Follow current work | [MVP roadmap](docs/backlog/mvp-roadmap.md) |
 
-W71 is the latest defined development wave and owns post-W70 trust and
-canonical-flow recovery. W70 retains the Task Workspace implementation history,
-while the parallel Command Desk UI refactor stays a disjoint product-refinement
-workstream until W71's final integration proof. W66 remains the independent
+W72 is the latest defined development wave and registers the requirements,
+decisions, and iterative delivery plan. W71 retains post-W70 trust and
+canonical-flow remediation plus Command Desk integration history; W70 retains
+the Task Workspace implementation history. W66 remains the independent
 release-qualification blocker. Architecture decisions live in
 [`docs/architecture/adr`](docs/architecture/adr), implementation slices in
 [`docs/backlog`](docs/backlog), and runnable contract examples in

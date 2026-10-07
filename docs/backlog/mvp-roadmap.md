@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-71-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-72-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -82,8 +82,9 @@ The authoritative planning model for implementation lives in:
 | W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
 | W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 10 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
 | W71 | Restore post-W70 filesystem, gate, Task-flow, state, multirepo, contract, evidence, and source-of-truth integrity while integrating the parallel Command Desk UI refactor only at final installed acceptance. | 15 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-71-implementation-slices.md` |
+| W72 | Replace the runtime with canonical Tasks, adopted decisions, criterion proof, bounded controllers/budgets/units, validated UX, and independent repository-task evaluation. | 21 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-72-implementation-slices.md` |
 
-The current roadmap contains **399 slices across 72 waves**.
+The current roadmap contains **416 slices across 73 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -344,6 +345,27 @@ The current roadmap contains **399 slices across 72 waves**.
 | W71-S15 | bounded live-E2E flow hotspot decomposition (no direct story closure) |
 | W71-S13 | current source-of-truth and story-evidence alignment target: PBO-09, PBO-10, OPS-06, OPS-11, OPS-12, EMP-03, DEV-05, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, FIN-03 |
 | W71-S14 | merged UI/runtime installed black-box and qualification-freeze target: PBO-09, PBO-10, DEV-05, DEV-06, OPS-01, OPS-06, OPS-11, OPS-12, RMO-04, RMO-05, RMO-06, DTX-01, DTX-04, DTX-08 |
+| W72-S01 | planned product operating model and comprehension baseline target: PSO-01, PSO-02, PBO-09, OPS-11, OPS-12, FIN-03; acceptance pending |
+| W72-S17 | planned iterative task ux design and prototype validation target: PBO-09, PBO-10, DEV-06, OPS-01, OPS-04, OPS-11, OPS-12, RQA-02, FIN-04; acceptance pending |
+| W72-S02 | planned versioned requirements, decision, and verification contracts target: PSO-01, EMP-01, DEV-01, RQA-02, SEC-03, FIN-03; acceptance pending |
+| W72-S03 | planned answer reconciliation and effective intake correctness target: PSO-01, PSO-02, PBO-09, OPS-11; acceptance pending |
+| W72-S04 | planned runtime-owned decision adoption and start authority target: EMP-05, OPS-04, OPS-11, SEC-03, FIN-03; acceptance pending |
+| W72-S05 | planned authoritative criterion verification producer target: DEV-05, RQA-02, RQA-03, RQA-05, FIN-03; acceptance pending |
+| W72-S06 | planned criterion-complete progress, review, and delivery closure target: DEV-05, RQA-02, DTX-01, DTX-04, FIN-03; acceptance pending |
+| W72-S07 | planned effective-contract context and runtime asset lifecycle target: EMP-02, DEV-01, AIP-06, ARC-04; acceptance pending |
+| W72-S08 | planned consequence-based preparation and lifecycle readiness target: PBO-09, EMP-02, DEV-01, SEC-04, OPS-12; acceptance pending |
+| W72-S09 | planned bounded work, observation, and repair loop target: EMP-05, DEV-05, OPS-01, OPS-04, OPS-11; acceptance pending |
+| W72-S10 | planned canonical headless decision and criterion actions target: OPS-01, OPS-04, OPS-11, FIN-04; acceptance pending |
+| W72-S11 | planned task workspace decisions, behavior changes, and evidence target: PBO-09, DEV-06, OPS-01, OPS-04, OPS-11, OPS-12, RQA-02; acceptance pending |
+| W72-S12 | planned active requirement revision and safe replan target: EMP-05, DEV-05, OPS-04, SEC-03, FIN-03; acceptance pending |
+| W72-S13 | planned criterion-aware multirepo invalidation and integration target: EMP-03, RMO-04, RMO-06, DTX-08, DEV-05; acceptance pending |
+| W72-S14 | planned breaking replacement consistency and retired-path removal target: PBO-09, OPS-01, SEC-03, FIN-03; acceptance pending |
+| W72-S15 | planned adversarial evaluation and human-comprehension pilot target: RQA-03, AIP-06, PBO-09, OPS-11, OPS-12, INC-05, FIN-04; acceptance pending |
+| W72-S16 | planned installed journey acceptance and qualification freeze target: PBO-09, DEV-05, DEV-06, OPS-06, OPS-07, OPS-12, RMO-04, DTX-01, DTX-08, FIN-03; acceptance pending |
+| W72-S18 | planned canonical task domain and atomic filesystem publication target: PSO-01, EMP-01, OPS-01, OPS-04, SEC-03; acceptance pending |
+| W72-S19 | planned detached task controller and cumulative resource budget target: EMP-05, OPS-01, OPS-04, OPS-11, FIN-03; acceptance pending |
+| W72-S20 | planned bounded unit planning, parallel scheduling, and integration target: EMP-03, RMO-04, RMO-06, DEV-05, DTX-08; acceptance pending |
+| W72-S21 | planned swe-bench case catalog and independent patch verifier target: RQA-03, AIP-06, DEV-05, OPS-12, FIN-04; acceptance pending |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1611,5 +1633,47 @@ wiring, and owns the combined installed black-box proof.
 
 **Detailed slices:** `docs/backlog/wave-71-implementation-slices.md`
 
+## W72 — Iterative Task architecture and complete replacement
+
+**Goal:** Implement the 19 accepted decisions recorded in
+[Task architecture](../architecture/17-iterative-task-architecture.md) and ADRs
+0023-0028 as one coherent model before release. The planning assumption is no
+production users or running Tasks requiring migration. Old-model readers,
+selectable engines, opt-in rollout, old-Task conversion, and engine rollback
+are outside scope; new-model revisions/recovery remain required.
+
+The wave contains 21 slices. S01/S02 establish product and strict contracts;
+S18 establishes canonical Task/domain/atomic publication; S03-S08 implement
+adoption, proof, context, and declarative preparation; S19/S09 implement detached
+supervision, cumulative capability-aware budgets, and bounded iteration; S20
+adapts unit planning/parallelism/integration. S17 requires real formative design
+observations before S10/S11 public/UI contracts. S12/S13 handle active revisions
+and multirepo invalidation; S14 removes retired paths. S21 adds a curated
+SWE-bench catalog and independent verifier; S15 combines AOR adversarial cases,
+paired repository tasks, and real human comparison; S16 owns installed proof
+and a fresh qualification freeze.
+
+Recommended order: S01, S02, S18, S03-S08, S19, S09, S20, S21, S17, S10-S16.
+Backend work is independent of S17 participant scheduling. S21 has a separate
+host/input qualification prerequisite. The earlier 8-12-week estimate needs
+re-estimation for these accepted foundations and evaluation requirements.
+
+**Exit criteria:**
+- All 19 decisions map to accepted slice outcomes and one source of authority.
+- Current mandatory criteria have fresh independent proof; contradictory
+  answers, stale workers, unsupported caps, and partial integration cannot pass.
+- CLI/API/web use one Task model, scoped blockers, exact-result delivery
+  approval, and new-model recovery without old execution paths.
+- S21 actual base/gold evidence and S15 paired/human observations retain exact
+  inputs, denominators, and limitations; fixtures cannot replace those outcomes.
+- Installed fresh-state proof and an immutable S16 freeze support separate
+  fresh provider qualification, without changing historical qualification.
+
+W66-S09 remains the independent release blocker and current active backlog
+record. This registration does not start another slice, assert a running OS
+worker, execute paid calls, or grant release clearance. Story tiers and past
+acceptance remain at their demonstrated scope.
+
+**Detailed slices:** `docs/backlog/wave-72-implementation-slices.md`
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

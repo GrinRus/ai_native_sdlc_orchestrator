@@ -1,7 +1,65 @@
-# Project description
+# Project description and positioning
 
 ## One-line definition
-AOR is an AI-native control plane that orchestrates the full SDLC from discovery to delivery across multiple runners, with evaluation and harness built in by default.
+
+AOR is a local-first control plane for turning software requests into verified
+outcomes through bounded AI work and explicit human decisions.
+
+## Product promise and status
+
+The operator states the desired result, reviews the work boundaries, resolves
+material decisions, and checks the result against observable criteria. AOR
+coordinates the runners, preserves the approved intent, and retains evidence
+through preparation, execution, review, delivery, release, and learning.
+
+This is the product direction registered in [W72](../backlog/wave-72-implementation-slices.md).
+The [accepted Task architecture](../architecture/17-iterative-task-architecture.md)
+records all 19 design decisions and their implementation owners. W72 replaces
+the current runtime model before release, without legacy readers, dual engines,
+opt-in rollout, or conversion of old Tasks. Revision history and recovery
+within the new model remain required.
+The current alpha provides the Task Workspace, bounded execution, durable
+approvals, reports, and delivery evidence. W72's effective answer reconciliation,
+adopted decision records, criterion-level verification, adaptive preparation,
+and revised UI remain planned. Positioning does not certify those capabilities
+or change the production audit hold.
+
+## Audience and primary jobs
+
+| User | Job | Value to demonstrate |
+| --- | --- | --- |
+| Repository maintainer or delivery engineer | Complete a bounded change or investigation and understand its limits. | A clear outcome, permitted work, meaningful recovery, and inspectable proof. |
+| Technical lead or product owner | Resolve consequential product choices while delegating implementation. | Original intent, changed behavior, assumptions, and consequences together at the decision boundary. |
+| Reviewer, QA, or operator | Decide whether a result is ready and what remains uncertain. | Current criterion evidence, source changes, delivery effects, and durable decision history. |
+
+The first adoption path is a local repository or bounded multirepo project
+with an existing coding runner. CLI/API users and installed web users share
+the same Task authority and outcome. Organization-wide portfolio management
+remains outside the product's MVP boundary.
+
+## Positioning principles
+
+1. **The result is the primary promise.** Product copy and navigation explain
+   what the Task will accomplish, what the operator must decide, and what has
+   been verified.
+2. **Human attention has an explicit purpose.** Start reviews work bounds;
+   decisions review consequences; Review inspects behavior and criterion proof.
+   Important unresolved assumptions remain visible at these boundaries.
+3. **Preparation follows the problem.** W72 selects discovery, research,
+   specification, and planning depth by uncertainty and consequences. Required
+   artifacts and safety gates remain explicit for the selected strategy.
+4. **Understanding and correctness require evidence.** A generated summary,
+   an approval click, or a successful command cannot by itself establish either.
+   Human comprehension is a hypothesis evaluated in the W72 pilot.
+5. **Technical depth remains available.** Packets, specifications, plans,
+   patches, logs, and provenance can be inspected from the related Task,
+   decision, or criterion. Detailed review remains required where policy or
+   consequence demands it.
+
+Use this document for positioning and scope, and the
+[iterative Task UX direction](10-iterative-task-ux.md) for the target journey,
+screen hierarchy, states, interaction rules, and design validation. W70/W71
+visual and runtime acceptance retain their historical scope.
 
 ## What makes AOR different
 AOR is not trying to replace every coding agent. It is the coordination layer around them.
@@ -20,15 +78,17 @@ The runners own:
 - session-local execution inside the constraints AOR provides.
 
 ## Core product goals
-1. Support the full SDLC, not just implementation.
+1. Turn a software request into a verified, bounded outcome.
 2. Work with multiple runners and adapters.
 3. Keep the core orchestration model runner-agnostic.
 4. Default to evidence, replay, and certification.
 5. Work for monoliths and bounded multirepo projects.
 6. Stay usable without a web UI.
 7. Rehearse end-to-end flows on curated public repositories with mission-specific discovery.
+8. Support the full SDLC through the preparation and quality strategy appropriate to each Task.
 
 ## Core product objects
+- **Task** — the target domain owner of requested outcome, lifecycle, decisions, budget, execution units, and review. Runs/attempts remain execution identities; Flow cannot own a competing Task lifecycle. The installed pre-W72 projection remains the current baseline until replacement.
 - **Project profile** — persistent configuration of repos, routes, policies, budgets, and write-back rules.
 - **Project analysis report** — materialized bootstrap knowledge about the target repository.
 - **Runtime context assets** — versioned docs, rules, skills, and bundles used to assemble step-specific context.
@@ -40,14 +100,31 @@ The runners own:
 - **Promotion decisions** — the record of whether a platform asset can move from candidate to stable or frozen.
 - **Incident reports** — the bridge from production failure back into learning memory.
 
-## Full lifecycle AOR must close
-1. **Bootstrap** — initialize the project, analyze it, validate the profile, and verify the target.
-2. **Intake and discovery** — ingest a request and turn it into discovery and research packets.
-3. **Specification and planning** — build a spec, wave ticket, and approved handoff packet.
-4. **Execution** — run bounded implementation, review, QA, retry, and repair steps from an approved mission-linked handoff.
-5. **Delivery** — prepare patches, branches, or PRs according to policy.
-6. **Release** — materialize release packets and sign-off evidence.
-7. **Learning** — backfill incidents into datasets, suites, and certification decisions.
+W72 proposes minimal decision-record and criterion-verification-report
+contracts. The approved intake-request body remains the effective requirements
+owner; projections and plans bind its version. These proposed contracts do not
+yet extend the implemented contract registry.
+
+## Lifecycle capabilities and preparation depth
+
+| Capability | Operator outcome |
+| --- | --- |
+| Bootstrap | Connect and verify the project's context and permitted repositories. |
+| Intake, discovery, and research | Preserve the request, establish facts, and expose meaningful unknowns. |
+| Specification and planning | Describe expected behavior and an executable approach at the required depth. |
+| Execution, review, and QA | Perform bounded work, observe results, repair within limits, and verify behavior. |
+| Delivery | Produce policy-approved patches, branches, or PR-ready output with evidence. |
+| Release | Bind release decisions to the exact source, package, and qualification evidence. |
+| Learning | Propose incident backfill and certify platform asset changes. |
+
+These are lifecycle capabilities. The W72 target journey selects their depth
+and iteration boundaries for the Task. A simple bugfix may use a short strategy;
+an ambiguous architectural change may require research, a specification, and
+several decisions. Analysis and review Tasks retain their no-write semantics.
+
+The current runtime's discovery/specification/planning prerequisites remain
+in force until W72 updates their contracts and consumers. This positioning
+document does not introduce a UI bypass for an existing required artifact.
 
 ### Incident backfill proposals
 
